@@ -1,7 +1,7 @@
 // Overview: per-hero ability stats across matches, career stats, match list.
 
 import { loadMatch } from "./data.js";
-import { analyzeAbility, counts, pct, aggregate, median, incoming } from "./analysis.js";
+import { analyzeAbility, counts, pct, aggregate, median, incoming, gunStats } from "./analysis.js";
 import { sparkline, fmtClock } from "./timeline.js";
 import {
   $, esc, S, settings, opts, fmtDate, fmtDay, ago, k1, tile, rankChip, controlsHTML,
@@ -42,6 +42,7 @@ export async function viewOverview(heroId, params) {
     <section class="summary" id="summary"><div class="muted">loading matches…</div></section>
     <section class="charts" id="charts"></section>
     <section class="charts charts-3" id="charts2"></section>
+    <section id="gun"></section>
     <section class="report" id="report"></section>
     <section id="career"></section>
     <section id="by-hero"></section>
@@ -129,6 +130,7 @@ export async function viewOverview(heroId, params) {
   renderCharts(list, agg);
   renderTargets(list, agg, ability);
   renderAbilityReport(list, heroId, abilityCls);
+  renderGun(list);
 
   // match cards
   $("#cards-title").hidden = !list.length;
@@ -434,4 +436,60 @@ function applyFilters(entries) {
     out = out.filter((e) => e.start_time >= since);
   }
   return out;
+}
+
+/** gun stats from the demos (exact shot/hit/headshot counts) next to Valve's official numbers */
+function renderGun(list) {
+  const el = $("#gun");
+  let shots = 0, bullets = 0, hits = 0, hs = 0, npc = 0, heroDmg = 0, mins = 0;
+  let vShots = 0, vHits = 0, vHs = 0;
+  const per = [];
+  for (const x of list) {
+    const g = gunStats(x.match, x.me.pawn, S.assets);
+    if (!g.shots) continue;
+    shots += g.shots; bullets += g.bullets; hits += g.heroHits; hs += g.headshots; npc += g.npcHits;
+    heroDmg += g.heroDmg; mins += x.match.end / 60;
+    const v = (S.valveStats?.[x.entry.match_id] || {})[S.index.account_id];
+    if (v?.hero_shots) { vShots += v.hero_shots; vHits += v.hero_hits; vHs += v.hero_headshots || 0; }
+    per.push({ x, g, rate: g.heroHits / g.shots, hsr: g.heroHits ? g.headshots / g.heroHits : 0 });
+  }
+  if (!per.length) { el.innerHTML = ""; return; }
+  per.sort((a, b) => a.x.entry.start_time - b.x.entry.start_time);
+  const W = 100 / per.length;
+  const maxR = Math.max(0.05, ...per.map((p) => p.rate));
+  el.innerHTML = `
+    <h2 class="section-title">Gun · ${per.length} demos</h2>
+    <div class="summary">
+      ${tile("Shots / min", (shots / mins).toFixed(1))}
+      ${tile("Bullets fired", k1(bullets))}
+      ${tile("Shots hit heroes", hits, "good")}
+      ${tile("Hit rate (per shot)", pct(hits / shots), "accent")}
+      ${tile("Headshot %", hits ? pct(hs / hits) : "–")}
+      ${tile("Trooper/NPC hits", npc)}
+      ${tile("Gun hero dmg / min", Math.round(heroDmg / mins))}
+      ${tile("Valve hero accuracy", vShots ? `${pct(vHits / vShots)}<small> ${vHits}/${vShots}</small>` : "–")}
+    </div>
+    <div class="charts career-charts">
+      <div class="chart-card wide"><h3>Hit rate per match <span class="muted">(bars)</span> · headshot % <span class="muted">(line)</span></h3>
+        <div class="bars career-bars">
+          ${per.map((p, i) => `<a class="bar ${p.x.entry.won ? "won" : "lost"}" href="#/match/${p.x.entry.match_id}?ability=__gun" style="left:${i * W}%;width:${W}%"
+            title="${fmtDay(new Date(p.x.entry.start_time * 1000))} · ${p.g.heroHits}/${p.g.shots} shots hit heroes · ${p.g.headshots} headshots">
+            <span style="height:${(p.rate / maxR) * 100}%"></span></a>`).join("")}
+          <svg class="overlay" viewBox="0 0 100 100" preserveAspectRatio="none"><path vector-effect="non-scaling-stroke" d="${per.map((p, i) => `${i ? "L" : "M"}${(i + 0.5) * W},${100 - p.hsr * 100}`).join(" ")}"/></svg>
+        </div>
+        <div class="bars-axis muted small"><span>bar height: hit rate (max ${pct(maxR)})</span><span>line: headshot % (0–100)</span></div>
+      </div>
+      <div class="chart-card"><h3>Who you shot</h3>
+        ${(() => {
+          const vm = new Map();
+          for (const p of per) for (const [hid, n] of p.g.byVictim) vm.set(hid, (vm.get(hid) || 0) + n);
+          const rows = [...vm].sort((a, b) => b[1] - a[1]).slice(0, 8);
+          const max = Math.max(1, ...rows.map((r) => r[1]));
+          return rows.map(([hid, n]) => `<div class="hbar"><span class="lbl"><img src="${esc(S.assets.hero(hid).icon)}" alt="">${esc(S.assets.hero(hid).name)}</span>
+            <span class="track"><span style="width:${(n / max) * 100}%"></span></span><span class="val">${n}</span></div>`).join("");
+        })()}
+      </div>
+    </div>
+    <p class="small muted">Demo counts: a shot = one trigger pull (bullets = shots × pellets); "shots hit heroes" counts damage events, so
+      multi-pellet hits fold into one. Valve's accuracy only counts shots fired near enemy heroes, so it's lower.</p>`;
 }

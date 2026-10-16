@@ -615,6 +615,21 @@ def main():
         args.reparse = False  # later accounts reuse what the first run reparsed
         indexes.append(idx)
 
+    # demos parsed for other (not synced now) accounts: keep their format current too
+    stale = [int(p.name.split(".")[0]) for p in MATCHES.glob("*.json.gz")
+             if manifest_version(ctx.manifest.get(p.name.split(".")[0])) != ctx.pver
+             and int(p.name.split(".")[0]) in ctx.demos]
+    if stale:
+        log(f"reparsing {len(stale)} demos with an outdated format")
+        with ThreadPoolExecutor(args.jobs) as ex:
+            futs = {ex.submit(parse, mid, ctx.demos[mid], ctx.ignore_ids): mid for mid in stale}
+            for f in as_completed(futs):
+                mid = futs[f]
+                ok, msg, warnings = f.result()
+                ctx.manifest[str(mid)] = ({"v": ctx.pver, "warnings": warnings} if ok
+                                          else {"v": ctx.pver, "error": msg})
+        MANIFEST.write_text(json.dumps(ctx.manifest))
+
     sync_assets(ctx.heroes, ctx.items, ctx.used_heroes, ctx.used_items, ctx.badges)
     sync_valve_stats(sorted({int(p.name.split(".")[0]) for p in MATCHES.glob("*.json.gz")}))
     profiles = sync_profiles(ctx.accounts)

@@ -289,3 +289,4 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
 @media (max-width: 1100px) { .charts.charts-3 { grid-template-columns: 1fr; } }
 .timeline .l-hs { fill: none; stroke: var(--accent); stroke-width: 2; }
 .m-hs { fill: var(--accent); }
+#gun { display: flex; flex-direction: column; gap: 10px; }
