@@ -291,7 +291,24 @@ export async function viewMatch(id, params) {
     const cell = (v, n, d, isBest) => v == null ? `<td class="muted">–</td>`
       : `<td class="${isBest ? "best" : ""}"><span class="acc-bar"><span style="width:${v * 100}%"></span></span>${pct(v)} <small class="muted">${n}/${d}</small></td>`;
     const teams = [...new Set(rows.map((r) => r.p.team))].sort();
+    // cumulative skill accuracy per player over the whole match (lines start after 5 casts)
+    const CW = 1000, CH = 150;
+    const cx = (tt) => 30 + (tt / Math.max(m.end, 60)) * (CW - 40);
+    const cy = (v) => CH - 14 - v * (CH - 24);
+    const accLines = tracked.map(({ p, skill }) => {
+      let thrown = 0, hit = 0, d = "";
+      for (const c of skill) {
+        thrown++;
+        if (c.result === "hit" || (!settings.heroesOnly && c.result === "other")) hit++;
+        if (thrown >= 5) d += `${d ? "L" : "M"}${cx(c.t).toFixed(1)},${cy(hit / thrown).toFixed(1)} `;
+      }
+      if (!d) return "";
+      return `<path class="acc-line team-${p.team} ${p.pawn === pawn ? "subject" : ""}" data-pawn="${p.pawn}" d="${d}"><title>${esc(S.profiles[p.account_id]?.name || p.name)}: ${pct(hit / thrown)}</title></path>`;
+    }).join("");
+    const grid = [0, 0.25, 0.5, 0.75, 1].map((v) => `<line class="grid" x1="30" x2="${CW - 10}" y1="${cy(v)}" y2="${cy(v)}"/><text class="axis" x="26" y="${cy(v) + 3}" text-anchor="end">${v * 100}%</text>`).join("");
+    const span = t0 != null ? `<rect class="acc-span" x="${cx(t0)}" y="4" width="${cx(t) - cx(t0)}" height="${CH - 18}"/>` : "";
     $("#tracker", app).innerHTML = `
+      <svg class="acc-chart" viewBox="0 0 ${CW} ${CH}">${grid}${span}${accLines}<line class="cursor" x1="${cx(t)}" x2="${cx(t)}" y1="4" y2="${CH - 14}"/></svg>
       <h3>Accuracy tracker · ${t0 != null ? `${fmtClock(t0)}–${fmtClock(t)}` : `at ${fmtClock(t)}`} <span class="muted">· signature skills that connect + gun, every player</span></h3>
       <table class="report-table tracker-table">
         <tr><th></th><th>player</th><th>HP</th><th>souls</th><th>skills thrown</th><th>skill hit %</th><th>shots</th><th>gun hit %</th><th>HS %</th><th>items</th></tr>
@@ -317,6 +334,10 @@ export async function viewMatch(id, params) {
           </tr>`).join("")).join("")}
       </table>`;
   }
+  $("#tracker", app).addEventListener("mouseover", (ev) => {
+    const tr = ev.target.closest("tr[data-pawn]");
+    for (const l of app.querySelectorAll(".acc-line")) l.classList.toggle("hl", !!tr && l.dataset.pawn === tr.dataset.pawn);
+  });
   $("#tracker", app).addEventListener("click", (ev) => {
     const tr = ev.target.closest("tr[data-pawn]");
     if (tr) setParams({ pawn: tr.dataset.pawn });

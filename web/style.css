@@ -445,3 +445,13 @@ img.slot-spirit { background: #5a3a8c !important; }
 .ts-bar span { display: block; height: 100%; }
 .c-hero { background: #e5645a; } .c-npc { background: #e0b25a; } .c-neutral { background: #5fd38d; } .c-out { background: #3a3f48; }
 .m-zip { background: #4f8fe8; } .m-slide { background: #a98bff; } .m-dash { background: #e8a33d; } .m-air { background: #8b919c; } .m-abil { background: #5fd38d; }
+.acc-chart { width: 100%; height: auto; display: block; margin-bottom: 8px; }
+.acc-chart .grid { stroke: var(--line); stroke-dasharray: 2 4; }
+.acc-chart .axis { fill: var(--muted); font-size: 10px; }
+.acc-chart .cursor { stroke: var(--accent); stroke-width: 1.5; }
+.acc-chart .acc-span { fill: var(--accent); opacity: .1; }
+.acc-line { fill: none; stroke-width: 1.5; opacity: .6; }
+.acc-line.team-2 { stroke: var(--amber); }
+.acc-line.team-3 { stroke: var(--sapphire); }
+.acc-line.subject { stroke-width: 3; opacity: 1; }
+.acc-line.hl { stroke: var(--accent); stroke-width: 3.5; opacity: 1; }
