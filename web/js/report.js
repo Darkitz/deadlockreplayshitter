@@ -202,7 +202,7 @@ export function renderReport(el, d, subjectAccount) {
         const a = S.assets.item(it.item_id);
         const icon = S.assets.itemIcon(it.item_id);
         return `<span class="bi ${it.sold_time_s ? "sold" : ""}" title="${esc(a?.name || it.item_id)} · bought ${fmtClock(it.game_time_s)}${it.sold_time_s ? ` · sold ${fmtClock(it.sold_time_s)}` : ""}">
-          ${icon ? `<img src="${esc(icon)}" alt="">` : ""}<small>${fmtClock(it.game_time_s)}</small></span>`;
+          ${icon ? `<img class="slot-${esc(a?.slot || "x")}" src="${esc(icon)}" alt="">` : ""}<small>${fmtClock(it.game_time_s)}</small></span>`;
       }).join("") || `<span class="muted">no items</span>`}</div>
     </div>`;
 }

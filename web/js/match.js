@@ -271,17 +271,26 @@ export async function viewMatch(id, params) {
     $("#tracker", app).innerHTML = `
       <h3>Accuracy tracker · ${t0 != null ? `${fmtClock(t0)}–${fmtClock(t)}` : `at ${fmtClock(t)}`} <span class="muted">· signature skills that connect + gun, every player</span></h3>
       <table class="report-table tracker-table">
-        <tr><th></th><th>player</th><th>skills thrown</th><th>skill hit %</th><th>shots</th><th>gun hit %</th><th>headshots</th><th>HS %</th></tr>
+        <tr><th></th><th>player</th><th>HP</th><th>souls</th><th>skills thrown</th><th>skill hit %</th><th>shots</th><th>gun hit %</th><th>HS %</th><th>items</th></tr>
         ${teams.map((tm) => rows.filter((r) => r.p.team === tm).map((r) => `
           <tr class="team-row-${tm} ${r.p.pawn === pawn ? "on" : ""}" data-pawn="${r.p.pawn}">
             <td><img src="${esc(S.assets.hero(r.p.hero_id).icon)}" alt=""></td>
             <td><a href="#/player/${r.p.account_id}">${esc(S.profiles[r.p.account_id]?.name || r.p.name)}</a></td>
+            <td>${(() => {
+              const h = hpAt(m, r.p.pawn, t);
+              if (!h) return "–";
+              if (h.hp <= 0) return `<span class="bad small">dead</span>`;
+              const f = h.max ? h.hp / h.max : 0;
+              return `<span class="mini-hp" title="${h.hp} / ${h.max}"><span style="width:${f * 100}%"></span></span>`;
+            })()}</td>
+            <td>${(() => { const st = statsAt(m, r.p.pawn, t); return st ? k1(st[0]) : "–"; })()}</td>
             <td>${r.thrown}</td>
             ${cell(r.sAcc, r.hit, r.thrown, r.thrown >= 5 && r.sAcc === bS)}
             <td>${r.shots}</td>
             ${cell(r.gAcc, r.hits, r.shots, r.shots >= 20 && r.gAcc === bG)}
-            <td>${r.hs}</td>
-            <td>${r.hits ? pct(r.hs / r.hits) : "–"}</td>
+            <td>${r.hits ? `${pct(r.hs / r.hits)} <small class="muted">${r.hs}</small>` : "–"}</td>
+            <td class="tr-items">${itemsAt(m, r.p.pawn, t).filter((id) => S.assets.item(id)?.type === "upgrade")
+              .map((id) => `<img class="slot-${esc(S.assets.item(id)?.slot || "x")}" src="${esc(S.assets.itemIcon(id))}" title="${esc(S.assets.item(id)?.name)}" alt="">`).join("")}</td>
           </tr>`).join("")).join("")}
       </table>`;
   }

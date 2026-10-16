@@ -400,3 +400,12 @@ body.solo #app > *:not(.solo-target) { display: none; }
 .mod img { width: 16px; height: 16px; border-radius: 50%; }
 .mod small { color: var(--muted); }
 .mod.debuff { border-color: var(--miss); color: #ffb3ab; }
+.mini-hp { display: inline-block; width: 54px; height: 6px; background: var(--panel-3); border-radius: 3px; overflow: hidden; vertical-align: middle; }
+.mini-hp span { display: block; height: 100%; background: var(--hit); }
+.tr-items { white-space: normal; min-width: 250px; max-width: 330px; }
+.tracker { overflow-x: auto; }
+.report-table td.tr-items img { display: inline-block; width: 18px; height: 18px; border-radius: 4px; margin: 1px; vertical-align: middle; }
+/* in-game slot colors behind the white item glyphs */
+img.slot-weapon { background: #7a4a12 !important; }
+img.slot-vitality { background: #2f6b2c !important; }
+img.slot-spirit { background: #5a3a8c !important; }
