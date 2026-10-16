@@ -6,10 +6,35 @@
 //         hit window (cut short by the next cast). Enemy hero → "hit", anything else that is
 //         not an ally → "other", nothing → "miss".
 
-import { posAt } from "./data.js";
+import { posAt, hpAt } from "./data.js";
 
 /** world units → meters (Source units are inches) */
 export const UNIT_M = 0.0254;
+/** enemies further away than this are ignored for aim error */
+const AIM_MAX_DIST = 80 / UNIT_M;
+
+/**
+ * smallest horizontal angle (deg) between the cast's aim and an alive enemy hero within range.
+ * returns {err, pawn, dist} or null.
+ */
+export function aimError(m, me, c) {
+  if (c.yaw == null || !(c.x || c.y)) return null;
+  let best = null;
+  for (const p of m.players) {
+    if (p.team === me.team) continue;
+    const hp = hpAt(m, p.pawn, c.t);
+    if (!hp || hp.hp <= 0) continue;
+    const pos = posAt(m, p.pawn, c.t);
+    if (!pos) continue;
+    const dx = pos[0] - c.x, dy = pos[1] - c.y;
+    const d = Math.hypot(dx, dy);
+    if (d > AIM_MAX_DIST || d < 1) continue;
+    let a = (Math.atan2(dy, dx) * 180) / Math.PI - c.yaw;
+    a = Math.abs(((a + 540) % 360) - 180);
+    if (!best || a < best.err) best = { err: a, pawn: p.pawn, dist: d * UNIT_M };
+  }
+  return best;
+}
 
 export const PHASES = [
   { key: "lane", label: "0–10 min", from: -Infinity, to: 600 },
@@ -93,6 +118,14 @@ export function analyzeAbility(m, pawn, ability, opts) {
       if (c.hitX != null && (c.x || c.y)) c.dist = Math.hypot(c.hitX - c.x, c.hitY - c.y) * UNIT_M;
     }
   }
+  if (me) {
+    for (const c of casts) {
+      const a = aimError(m, me, c);
+      c.aimErr = a?.err ?? null;
+      c.aimPawn = a?.pawn ?? null;
+      c.aimDist = a?.dist ?? null;
+    }
+  }
   const res = { source, casts };
   m._analysis.set(key, res);
   return res;
@@ -142,6 +175,8 @@ export function aggregate(list, heroesOnly) {
   const victims = new Map(); // hero_id -> hits
   const delays = [];
   const dists = [];
+  const aimMiss = [];
+  const aimHit = [];
   for (const { match, casts } of list) {
     for (const c of casts) {
       const ph = phases.find((x) => c.t >= x.from && c.t < x.to);
@@ -150,11 +185,19 @@ export function aggregate(list, heroesOnly) {
       if (ok) ph.scored++;
       if (c.delay != null && ok) delays.push(c.delay);
       if (c.dist != null && ok) dists.push(c.dist);
+      if (c.aimErr != null) (c.result === "miss" ? aimMiss : ok ? aimHit : []).push(c.aimErr);
       for (const v of c.victims) {
         const hid = match.byPawn.get(v)?.hero_id;
         victims.set(hid, (victims.get(hid) || 0) + 1);
       }
     }
   }
-  return { phases, victims: [...victims].sort((a, b) => b[1] - a[1]), delays, dists };
+  return { phases, victims: [...victims].sort((a, b) => b[1] - a[1]), delays, dists, aimMiss, aimHit };
 }
+
+export const median = (xs) => {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const i = s.length >> 1;
+  return s.length % 2 ? s[i] : (s[i - 1] + s[i]) / 2;
+};

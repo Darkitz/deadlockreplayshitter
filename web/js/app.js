@@ -4,7 +4,7 @@
 //   #/match/<id>?pawn=&ability=   match detail (minimap + timeline)
 
 import { loadJSON, loadMatch, Assets, statsAt, TEAM_NAMES } from "./data.js";
-import { analyzeAbility, counts, pct, abilityTable, aggregate, PHASES } from "./analysis.js";
+import { analyzeAbility, counts, pct, abilityTable, aggregate, median } from "./analysis.js";
 import { createTimeline, sparkline, fmtClock } from "./timeline.js";
 import { createMinimap } from "./minimap.js";
 
@@ -211,7 +211,10 @@ async function viewOverview(heroId, params) {
     tile("Per match", list.length ? `${(thrown / list.length).toFixed(1)}<small> thrown</small>` : "–") +
     tile("Avg hit delay", avgDelay != null ? `${avgDelay.toFixed(2)}<small> s</small>` : "–") +
     tile("Avg hit range", agg.dists.length ? `${Math.round(agg.dists.reduce((a, b) => a + b, 0) / agg.dists.length)}<small> m</small>` : "–") +
-    tile("Damage", k1(dmg));
+    tile("Aim error on misses", agg.aimMiss.length ? `${median(agg.aimMiss).toFixed(1)}<small>° median</small>` : "–") +
+    tile("Damage", k1(dmg)) +
+    `<div class="tile" id="bench"><div class="k" title="same hero, other players, any of your parsed demos">Other ${esc(hero.name)}s</div><div class="v muted">…</div></div>`;
+  benchmark(heroId, ability, list.length);
 
   renderCharts(list, agg);
   renderAbilityReport(list, heroId, abilityCls);
@@ -276,8 +279,33 @@ function renderCharts(list, agg) {
     <div class="chart-card"><h3>Most hit heroes</h3>${victims || `<p class="muted">no hero hits</p>`}</div>
     <div class="chart-card"><h3>Hit delay</h3><div class="hist">${hist}</div>
       <div class="bars-axis muted small"><span>0 s</span><span>1 s</span><span>2 s+</span></div></div>
+    <div class="chart-card"><h3>Aim error on misses</h3><div class="hist">${histogram(agg.aimMiss, 10, 2, "°")}</div>
+      <div class="bars-axis muted small"><span>0°</span><span>10°</span><span>20°+</span></div></div>
     <div class="chart-card"><h3>Hit range</h3><div class="hist">${histogram(agg.dists, 10, 5, "m")}</div>
       <div class="bars-axis muted small"><span>0 m</span><span>25 m</span><span>50 m+</span></div></div>`;
+}
+
+/** same hero, same ability, every other player in any parsed demo */
+async function benchmark(heroId, ability) {
+  const el = $("#bench");
+  const ids = S.index.matches.filter((m) => m.parsed).map((m) => m.match_id);
+  let thrown = 0, scored = 0;
+  const players = new Set();
+  for (const id of ids) {
+    let m;
+    try { m = await loadMatch(id); } catch { continue; }
+    for (const p of m.players) {
+      if (p.hero_id !== heroId || p.account_id === S.index.account_id) continue;
+      const c = counts(analyzeAbility(m, p.pawn, ability, opts()).casts, settings.heroesOnly);
+      thrown += c.thrown; scored += c.scored;
+      players.add(p.account_id);
+    }
+  }
+  if (!el.isConnected) return;
+  el.querySelector(".v").innerHTML = thrown
+    ? `${pct(scored / thrown)}<small> ${scored}/${thrown} · ${players.size} player${players.size === 1 ? "" : "s"}</small>`
+    : `<small>none found</small>`;
+  el.querySelector(".v").classList.remove("muted");
 }
 
 function histogram(values, bins, width, unit) {
@@ -597,14 +625,19 @@ async function viewMatch(id, params) {
         }).join("");
         const dist = k.dist != null ? ` · ${Math.round(k.dist)} m` : "";
         const label = k.result === "hit" ? `hit${k.delay != null ? ` +${k.delay.toFixed(2)}s` : ""}${dist} · ${k.dmg} dmg`
-          : k.result === "other" ? `hit non-hero${dist} · ${k.dmg} dmg` : "miss";
+          : k.result === "other" ? `hit non-hero${dist} · ${k.dmg} dmg`
+          : k.aimErr != null ? `miss · ${k.aimErr.toFixed(0)}° off <img src="${esc(S.assets.hero(m.byPawn.get(k.aimPawn)?.hero_id).icon)}" title="${esc(m.byPawn.get(k.aimPawn)?.name)}"> @ ${Math.round(k.aimDist)} m`
+          : "miss · no enemy in range";
         return `<li data-t="${k.t}"><span class="dot ${k.result}"></span><span class="t">${fmtClock(k.t)}</span>${vics}<span>${label}</span></li>`;
       }
-      const [kt, vic, att] = ev.k;
+      const [kt, vic, att, abilityId] = ev.k;
       const v = m.byPawn.get(vic), a = m.byPawn.get(att);
       const died = vic === pawn;
+      const kab = S.assets.item(abilityId);
       return `<li data-t="${kt}" class="${died ? "ev-death" : "ev-kill"}"><span class="t">${fmtClock(kt)}</span>
-        ${a ? `<img src="${esc(S.assets.hero(a.hero_id).icon)}" title="${esc(a.name)}">` : ""}<span>${died ? "killed" : "kill"}</span>
+        ${a ? `<img src="${esc(S.assets.hero(a.hero_id).icon)}" title="${esc(a.name)}">` : ""}
+        ${kab?.image ? `<img class="kab" src="${esc(kab.image)}" title="${esc(kab.name)}">` : kab ? `<span class="muted small">${esc(kab.name)}</span>` : ""}
+        <span>${died ? "killed" : "kill"}</span>
         ${v ? `<img src="${esc(S.assets.hero(v.hero_id).icon)}" title="${esc(v.name)}">` : ""}</li>`;
     }).join("") || `<li class="muted">nothing yet</li>`;
   }

@@ -52,7 +52,7 @@ export async function loadMatch(id) {
   return matchCache.get(id);
 }
 
-function prepare(m) {
+export function prepare(m) {
   m.end = m.game_over_s ?? m.duration_s;
   m.byPawn = new Map(m.players.map((p) => [p.pawn, p]));
   m.tracks = new Map(m.samples.tracks.map((t) => [t.pawn, t]));

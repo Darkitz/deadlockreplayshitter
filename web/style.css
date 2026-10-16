@@ -104,7 +104,7 @@ footer { padding: 16px 24px 28px; }
 .tile.accent .v { color: var(--accent); }
 
 /* overview charts */
-.charts { display: grid; grid-template-columns: 1.6fr 1.2fr 1.2fr 1fr 1fr; gap: 10px; }
+.charts { display: grid; grid-template-columns: 1.6fr 1.2fr 1.2fr 1fr 1fr 1fr; gap: 10px; }
 .report-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 .report-table th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 4px 8px; }
 .report-table td { padding: 5px 8px; border-top: 1px solid var(--line); }
@@ -262,3 +262,4 @@ table.plain td { padding: 4px 8px; border-top: 1px solid var(--line); }
 #career { display: flex; flex-direction: column; gap: 10px; }
 .mh-hero { width: 30px; height: 30px; border-radius: 6px; align-self: center; }
 code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+.feed li img.kab { border-radius: 50%; background: var(--panel-3); }

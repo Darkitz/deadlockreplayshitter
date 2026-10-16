@@ -96,6 +96,13 @@ The replay salt never appears in public metadata. It comes only from the Steam G
 remembers failed lookups: deleted demos are never retried, and missing salts are rechecked after
 6 h.
 
+## Tests
+
+```bash
+node --test tests/*.test.mjs          # hit/miss classification, aim error, range
+python3 -m unittest discover tests    # sync helpers
+```
+
 ## How "hit" is decided (`web/js/analysis.js`)
 
 - **Thrown** comes from `ImportantAbilityUsed` for the ability. Older demos don't have this
@@ -105,3 +112,6 @@ remembers failed lookups: deleted demos are never retried, and missing salts are
   isn't an ally counts as a non-hero hit, and no event is a miss.
 - Hit position is the damage origin, which is within about 1–2 m of the victim. Range is measured
   from the caster's position at cast time.
+- **Aim error** is the horizontal angle between the caster's eye yaw at cast time and the nearest
+  alive enemy hero within 80 m. On real Drifter data, hits sit at about 2° and Rend misses at
+  about 20°.
