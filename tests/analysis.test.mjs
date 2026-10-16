@@ -107,3 +107,19 @@ test("incoming: enemy casts aimed at the subject are hit or dodged", async () =>
   assert.equal(r.hit, 1);
   assert.equal(r.dodged, 2);
 });
+
+test("kill conversion and ready-idle time", () => {
+  const m = fixture({
+    casts: [cast(10), cast(40)],
+    damage: [dmg(10.2, 2)],
+    uses: [[10, 1, AB.id, 20, 0], [40, 1, AB.id, 20, 0]],
+  });
+  m.kills.push([15, 2, 1, AB.id, []]);
+  const { casts } = analyzeAbility(m, 1, AB, { window: 3 });
+  assert.equal(casts[0].killed, true);
+  assert.equal(casts[0].idle, null);          // nothing known before the first cast
+  assert.ok(Math.abs(casts[1].idle - 10) < 1e-9); // ready at 30, recast at 40
+  const c = counts(casts);
+  assert.equal(c.kills, 1);
+  assert.ok(Math.abs(c.idle - 10) < 1e-9);
+});

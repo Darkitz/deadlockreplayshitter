@@ -250,6 +250,7 @@ table.plain td { padding: 4px 8px; border-top: 1px solid var(--line); }
   .top { padding: 12px 16px; position: static; }
   main { padding: 12px 16px; }
   .charts, .scoreboard, .readout { grid-template-columns: 1fr; }
+  .items-row { flex-direction: column; align-items: flex-start; }
 }
 
 /* career */
@@ -268,3 +269,4 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
 .incoming h3 { font-size: 14px; color: var(--text); }
 .inline-ab { display: inline-flex; gap: 6px; align-items: center; }
 .inline-ab img { width: 20px !important; height: 20px !important; }
+.kill-tag { color: var(--kill); font-weight: 600; }

@@ -196,10 +196,12 @@ async function viewOverview(heroId, params) {
   if (S.view !== "overview") return;
 
   // summary
-  let thrown = 0, scored = 0, other = 0, dmg = 0;
+  let thrown = 0, scored = 0, other = 0, dmg = 0, hits = 0, kills = 0, idleSum = 0, idleN = 0;
   for (const x of list) {
     const c = counts(x.casts, settings.heroesOnly);
     thrown += c.thrown; scored += c.scored; other += c.other; dmg += c.dmg;
+    hits += c.hit; kills += c.kills;
+    for (const k of x.casts) if (k.idle != null) { idleSum += k.idle; idleN++; }
   }
   const agg = aggregate(list, settings.heroesOnly);
   const avgDelay = agg.delays.length ? agg.delays.reduce((a, b) => a + b, 0) / agg.delays.length : null;
@@ -218,6 +220,8 @@ async function viewOverview(heroId, params) {
     })()) +
     tile("Aim error on misses", agg.aimMiss.length ? `${median(agg.aimMiss).toFixed(1)}<small>° median</small>` : "–") +
     tile("Damage", k1(dmg)) +
+    tile("Hits → kills", hits ? `${pct(kills / hits)}<small> ${kills}/${hits}</small>` : "–") +
+    tile("Avg ready-idle", idleN ? `${(idleSum / idleN).toFixed(1)}<small> s before recast</small>` : "–") +
     `<div class="tile" id="bench"><div class="k" title="same hero, other players, any of your parsed demos">Other ${esc(hero.name)}s</div><div class="v muted">…</div></div>`;
   benchmark(heroId, ability, list.length);
 
@@ -635,7 +639,9 @@ async function viewMatch(id, params) {
       tile("K / D / A", st ? `${st[2]}/${st[3]}/${st[4]}` : "–") +
       tile("Souls", st ? k1(st[0]) : "–") +
       tile("Level", st ? st[1] : "–") +
-      tile("Hit non-hero", c.other);
+      tile("Hit non-hero", c.other) +
+      tile("Hits → kills", c.hit ? `${c.kills}<small> / ${c.hit}</small>` : "–") +
+      tile("Avg ready-idle", c.idle != null ? `${c.idle.toFixed(1)}<small> s</small>` : "–");
 
     const events = [];
     for (const k of past.slice(-40)) events.push({ t: k.t, kind: "cast", k });
@@ -656,7 +662,8 @@ async function viewMatch(id, params) {
           : k.result === "other" ? `hit non-hero${dist} · ${k.dmg} dmg`
           : k.aimErr != null ? `miss · ${k.aimErr.toFixed(0)}° off <img src="${esc(S.assets.hero(m.byPawn.get(k.aimPawn)?.hero_id).icon)}" title="${esc(m.byPawn.get(k.aimPawn)?.name)}"> @ ${Math.round(k.aimDist)} m`
           : "miss · no enemy in range";
-        return `<li data-t="${k.t}"><span class="dot ${k.result}"></span><span class="t">${fmtClock(k.t)}</span>${vics}<span>${label}</span></li>`;
+        const extra = k.killed ? ` <b class="kill-tag">→ kill</b>` : "";
+        return `<li data-t="${k.t}"><span class="dot ${k.result}"></span><span class="t">${fmtClock(k.t)}</span>${vics}<span>${label}${extra}</span></li>`;
       }
       const [kt, vic, att, abilityId] = ev.k;
       const v = m.byPawn.get(vic), a = m.byPawn.get(att);

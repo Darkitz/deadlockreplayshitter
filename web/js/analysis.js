@@ -12,6 +12,8 @@ import { posAt, hpAt } from "./data.js";
 export const UNIT_M = 0.0254;
 /** enemies further away than this are ignored for aim error */
 const AIM_MAX_DIST = 80 / UNIT_M;
+/** a hero hit "converts" when that victim dies within this many seconds */
+export const KILL_WINDOW = 10;
 
 /**
  * smallest horizontal angle (deg) between the cast's aim and an alive enemy hero within range.
@@ -120,6 +122,18 @@ export function analyzeAbility(m, pawn, ability, opts) {
       if (c.hitX != null && (c.x || c.y)) c.dist = Math.hypot(c.hitX - c.x, c.hitY - c.y) * UNIT_M;
     }
   }
+  // kill conversion + idle time (how long the ability was ready before this cast)
+  const deaths = m.kills.map((k) => [k[0], k[1]]);
+  const cds = aid != null ? m.uses.filter((u) => u[1] === pawn && u[2] === aid) : [];
+  let prevReady = null;
+  for (const c of casts) {
+    c.killed = c.result === "hit" && c.victims.some((v) =>
+      deaths.some(([dt, dv]) => dv === v && dt >= c.hitT && dt <= c.hitT + KILL_WINDOW));
+    // cooldown that started with this cast (within half a second)
+    const cd = cds.find((u) => Math.abs(u[0] - c.t) < 0.5);
+    c.idle = prevReady != null && c.t > prevReady ? c.t - prevReady : prevReady != null ? 0 : null;
+    prevReady = cd && cd[3] > 0 ? c.t + cd[3] : null;
+  }
   if (me) {
     for (const c of casts) {
       const a = aimError(m, me, c);
@@ -142,7 +156,12 @@ export function counts(casts, heroesOnly = true) {
   }
   const thrown = casts.length;
   const scored = heroesOnly ? hit : hit + other;
-  return { thrown, hit, other, miss: thrown - hit - other, scored, dmg, acc: thrown ? scored / thrown : 0 };
+  const kills = casts.filter((c) => c.killed).length;
+  const idles = casts.map((c) => c.idle).filter((v) => v != null);
+  return {
+    thrown, hit, other, miss: thrown - hit - other, scored, dmg, acc: thrown ? scored / thrown : 0,
+    kills, idle: idles.length ? idles.reduce((a, b) => a + b, 0) / idles.length : null,
+  };
 }
 
 export const pct = (x) => `${Math.round(x * 100)}%`;
