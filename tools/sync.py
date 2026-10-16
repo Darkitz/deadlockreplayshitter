@@ -125,17 +125,42 @@ def local_demos():
     return found
 
 
-def fetch_demo(match_id, steam_salts):
-    """download via deadlock-api salts. returns (path|None, reason)."""
-    url = f"{API}/v1/matches/{match_id}/salts"
-    if not steam_salts:
-        url += "?disable_steam=true"
+SALTS_CACHE = ROOT / "data" / "salts.json"
+_salts = None
+
+
+def get_salts(match_id, steam_salts=False):
+    """deadlock-api's salts for a match (the only per-match thing we ask it for), cached:
+    metadata salts never change; a missing replay salt is asked again after NO_SALT_RECHECK."""
+    global _salts
+    if _salts is None:
+        try:
+            _salts = json.loads(SALTS_CACHE.read_text())
+        except (OSError, ValueError):
+            _salts = {}
+    c = _salts.get(str(match_id))
+    if c and (c.get("demo_url") or time.time() - c.get("at", 0) < NO_SALT_RECHECK) and not steam_salts:
+        return c
+    url = f"{API}/v1/matches/{match_id}/salts" + ("" if steam_salts else "?disable_steam=true")
     try:
-        salts = get_json(url)
+        got = get_json(url)
     except urllib.error.HTTPError as e:
-        return None, f"salts http {e.code}"
+        got = {"error": f"salts http {e.code}"}
     except urllib.error.URLError as e:
-        return None, f"salts error {e.reason}"
+        return {"error": f"salts error {e.reason}"}
+    rec = {k: got.get(k) for k in ("metadata_url", "demo_url", "error")}
+    rec["at"] = time.time()
+    _salts[str(match_id)] = rec
+    SALTS_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    SALTS_CACHE.write_text(json.dumps(_salts))
+    return rec
+
+
+def fetch_demo(match_id, steam_salts):
+    """download the demo from Valve using deadlock-api's salt. returns (path|None, reason)."""
+    salts = get_salts(match_id, steam_salts)
+    if salts.get("error"):
+        return None, salts["error"]
     demo_url = salts.get("demo_url")
     if not demo_url:
         return None, "no replay salt known"
@@ -284,30 +309,68 @@ def sync_assets(heroes, items, used_heroes, used_items, badges=()):
     log(f"assets: {len(out_heroes)} heroes, {len(out_items)} items")
 
 
+STEAM_CACHE = ROOT / "data" / "steam_profiles.json"
+STEAM_TTL = 3600          # re-read a profile at most once an hour
+STEAM_MAX_PER_RUN = 60    # Steam answers ~1 profile/s; the rest refresh on later syncs
+
+
+def _steam_profile(aid):
+    """name + avatar from steamcommunity's public XML (no API key needed)."""
+    import re
+    url = f"https://steamcommunity.com/profiles/{aid + STEAM_ID64_BASE}/?xml=1"
+    req = urllib.request.Request(url, headers=UA)
+    with urllib.request.urlopen(req, timeout=20) as r:
+        xml = r.read().decode("utf-8", "replace")
+    def tag(name):
+        m = re.search(rf"<{name}>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</{name}>", xml, re.S)
+        return m.group(1).strip() if m else None
+    if "<profile>" not in xml:
+        raise OSError("no profile")
+    return {"name": tag("steamID"), "avatar_src": tag("avatarFull") or tag("avatarMedium"),
+            "url": f"https://steamcommunity.com/profiles/{aid + STEAM_ID64_BASE}/"}
+
+
 def sync_profiles(account_ids):
-    """steam name/avatar/profile url for every account seen; avatars mirrored locally."""
-    out = {}
+    """Steam name/avatar/profile url for every account seen, straight from Steam, cached 1 h.
+    Avatars are mirrored to web/assets/avatars/ (re-downloaded only when they change)."""
+    try:
+        cache = {int(k): v for k, v in json.loads(STEAM_CACHE.read_text()).items()}
+    except (OSError, ValueError):
+        cache = {}
+    now = time.time()
     ids = sorted(a for a in account_ids if a)
-    for i in range(0, len(ids), 100):
-        chunk = ids[i:i + 100]
+    stale = [a for a in ids if now - cache.get(a, {}).get("at", 0) > STEAM_TTL]
+    # tracked / recently seen first would be nicer; newest accounts first is a fine proxy
+    todo = stale[:STEAM_MAX_PER_RUN]
+
+    def fetch(aid):
         try:
-            rows = get_json(f"{API}/v1/players/steam?account_ids={','.join(map(str, chunk))}")
-        except (urllib.error.URLError, OSError) as e:
-            log(f"profile fetch failed: {e}")
-            continue
-        for p in rows:
-            aid = p["account_id"]
-            out[aid] = {
-                "name": p.get("personaname"),
-                "url": p.get("profileurl")
-                or f"https://steamcommunity.com/profiles/{aid + STEAM_ID64_BASE}/",
-                "avatar": mirror(p.get("avatarfull") or p.get("avatarmedium") or p.get("avatar"),
-                                 "avatars", f"{aid}.jpg"),
-                "country": p.get("countrycode"),
-                "matches_30d": p.get("matches_played_last_30d"),
-            }
+            return aid, _steam_profile(aid)
+        except (urllib.error.URLError, OSError, ValueError):
+            return aid, None
+
+    with ThreadPoolExecutor(6) as ex:
+        for aid, prof in ex.map(fetch, todo):
+            old = cache.get(aid, {})
+            if prof is None:
+                cache[aid] = {**old, "at": now}  # keep what we had, retry in an hour
+                continue
+            avatar = old.get("avatar")
+            if prof["avatar_src"] and (prof["avatar_src"] != old.get("avatar_src") or not avatar):
+                dest = ASSET_DIR / "avatars" / f"{aid}.jpg"
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    download(prof["avatar_src"], dest)
+                    avatar = f"assets/avatars/{aid}.jpg"
+                except (urllib.error.URLError, OSError):
+                    avatar = prof["avatar_src"]
+            cache[aid] = {**prof, "avatar": avatar, "at": now}
+    STEAM_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    STEAM_CACHE.write_text(json.dumps(cache))
+    out = {aid: {"name": c.get("name"), "url": c.get("url"), "avatar": c.get("avatar")}
+           for aid, c in cache.items() if aid in set(ids) and c.get("name")}
     (DATA / "profiles.json").write_text(json.dumps(out))
-    log(f"profiles: {len(out)}")
+    log(f"profiles: {len(out)} ({len(todo)} refreshed from Steam, {len(stale) - len(todo)} left for later)")
     return out
 
 
@@ -331,35 +394,60 @@ META_DIR = DATA / "meta"
 META_MISSING = ROOT / "data" / "meta_missing.json"
 
 
+DLMETA = ROOT / "parser" / "target" / "release" / "dlmeta"
+
+
+def fetch_metadata(mid):
+    """Valve's .meta file via the metadata salt → JSON (decoded locally with dlmeta)."""
+    salts = get_salts(mid)
+    url = salts.get("metadata_url")
+    if not url:
+        return None, salts.get("error") or "no metadata salt"
+    with tempfile.TemporaryDirectory() as tmp:
+        raw = Path(tmp) / "m.meta"
+        try:
+            download(url, raw, timeout=120)
+        except urllib.error.HTTPError as e:
+            return None, f"valve http {e.code}"
+        if raw.read_bytes()[:3] == b"BZh":  # older matches
+            data = bz2.decompress(raw.read_bytes())
+            raw.write_bytes(data)
+        out = Path(tmp) / "m.json"
+        r = subprocess.run([str(DLMETA), str(raw), str(out)], capture_output=True, text=True)
+        if r.returncode != 0:
+            return None, f"decode failed: {r.stderr.strip()[-200:]}"
+        return out.read_bytes(), "ok"
+
+
 def sync_metadata(match_ids):
     """Valve's full match metadata (objectives, per-player stat timelines, items, deaths,
-    damage matrix, 1 Hz position paths, ...) as web/data/meta/<id>.json.gz. Only deadlock-api's
-    cache is asked (no Steam fallback); misses are retried after a day."""
+    damage matrix, 1 Hz position paths, ...) as web/data/meta/<id>.json.gz, downloaded from
+    Valve's replay servers with the metadata salt and decoded locally. Misses retry after a day."""
     META_DIR.mkdir(parents=True, exist_ok=True)
     try:
         missing = json.loads(META_MISSING.read_text())
     except (OSError, ValueError):
         missing = {}
     now = time.time()
+    todo = [m for m in match_ids
+            if not (META_DIR / f"{m}.json.gz").exists() and now - missing.get(str(m), 0) >= 86400]
+
+    def one(mid):
+        return mid, *fetch_metadata(mid)
+
     got = 0
-    for mid in match_ids:
-        dest = META_DIR / f"{mid}.json.gz"
-        if dest.exists() or now - missing.get(str(mid), 0) < 86400:
-            continue
-        try:
-            req = urllib.request.Request(f"{API}/v1/matches/{mid}/metadata?disable_steam=true", headers=UA)
-            with urllib.request.urlopen(req, timeout=120) as r:
-                raw = r.read()
-        except (urllib.error.URLError, OSError) as e:
-            missing[str(mid)] = now
-            log(f"  metadata {mid}: {getattr(e, 'code', e)}")
-            continue
-        with gzip.open(dest.with_name(dest.name + ".part"), "wb", 6) as f:
-            f.write(raw)
-        dest.with_name(dest.name + ".part").replace(dest)
-        missing.pop(str(mid), None)
-        got += 1
-        time.sleep(0.15)  # 100 req / 10 s from S3
+    with ThreadPoolExecutor(4) as ex:
+        for mid, raw, why in ex.map(one, todo):
+            dest = META_DIR / f"{mid}.json.gz"
+            if raw is None:
+                missing[str(mid)] = now
+                log(f"  metadata {mid}: {why}")
+                continue
+            with gzip.open(dest.with_name(dest.name + ".part"), "wb", 6) as f:
+                f.write(raw)
+            dest.with_name(dest.name + ".part").replace(dest)
+            missing.pop(str(mid), None)
+            got += 1
     META_MISSING.write_text(json.dumps(missing))
     log(f"metadata: {got} new, {len(list(META_DIR.glob('*.json.gz')))} total")
 
@@ -370,79 +458,55 @@ VALVE_FIELDS = ["shots_hit", "shots_missed", "hero_bullets_hit", "hero_bullets_h
                 "deaths", "assists", "headshot_kills", "bullet_kills", "ability_kills", "melee_kills"]
 
 
-def sync_valve_stats(match_ids):
-    """Valve's end-of-match stats for every player of every parsed match (cached forever)."""
-    try:
-        cache = json.loads(VALVE_STATS.read_text())
-    except (OSError, ValueError):
-        cache = {}
-    todo = [m for m in match_ids if str(m) not in cache]
-    for i in range(0, len(todo), 50):
-        chunk = todo[i:i + 50]
-        url = (f"{API}/v1/matches/metadata?match_ids={','.join(map(str, chunk))}"
-               f"&include_player_info=true&include_player_final_stats=true&limit={len(chunk)}")
+def _meta_player_stats(mi, p):
+    """final stats + named custom stats of one player from a metadata match_info"""
+    names = {c["id"]: c["name"] for c in mi.get("custom_user_stats") or [] if c.get("name")}
+    fs = (p.get("stats") or [{}])[-1]
+    custom = fs.get("custom_user_stats") or []
+    cs = custom if isinstance(custom, dict) else {names.get(c.get("id")): c.get("value") for c in custom}
+    return fs, cs
+
+
+def digest_metadata(accounts):
+    """valve-stats.json (every player of every match with metadata) and career-<acc>.json
+    (tracked players), computed from the local metadata files."""
+    valve, careers = {}, {a: [] for a in accounts}
+    for f in sorted(META_DIR.glob("*.json.gz")) if META_DIR.exists() else []:
         try:
-            rows = get_json(url, timeout=180)
-        except (urllib.error.URLError, OSError) as e:
-            log(f"valve stats fetch failed: {e}")
-            break
-        for m in rows:
-            per = {}
-            for p in m.get("players", []):
-                fs = p.get("final_stats") or {}
-                cs = fs.get("custom_user_stats") or {}
-                rec = {k: fs.get(k) for k in VALVE_FIELDS}
-                for k, short in CAREER_CUSTOM.items():
-                    rec[short] = cs.get(k)
-                per[p["account_id"]] = rec
-            cache[str(m["match_id"])] = per
-        for mid in chunk:  # matches deadlock-api has no metadata for: don't ask every sync
-            cache.setdefault(str(mid), {})
-    VALVE_STATS.write_text(json.dumps(cache))
-    log(f"valve stats: {sum(1 for v in cache.values() if v)} matches")
-
-
-def sync_career(account):
-    """end-of-match stats for every match deadlock-api has metadata for (no demo needed).
-    written to web/data/career-<account>.json"""
-    url = (f"{API}/v1/matches/metadata?account_ids={account}&only_filtered_players=true"
-           "&include_info=true&include_player_info=true&include_player_final_stats=true&limit=5000")
-    try:
-        rows = get_json(url, timeout=300)
-    except (urllib.error.URLError, OSError) as e:
-        log(f"career fetch failed: {e}")
-        return
-    out = []
-    for m in rows:
-        p = next((x for x in m.get("players", []) if x["account_id"] == account), None)
-        if not p or not p.get("final_stats"):
+            with gzip.open(f, "rt") as fh:
+                mi = json.load(fh).get("match_info") or {}
+        except (OSError, ValueError):
             continue
-        fs = p["final_stats"]
-        cs = fs.get("custom_user_stats") or {}
-        rec = {
-            "match_id": m["match_id"],
-            "hero_id": p["hero_id"],
-            "duration_s": m["duration_s"],
-            "won": m.get("winning_team") == p.get("team"),
-            "kills": p.get("kills"), "deaths": p.get("deaths"), "assists": p.get("assists"),
-            "badge": m.get("average_badge"),
-            "mode": m.get("match_mode"),
-        }
-        for k in CAREER_FIELDS:
-            rec[k] = fs.get(k)
-        for k, short in CAREER_CUSTOM.items():
-            rec[short] = cs.get(k)
-        # outgoing ability damage by distance bucket (m): {"10": dmg, ...}
-        rec["ability_dist"] = {k.split("##")[1]: v for k, v in cs.items()
-                               if k.startswith("Outgoing Ability Dist##")}
-        rec["bullet_dist"] = {k.split("##")[1]: v for k, v in cs.items()
-                              if k.startswith("Outgoing Bullet Dist##")}
-        out.append(rec)
-    (DATA / f"career-{account}.json").write_text(json.dumps(out))
-    log(f"career: {len(out)} matches with end-of-match stats")
+        mid = mi.get("match_id") or int(f.name.split(".")[0])
+        per = {}
+        for p in mi.get("players") or []:
+            fs, cs = _meta_player_stats(mi, p)
+            rec = {k: fs.get(k) for k in VALVE_FIELDS}
+            for k, short in CAREER_CUSTOM.items():
+                rec[short] = cs.get(k)
+            per[p.get("account_id")] = rec
+            if p.get("account_id") in careers:
+                c = {
+                    "match_id": mid, "hero_id": p.get("hero_id"), "duration_s": mi.get("duration_s"),
+                    "won": mi.get("winning_team") == p.get("team"),
+                    "kills": p.get("kills"), "deaths": p.get("deaths"), "assists": p.get("assists"),
+                    "badge": None, "mode": mi.get("match_mode"),
+                }
+                for k in CAREER_FIELDS:
+                    c[k] = fs.get(k)
+                for k, short in CAREER_CUSTOM.items():
+                    c[short] = cs.get(k)
+                c["ability_dist"] = {k.split("##")[1]: v for k, v in cs.items()
+                                     if k and k.startswith("Outgoing Ability Dist##")}
+                c["bullet_dist"] = {k.split("##")[1]: v for k, v in cs.items()
+                                    if k and k.startswith("Outgoing Bullet Dist##")}
+                careers[p["account_id"]].append(c)
+        valve[str(mid)] = per
+    (DATA / "valve-stats.json").write_text(json.dumps(valve))
+    for acc, rows in careers.items():
+        (DATA / f"career-{acc}.json").write_text(json.dumps(rows))
+    log(f"metadata digest: {len(valve)} matches, career rows {sum(len(r) for r in careers.values())}")
 
-
-# ---------------------------------------------------------------- main
 
 def write_match_list(indexes):
     """web/data/matches.json: every parsed match (any account) with its 12 players."""
@@ -540,6 +604,7 @@ class Ctx:
         self.used_heroes, self.used_items, self.accounts = set(), set(), set()
         self.badges = []
         self.meta_ids = set()
+        self.all_ids = set()
 
 
 def sync_account(ctx, account):
@@ -628,11 +693,11 @@ def sync_account(ctx, account):
     if selected:
         ctx.used_heroes |= selected
     ctx.badges += [m.get("ranked_display_badge") for m in history]
+    ctx.all_ids |= {m["match_id"] for m in history}
     ctx.meta_ids |= {m["match_id"] for m in history
                      if (MATCHES / f"{m['match_id']}.json.gz").exists()
                      or selected is None or m.get("hero_id") in selected}
 
-    sync_career(account)
 
     entries = []
     for m in history:
@@ -690,6 +755,8 @@ def main():
     ap.add_argument("--no-download", action="store_true")
     ap.add_argument("--no-refetch", action="store_true", help="use deadlock-api's cached history")
     ap.add_argument("--no-meta", action="store_true", help="skip Valve match metadata downloads")
+    ap.add_argument("--meta-all", action="store_true",
+                    help="download metadata for every match in history (career stats for all heroes)")
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2))
     args = ap.parse_args()
 
@@ -733,10 +800,13 @@ def main():
         MANIFEST.write_text(json.dumps(ctx.manifest))
 
     sync_assets(ctx.heroes, ctx.items, ctx.used_heroes, ctx.used_items, ctx.badges)
-    sync_valve_stats(sorted({int(p.name.split(".")[0]) for p in MATCHES.glob("*.json.gz")}))
     if not args.no_meta:
         parsed_ids = {int(p.name.split(".")[0]) for p in MATCHES.glob("*.json.gz")}
-        sync_metadata(sorted(ctx.meta_ids | parsed_ids, reverse=True))
+        wanted = ctx.meta_ids | parsed_ids
+        if args.meta_all:
+            wanted |= ctx.all_ids
+        sync_metadata(sorted(wanted, reverse=True))
+    digest_metadata([idx["account_id"] for idx in indexes])
     # players from downloaded metadata (matches without a demo) get profiles too
     for f in META_DIR.glob("*.json.gz") if META_DIR.exists() else []:
         try:
