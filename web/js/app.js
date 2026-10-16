@@ -35,6 +35,12 @@ function renderHeader() {
   const rank = lastRanked && S.assets.ranks[lastRanked.badge];
   $("#rank").innerHTML = rank ? `<img src="${esc(rank.image)}" alt=""><span>${esc(rank.name)}</span>` : "";
   $("#rank").title = rank ? `latest ranked badge (${fmtDay(new Date(lastRanked.start_time * 1000))})` : "";
+  const h = S.index.health;
+  $("#health").innerHTML = h
+    ? `parser v${S.index.parser_version} · ${h.parsed} demos parsed` +
+      (h.failed.length ? ` · <b class="bad">${h.failed.length} failed to parse</b> (a game patch may need <code>tools/update-parser.sh</code>)` : "") +
+      (h.warned.length ? ` · ${h.warned.length} with warnings` : "")
+    : "";
   $("#subtitle").textContent =
     `${S.index.matches.length} matches · ${parsed} with demo · synced ${fmtDate(new Date(S.index.generated * 1000))} (${TZ})`;
 }
@@ -99,7 +105,13 @@ async function main() {
   try {
     await loadAll();
   } catch (err) {
-    $("#subtitle").textContent = `failed to load data: ${err.message}. Run tools/sync.py first.`;
+    const h = S.index.health;
+  $("#health").innerHTML = h
+    ? `parser v${S.index.parser_version} · ${h.parsed} demos parsed` +
+      (h.failed.length ? ` · <b class="bad">${h.failed.length} failed to parse</b> (a game patch may need <code>tools/update-parser.sh</code>)` : "") +
+      (h.warned.length ? ` · ${h.warned.length} with warnings` : "")
+    : "";
+  $("#subtitle").textContent = `failed to load data: ${err.message}. Run tools/sync.py first.`;
     return;
   }
   window.addEventListener("hashchange", route);

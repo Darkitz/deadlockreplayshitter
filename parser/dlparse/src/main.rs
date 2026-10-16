@@ -22,9 +22,11 @@ use haste::valveprotos::deadlock::{
 use prost::Message;
 use serde::Serialize;
 
-const FORMAT_VERSION: u32 = 5;
-/// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`
-const NOISY_ABILITIES: &[u32] = &[
+const FORMAT_VERSION: u32 = 6;
+/// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`.
+/// sync.py passes the current ids (resolved by class name) via `--ignore-ids`; this list is only
+/// the fallback.
+const DEFAULT_NOISY_ABILITIES: &[u32] = &[
     2573821048, // zip_line
     875395762,  // zipline_boost
     4109126631, // mantle
@@ -161,6 +163,8 @@ struct Output {
     kills: Vec<(f32, i32, i32, u32, Vec<i32>)>,
     samples: Samples,
     stats: Stats,
+    /// sanity problems found after parsing (a game patch changing the demo format shows up here)
+    warnings: Vec<String>,
 }
 
 #[derive(Default)]
@@ -183,6 +187,7 @@ struct V {
     pawn_ctrl: HashMap<i32, i32>,
     pawn_hero: HashMap<i32, u32>,
     abilities: HashMap<i32, AbilityState>,
+    noisy: Vec<u32>,
     next_sample: f32,
     next_stat: f32,
     track_idx: HashMap<i32, usize>,
@@ -261,7 +266,7 @@ impl V {
             return;
         }
         let cd_start: f32 = e.get_value(&COOLDOWN_START).unwrap_or(0.0);
-        if cd_start > 0.0 && (cd_start - a.cooldown_start).abs() > 1e-3 && !NOISY_ABILITIES.contains(&a.id) {
+        if cd_start > 0.0 && (cd_start - a.cooldown_start).abs() > 1e-3 && !self.noisy.contains(&a.id) {
             a.cooldown_start = cd_start;
             let cd_end: f32 = e.get_value(&COOLDOWN_END).unwrap_or(cd_start);
             let charges: i32 = e.get_value(&CHARGES).unwrap_or(0);
@@ -499,6 +504,43 @@ impl Visitor for V {
     }
 }
 
+/// cheap invariants; each failure usually means a field or message was renamed by a patch
+fn sanity_check(o: &Output, has_start: bool) -> Vec<String> {
+    let mut w = Vec::new();
+    if !has_start {
+        w.push("game start time not found (m_flGameStartTime)".into());
+    }
+    if o.players.len() != 12 {
+        w.push(format!("{} players resolved (expected 12)", o.players.len()));
+    }
+    if o.players.iter().any(|p| p.account_id == 0) {
+        w.push("players without steam id (m_steamID)".into());
+    }
+    if o.players.iter().any(|p| p.hero_id == 0) {
+        w.push("players without hero id".into());
+    }
+    if o.casts.is_empty() {
+        w.push("no ImportantAbilityUsed casts (old demo, or message changed)".into());
+    }
+    if o.uses.is_empty() {
+        w.push("no ability cooldowns (m_flCooldownStart / m_nSubclassID)".into());
+    }
+    if o.damage.is_empty() {
+        w.push("no hero damage events".into());
+    }
+    if o.kills.is_empty() {
+        w.push("no hero kills".into());
+    }
+    let moving = o.samples.tracks.iter().filter(|t| t.pos.iter().any(|&v| v != 0)).count();
+    if moving < o.players.len() {
+        w.push(format!("positions missing for {} players", o.players.len() - moving));
+    }
+    if o.stats.tracks.iter().all(|t| t.rows.iter().all(|r| r[0] == 0)) {
+        w.push("net worth never set (m_iGoldNetWorth)".into());
+    }
+    w
+}
+
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("--version") {
@@ -509,9 +551,16 @@ fn main() -> anyhow::Result<()> {
         anyhow::bail!("usage: dlparse <demo.dem> <out.json> [match_id]");
     }
     let match_id = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(0);
+    let noisy = args
+        .iter()
+        .position(|a| a == "--ignore-ids")
+        .and_then(|i| args.get(i + 1))
+        .map(|s| s.split(',').filter_map(|x| x.trim().parse().ok()).collect())
+        .unwrap_or_else(|| DEFAULT_NOISY_ABILITIES.to_vec());
 
     let demo = DemoFile::start_reading(BufReader::new(File::open(&args[1])?))?;
-    let mut parser = Parser::from_stream_with_visitor(demo, V::default())?;
+    let v = V { noisy, ..V::default() };
+    let mut parser = Parser::from_stream_with_visitor(demo, v)?;
     parser.run_to_end().map_err(|e| anyhow::anyhow!("parse failed: {e:?}"))?;
     let max_coord = parser.context().max_coord();
     let mut v = parser.into_visitor();
@@ -532,6 +581,10 @@ fn main() -> anyhow::Result<()> {
     v.out.version = FORMAT_VERSION;
     v.out.map_radius = max_coord.unwrap_or(0.0);
     v.out.uses.sort_by(|a, b| a.0.total_cmp(&b.0));
+    v.out.warnings = sanity_check(&v.out, v.game_start.is_some());
+    for w in &v.out.warnings {
+        eprintln!("warning: {w}");
+    }
 
     serde_json::to_writer(BufWriter::new(File::create(&args[2])?), &v.out)?;
     eprintln!(

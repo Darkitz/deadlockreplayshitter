@@ -96,6 +96,32 @@ The replay salt never appears in public metadata. It comes only from the Steam G
 remembers failed lookups: deleted demos are never retried, and missing salts are rechecked after
 6 h.
 
+## After a Deadlock patch
+
+Game updates can change the demo format: new field types, renamed fields, or new protobuf
+messages. Here is what protects the site:
+
+- **The parser fails loudly or warns.** `dlparse` writes sanity `warnings` into every match
+  file, for example missing casts, positions, steam ids or net worth. Sync logs them, the site
+  shows them on the match, and the footer lists any demos that failed to parse.
+- **The canary:** `tools/check.sh` parses the newest local demo. It fails on parse errors or
+  warnings, then runs all tests.
+- **Updating the parser:** `tools/update-parser.sh` pulls deadlock-api's maintained haste fork
+  and protos, which they keep current across patches. It then rebuilds and runs the canary. If
+  either step fails, it restores the previous parser automatically.
+- **No hardcoded game ids in the data path.** Heroes, abilities and items come from live
+  deadlock-api assets on every sync. The movement abilities that get filtered out are resolved
+  by class name and passed to the parser.
+- **Reparsing on format changes.** Bumping `FORMAT_VERSION` in the parser makes the next sync
+  reparse every demo.
+
+Typical patch-day routine:
+
+```bash
+tools/check.sh || tools/update-parser.sh
+python3 tools/sync.py
+```
+
 ## Tests
 
 ```bash

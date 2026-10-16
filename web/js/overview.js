@@ -130,6 +130,7 @@ export async function viewOverview(heroId, params) {
         <span class="muted" title="${esc(d.toString())}">${fmtDate(d)} · ${ago(d)}</span>
         <span class="muted">${fmtClock(x.entry.duration_s)}</span>
         ${rankChip(x.entry)}
+        ${x.entry.warnings?.length ? `<span class="warn-dot" title="${esc(x.entry.warnings.join("\n"))}">⚠</span>` : ""}
       </div>
       ${sparkline(x.casts, x.match.end, settings.heroesOnly)}
       <div class="card-stats">

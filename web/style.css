@@ -280,3 +280,7 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
 .feed-filter { display: flex; gap: 6px; }
 .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
 .chip.on { border-color: var(--accent); color: var(--accent); }
+#health { margin-bottom: 4px; }
+#health .bad, .bad { color: var(--miss); }
+.note.warn { border-left-color: var(--miss); }
+.warn-dot { color: var(--accent); cursor: help; }

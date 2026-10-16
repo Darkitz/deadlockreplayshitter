@@ -43,6 +43,13 @@ GAME_REPLAYS = Path(os.environ.get(
 API = "https://api.deadlock-api.com"
 STEAM_ID64_BASE = 76561197960265728
 UA = {"User-Agent": "deadlock-replay-skill-hitter/0.2"}
+# movement abilities kept out of the parser's `uses` (resolved to ids from live assets, so a
+# patch that renumbers them doesn't silently flood the data)
+NOISY_CLASSES = [
+    "citadel_ability_zip_line", "citadel_ability_zipline_boost", "citadel_ability_mantle",
+    "citadel_ability_climb_rope", "citadel_ability_jump", "citadel_ability_sprint",
+    "citadel_ability_dash", "citadel_ability_slide", "citadel_ability_jump_ratking",
+]
 
 
 def log(*a):
@@ -88,6 +95,11 @@ def to_account_id(v: str) -> int:
 def parser_version():
     r = subprocess.run([str(PARSER), "--version"], capture_output=True, text=True)
     return int(r.stdout.strip() or 0)
+
+
+def manifest_version(entry):
+    """manifest entries were plain versions before warnings were tracked"""
+    return entry if isinstance(entry, int) else (entry or {}).get("v")
 
 
 def load_manifest():
@@ -139,22 +151,27 @@ def fetch_demo(match_id, steam_salts):
     return dem, "downloaded"
 
 
-def parse(match_id, demo: Path):
-    """run the parser, gzip its output. returns (ok, message)."""
+def parse(match_id, demo: Path, ignore_ids=()):
+    """run the parser, gzip its output. returns (ok, message, warnings)."""
     MATCHES.mkdir(parents=True, exist_ok=True)
     out = MATCHES / f"{match_id}.json.gz"
     part = out.with_name(out.name + ".part")
     with tempfile.TemporaryDirectory() as tmp:
         raw = Path(tmp) / "m.json"
-        r = subprocess.run([str(PARSER), str(demo), str(raw), str(match_id)],
-                           capture_output=True, text=True)
+        cmd = [str(PARSER), str(demo), str(raw), str(match_id)]
+        if ignore_ids:
+            cmd += ["--ignore-ids", ",".join(map(str, ignore_ids))]
+        r = subprocess.run(cmd, capture_output=True, text=True)
         if r.returncode != 0:
-            return False, f"parse failed: {r.stderr.strip()[-300:]}"
+            return False, f"parse failed: {r.stderr.strip()[-300:]}", []
         with open(raw, "rb") as src, gzip.open(part, "wb", 6) as dst:
             shutil.copyfileobj(src, dst)
         part.replace(out)
     (MATCHES / f"{match_id}.json").unlink(missing_ok=True)  # pre-gzip format
-    return True, r.stderr.strip()
+    lines = r.stderr.strip().splitlines()
+    warnings = [l[len("warning: "):] for l in lines if l.startswith("warning: ")]
+    summary = next((l for l in lines if l.startswith("ok:")), "ok")
+    return True, summary, warnings
 
 
 def read_match(match_id):
@@ -185,8 +202,7 @@ def sync_ranks(badges):
     return out
 
 
-def sync_assets(heroes, used_heroes, used_items, badges=()):
-    items = get_json(f"{API}/v1/assets/items")
+def sync_assets(heroes, items, used_heroes, used_items, badges=()):
     out_heroes = {}
     for h in heroes:
         img = h.get("images", {})
@@ -365,6 +381,10 @@ def main():
     pver = parser_version()
     account = to_account_id(args.account)
     heroes = get_json(f"{API}/v1/assets/heroes")
+    items = get_json(f"{API}/v1/assets/items")
+    ignore_ids = [it["id"] for it in items if it.get("class_name") in NOISY_CLASSES]
+    if len(ignore_ids) != len(NOISY_CLASSES):
+        log(f"note: only {len(ignore_ids)}/{len(NOISY_CLASSES)} movement abilities found in assets")
     selected = resolve_heroes(heroes, args.hero)
     names = "all heroes" if selected is None else ", ".join(
         h["name"] for h in heroes if h["id"] in selected)
@@ -418,7 +438,7 @@ def main():
         mid = m["match_id"]
         if mid not in demos:
             continue
-        have = (MATCHES / f"{mid}.json.gz").exists() and manifest.get(str(mid)) == pver
+        have = (MATCHES / f"{mid}.json.gz").exists() and manifest_version(manifest.get(str(mid))) == pver
         if have and not args.reparse:
             status[mid] += "; parsed"
             continue
@@ -426,16 +446,16 @@ def main():
     if jobs:
         log(f"parsing {len(jobs)} demos with {args.jobs} workers")
         with ThreadPoolExecutor(args.jobs) as ex:
-            futs = {ex.submit(parse, mid, demos[mid]): mid for mid in jobs}
+            futs = {ex.submit(parse, mid, demos[mid], ignore_ids): mid for mid in jobs}
             for f in as_completed(futs):
                 mid = futs[f]
-                ok, msg = f.result()
-                log(f"  {mid}: {msg}")
+                ok, msg, warnings = f.result()
+                log(f"  {mid}: {msg}" + "".join(f"\n    warning: {w}" for w in warnings))
                 if ok:
-                    manifest[str(mid)] = pver
+                    manifest[str(mid)] = {"v": pver, "warnings": warnings}
                     status[mid] += "; parsed"
                 else:
-                    manifest.pop(str(mid), None)
+                    manifest[str(mid)] = {"v": pver, "error": msg}
                     status[mid] += f"; {msg}"
         MANIFEST.parent.mkdir(parents=True, exist_ok=True)
         MANIFEST.write_text(json.dumps(manifest))
@@ -454,26 +474,29 @@ def main():
         used_heroes |= selected
 
     DATA.mkdir(parents=True, exist_ok=True)
-    sync_assets(heroes, used_heroes, used_items, [m.get("ranked_display_badge") for m in history])
+    sync_assets(heroes, items, used_heroes, used_items, [m.get("ranked_display_badge") for m in history])
     profiles = sync_profiles(accounts)
     sync_career(account)
 
     entries = []
     for m in history:
         mid = m["match_id"]
+        man = manifest.get(str(mid))
         entries.append({
             "match_id": mid,
-            "start_time": m["start_time"],
-            "duration_s": m["match_duration_s"],
-            "hero_id": m["hero_id"],
-            "kills": m["player_kills"],
-            "deaths": m["player_deaths"],
-            "assists": m["player_assists"],
-            "net_worth": m["net_worth"],
-            "last_hits": m["last_hits"],
-            "level": m["hero_level"],
-            "won": m["match_result"] == m["player_team"],
-            "mode": m["match_mode"],
+            "start_time": m.get("start_time", 0),
+            "duration_s": m.get("match_duration_s", 0),
+            "hero_id": m.get("hero_id", 0),
+            "kills": m.get("player_kills", 0),
+            "deaths": m.get("player_deaths", 0),
+            "assists": m.get("player_assists", 0),
+            "net_worth": m.get("net_worth", 0),
+            "last_hits": m.get("last_hits", 0),
+            "level": m.get("hero_level", 0),
+            "won": m.get("match_result") == m.get("player_team"),
+            "mode": m.get("match_mode"),
+            "warnings": (man or {}).get("warnings", []) if isinstance(man, dict) else [],
+            "parse_error": (man or {}).get("error") if isinstance(man, dict) else None,
             "badge": m.get("ranked_display_badge"),
             "rank_delta": m.get("ranked_delta"),
             "parsed": (MATCHES / f"{mid}.json.gz").exists(),
@@ -489,6 +512,11 @@ def main():
         "profile": profiles.get(account),
         "generated": int(time.time()),
         "parser_version": pver,
+        "health": {
+            "parsed": sum(1 for e in entries if e["parsed"]),
+            "failed": [e["match_id"] for e in entries if e["parse_error"]],
+            "warned": [e["match_id"] for e in entries if e["warnings"]],
+        },
         "default_hero": default_hero,
         "matches": entries,
     }))
