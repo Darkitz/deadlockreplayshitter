@@ -283,51 +283,74 @@ export function incoming(m, pawn, assets, opts) {
 export const GUN = { class_name: "__gun", name: "Gun", id: null };
 
 /**
- * Gun stats for a pawn, straight from the demo:
- *   shots    = trigger pulls (weapon m_nShotNumber), bullets = shots × pellets per shot
- *   heroHits = weapon damage events on enemy heroes (one per shot that connected; for
- *              multi-pellet guns several pellets fold into one event)
- *   headshots = hero hits on hitgroup 1 / with crit damage
- * Returns totals plus time-ordered events for timelines: {t, kind: "shot"|"hit"|"hs"|"npc", n}
+ * Gun stats for a pawn, straight from the demo, paired per shot:
+ *   shots     = trigger pulls (weapon m_nShotNumber), bullets = shots × pellets per shot
+ *   each shot is matched with the weapon damage that landed within 0.15 s (bullets are near
+ *   instant): it hit an enemy hero, only troopers/neutrals/objectives ("npc"), or nothing.
+ *   headshot  = a hero hit on hitgroup 1 / with crit damage
+ *   hero accuracy excl. NPC shots = hero shots / (shots - npc shots): shots spent on troopers
+ *   are taken out so the rest approximates "shots aimed at heroes".
+ * Timeline events: {t, kind: "shot"|"hit"|"hs"|"npc", n}
  */
 export function gunStats(m, pawn, assets) {
   m._gun ??= new Map();
   if (m._gun.has(pawn)) return m._gun.get(pawn);
   const me = m.byPawn.get(pawn);
-  const weapons = new Set();
+  const rows = (m.shots || []).filter((s) => s[1] === pawn);
+  const weapons = new Set(rows.map((s) => s[2]));
+  const dmg = m.damage.filter((d) => d[1] === pawn && weapons.has(d[4]));
   const events = [];
-  let shots = 0, bullets = 0;
-  for (const s of m.shots || []) {
-    if (s[1] !== pawn) continue;
-    weapons.add(s[2]);
-    const pellets = assets?.item(s[2])?.pellets || 1;
-    shots += s[3];
-    bullets += s[3] * pellets;
-    events.push({ t: s[0], kind: "shot", n: s[3] });
-  }
-  let heroHits = 0, headshots = 0, npcHits = 0, dmg = 0, heroDmg = 0;
+  let shots = 0, bullets = 0, heroShots = 0, npcShots = 0, headshots = 0, heroDmg = 0, dmgTotal = 0;
   const byVictim = new Map();
-  for (const d of m.damage) {
-    if (d[1] !== pawn || !weapons.has(d[4])) continue;
-    dmg += d[5];
+  // one entry per trigger pull (rows can hold several pulls in one tick)
+  const pulls = [];
+  for (const [t, , wid, n] of rows) {
+    const pellets = assets?.item(wid)?.pellets || 1;
+    shots += n;
+    bullets += n * pellets;
+    events.push({ t, kind: "shot", n });
+    for (let k = 0; k < n; k++) pulls.push({ t, hit: null });
+  }
+  // damage landing in the same tick is one shot's worth (pellets / multiple targets)
+  const packets = [];
+  for (const d of dmg) {
     const vic = d[3] >= 0 ? m.byPawn.get(d[3]) : null;
     if (vic && vic.team === me.team) continue;
+    dmgTotal += d[5];
+    let pk = packets.at(-1);
+    if (!pk || Math.abs(pk.t - d[0]) > 0.008) {
+      pk = { t: d[0], hero: null, npc: false, hs: false };
+      packets.push(pk);
+    }
     if (vic) {
-      heroHits++;
+      pk.hero = d[3];
       heroDmg += d[5];
-      const hs = d[9] === 1 || d[10] === 1;
-      if (hs) headshots++;
-      byVictim.set(vic.hero_id, (byVictim.get(vic.hero_id) || 0) + 1);
-      events.push({ t: d[0], kind: hs ? "hs" : "hit", n: 1, victim: d[3] });
+      if (d[9] === 1 || d[10] === 1) pk.hs = true;
+    } else pk.npc = true;
+  }
+  // FIFO: each packet claims the oldest unclaimed pull fired before it, within travel time
+  const TRAVEL = 1.5;
+  let q = 0;
+  for (const pk of packets) {
+    while (q < pulls.length && (pulls[q].hit || pulls[q].t < pk.t - TRAVEL)) q++;
+    if (q >= pulls.length || pulls[q].t > pk.t + 0.02) continue;
+    pulls[q].hit = pk;
+    if (pk.hero != null) {
+      heroShots++;
+      if (pk.hs) headshots++;
+      const hid = m.byPawn.get(pk.hero).hero_id;
+      byVictim.set(hid, (byVictim.get(hid) || 0) + 1);
+      events.push({ t: pk.t, kind: pk.hs ? "hs" : "hit", n: 1, victim: pk.hero });
     } else {
-      npcHits++;
-      events.push({ t: d[0], kind: "npc", n: 1 });
+      npcShots++;
+      events.push({ t: pk.t, kind: "npc", n: 1 });
     }
   }
   events.sort((a, b) => a.t - b.t);
   const res = {
-    weapons: [...weapons], shots, bullets, heroHits, headshots, npcHits, dmg, heroDmg, events,
-    byVictim: [...byVictim].sort((a, b) => b[1] - a[1]),
+    weapons: [...weapons], shots, bullets, heroHits: heroShots, headshots, npcHits: npcShots,
+    dmg: dmgTotal, heroDmg, events, byVictim: [...byVictim].sort((a, b) => b[1] - a[1]),
+    heroAcc: shots - npcShots > 0 ? heroShots / (shots - npcShots) : null,
   };
   m._gun.set(pawn, res);
   return res;
@@ -366,7 +389,9 @@ export function playerMatchSummary(m, pawn, assets, opts) {
     deaths: dc.length, isolatedDeaths: dc.filter((d) => d.isolated).length,
     thrown, hit, skillAcc: thrown ? hit / thrown : null, skillDmg: dmg, abilities,
     shots: g.shots, bullets: g.bullets, gunHits: g.heroHits, headshots: g.headshots,
-    gunAcc: g.shots ? g.heroHits / g.shots : null,
+    // hero hits / (shots - shots that only hit troopers/neutrals): ~ Valve's hero accuracy
+    gunAcc: g.heroAcc,
+    gunRaw: g.shots ? g.heroHits / g.shots : null, npcShots: g.npcHits,
     aimedAt: inc.aimed, gotHit: inc.hit,
   };
 }
@@ -435,4 +460,53 @@ export function deathContexts(m, pawn) {
     const s = surroundings(m, pawn, k[0] - 1.5);
     return { t: k[0], killer: k[2], ...(s || {}), isolated: s ? s.ally == null || s.ally > 30 : null };
   });
+}
+
+/** pseudo-ability for melee in the UI */
+export const MELEE = { class_name: "__melee", name: "Melee", id: null };
+export const MELEE_KIND = { 1: "light", 2: "heavy", 3: "heavy" };
+
+/**
+ * Melee swings (from the melee ability entity) paired with the melee damage that followed
+ * within 0.6 s. Returns totals per light/heavy plus parries and timeline events
+ * ({t, kind: "shot"|"hit"|"hs"|"npc"}, "hs" = heavy that hit a hero).
+ */
+export function meleeStats(m, pawn) {
+  m._melee ??= new Map();
+  if (m._melee.has(pawn)) return m._melee.get(pawn);
+  const me = m.byPawn.get(pawn);
+  const swings = (m.melee || []).filter((x) => x[1] === pawn);
+  const ids = new Set(swings.map((x) => x[2]));
+  const dmg = m.damage.filter((d) => d[1] === pawn && ids.has(d[4]));
+  const out = { light: { n: 0, hero: 0, npc: 0, dmg: 0 }, heavy: { n: 0, hero: 0, npc: 0, dmg: 0 }, events: [], swings: [] };
+  let j = 0;
+  for (let i = 0; i < swings.length; i++) {
+    const [t, , , type] = swings[i];
+    const kind = MELEE_KIND[type] || "light";
+    const end = Math.min(t + 0.6, i + 1 < swings.length ? swings[i + 1][0] : Infinity);
+    while (j < dmg.length && dmg[j][0] < t - 0.05) j++;
+    let hero = false, npc = false, total = 0;
+    const victims = new Set();
+    for (let k = j; k < dmg.length && dmg[k][0] <= end; k++) {
+      const v = dmg[k][3] >= 0 ? m.byPawn.get(dmg[k][3]) : null;
+      if (v && v.team === me.team) continue;
+      if (v) { hero = true; victims.add(dmg[k][3]); } else npc = true;
+      total += dmg[k][5];
+    }
+    const s = out[kind];
+    s.n++;
+    if (hero) s.hero++; else if (npc) s.npc++;
+    s.dmg += total;
+    const result = hero ? "hit" : npc ? "other" : "miss";
+    out.swings.push({ t, kind, result, dmg: total, victims: [...victims] });
+    out.events.push({ t, kind: "shot", n: 1 });
+    if (hero) out.events.push({ t, kind: kind === "heavy" ? "hs" : "hit", n: 1, victim: [...victims][0] });
+    else if (npc) out.events.push({ t, kind: "npc", n: 1 });
+  }
+  const parries = (m.parries || []).filter((x) => x[1] === pawn);
+  out.parryAttempts = parries.filter((x) => x[2] === 0).length;
+  out.parrySuccess = parries.filter((x) => x[2] === 1).length;
+  out.parries = parries;
+  m._melee.set(pawn, out);
+  return out;
 }

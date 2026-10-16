@@ -155,3 +155,20 @@ test("fights chain kills within the gap", async () => {
   assert.equal(f[0].t1, 108);
   assert.equal(f[1].kills.length, 1);
 });
+
+test("melee: light/heavy swings paired with following damage", async () => {
+  const { meleeStats } = await import("../web/js/analysis.js");
+  const m = fixture({
+    damage: [
+      [10.2, 1, 2, 2, 555, 50, 1, 0, 0, 0, 0],     // light hits enemy hero
+      [20.3, 1, 70, -1, 555, 120, 4, 0, 0, 0, 0],  // heavy hits a trooper
+    ],
+  });
+  m.melee = [[10, 1, 555, 1], [20, 1, 555, 2], [30, 1, 555, 3]];
+  m.parries = [[40, 1, 0], [40.2, 1, 1], [50, 1, 0]];
+  const s = meleeStats(m, 1);
+  assert.deepEqual([s.light.n, s.light.hero], [1, 1]);
+  assert.deepEqual([s.heavy.n, s.heavy.hero, s.heavy.npc], [2, 0, 1]);
+  assert.equal(s.parryAttempts, 2);
+  assert.equal(s.parrySuccess, 1);
+});

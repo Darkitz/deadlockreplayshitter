@@ -23,7 +23,7 @@ use haste::valveprotos::deadlock::{
 use prost::Message;
 use serde::Serialize;
 
-const FORMAT_VERSION: u32 = 10;
+const FORMAT_VERSION: u32 = 11;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`.
 /// sync.py passes the current ids (resolved by class name) via `--ignore-ids`; this list is only
 /// the fallback.
@@ -85,6 +85,12 @@ const UPGRADE_INFO: u64 = fkey_from_path(&["m_nUpgradeInfo"]);
 const CHARGES: u64 = fkey_from_path(&["m_iRemainingCharges"]);
 // weapons
 const SHOT_NUMBER: u64 = fkey_from_path(&["m_nShotNumber"]);
+// melee (CCitadel_Ability_HoldMelee): 1 = light, 2 = heavy, 3 = heavy variant
+const MELEE_ATTACK_TYPE: u64 = fkey_from_path(&["m_eCurrentAttackType"]);
+const MELEE_TRIGGERED: u64 = fkey_from_path(&["m_flAttackTriggeredTime"]);
+// parry (CCitadel_Ability_MeleeParry)
+const PARRY_START: u64 = fkey_from_path(&["m_flParryStartTime"]);
+const PARRY_SUCCESS: u64 = fkey_from_path(&["m_bAttackParried"]);
 
 const STEAM_ID64_BASE: u64 = 76561197960265728;
 
@@ -188,6 +194,10 @@ struct Output {
     /// [t, attacker_pawn, victim_entindex, victim_pawn_or_-1, ability_id, damage, victim_class, x, y,
     ///  hitgroup, crit]
     damage: Vec<(f32, i32, i32, i32, u32, i32, u32, i32, i32, i32, u8)>,
+    /// melee swings: [t, pawn, melee_ability_id, attack_type (1 light, 2 heavy, 3 heavy variant)]
+    melee: Vec<(f32, i32, u32, u8)>,
+    /// parries: [t, pawn, 0 = attempt / 1 = successful parry]
+    parries: Vec<(f32, i32, u8)>,
     /// weapon shots fired (trigger pulls; multiply by the weapon's pellets for bullets):
     /// [t, pawn, weapon_id, shots] (one row per tick with shots)
     shots: Vec<(f32, i32, u32, i32)>,
@@ -207,6 +217,9 @@ struct Output {
 #[derive(Default)]
 struct AbilityState {
     shot_number: Option<i64>,
+    melee_triggered: f32,
+    parry_start: f32,
+    parried: bool,
     owner_pawn: i32,
     id: u32,
     cooldown_start: f32,
@@ -320,6 +333,26 @@ impl V {
             }
         }
         let a = self.abilities.get_mut(&idx).unwrap();
+        // melee swing: the trigger time jumps to a new non-zero value once per attack
+        if let Some(trig) = e.get_value::<f32>(&MELEE_TRIGGERED) {
+            if trig > 0.0 && (trig - a.melee_triggered).abs() > 1e-3 && t > 0.0 {
+                let kind = e.get_value::<u64>(&MELEE_ATTACK_TYPE).unwrap_or(0) as u8;
+                self.out.melee.push((t, a.owner_pawn, a.id, kind));
+            }
+            a.melee_triggered = trig;
+        }
+        if let Some(ps) = e.get_value::<f32>(&PARRY_START) {
+            if ps > 0.0 && (ps - a.parry_start).abs() > 1e-3 && t > 0.0 {
+                self.out.parries.push((t, a.owner_pawn, 0));
+            }
+            a.parry_start = ps;
+        }
+        if let Some(ok) = e.get_value::<bool>(&PARRY_SUCCESS) {
+            if ok && !a.parried && t > 0.0 {
+                self.out.parries.push((t, a.owner_pawn, 1));
+            }
+            a.parried = ok;
+        }
         let cd_start: f32 = e.get_value(&COOLDOWN_START).unwrap_or(0.0);
         if cd_start > 0.0 && (cd_start - a.cooldown_start).abs() > 1e-3 && !self.noisy.contains(&a.id) {
             a.cooldown_start = cd_start;
@@ -525,6 +558,8 @@ impl Visitor for V {
             }
         } else if e.get_field_value(&COOLDOWN_START).is_some()
             || e.get_field_value(&SHOT_NUMBER).is_some()
+            || e.get_field_value(&MELEE_TRIGGERED).is_some()
+            || e.get_field_value(&PARRY_START).is_some()
             || self.abilities.contains_key(&e.index())
         {
             self.handle_ability_entity(ctx, dh, e);
@@ -665,6 +700,9 @@ fn sanity_check(o: &Output, has_start: bool) -> Vec<String> {
     }
     if o.shots.is_empty() {
         w.push("no weapon shots (m_nShotNumber)".into());
+    }
+    if o.melee.is_empty() {
+        w.push("no melee swings (m_flAttackTriggeredTime)".into());
     }
     if o.modifiers.is_empty() {
         w.push("no modifiers (ActiveModifiers string table)".into());

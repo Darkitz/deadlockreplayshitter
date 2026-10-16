@@ -269,7 +269,7 @@ function renderCareer(heroId, entries) {
       ${tile("Win rate", pct(wins / rows.length), "accent")}
       ${tile("KDA ratio", kda.toFixed(2))}
       ${tile("Gun acc. vs heroes", shots ? pct(hits / shots) : "–", "good")}
-      ${tile("Headshot rate", hits ? pct(sum("hero_headshots") / hits) : "–")}
+      ${tile("Hero headshot rate", hits ? pct(sum("hero_headshots") / hits) : "–")}
       ${tile("Hero dmg / min", Math.round(sum("player_damage") / mins))}
       ${tile("Dmg taken / min", Math.round(sum("player_damage_taken") / mins))}
       ${tile("Ability kills", `${sum("ability_kills")}<small> / ${sum("kills")}</small>`)}
@@ -468,7 +468,7 @@ function renderGun(list) {
       ${tile("Bullets fired", k1(bullets))}
       ${tile("Shots hit heroes", hits, "good")}
       ${tile("Hit rate (per shot)", pct(hits / shots), "accent")}
-      ${tile("Headshot %", hits ? pct(hs / hits) : "–")}
+      ${tile("Hero headshot %", hits ? pct(hs / hits) : "–")}
       ${tile("Trooper/NPC hits", npc)}
       ${tile("Gun hero dmg / min", Math.round(heroDmg / mins))}
       ${tile("Valve hero accuracy", vShots ? `${pct(vHits / vShots)}<small> ${vHits}/${vShots}</small>` : "–")}

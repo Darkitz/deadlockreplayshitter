@@ -46,7 +46,7 @@ export async function viewHero(heroId, params) {
   const perAbility = new Map(sigs.map((ab) => [ab.class_name, { ab, thrown: 0, hit: 0, dmg: 0 }]));
   const perPlayer = new Map();
   const itemStats = new Map(); // item id -> {n, wins, timeSum}
-  let wins = 0, shots = 0, gunHits = 0, hs = 0;
+  let wins = 0, shots = 0, gunHits = 0, hs = 0, npcShots = 0;
   // load matches 4 at a time, then aggregate in order
   const loaded = new Array(apps.length);
   let next = 0;
@@ -86,14 +86,14 @@ export async function viewHero(heroId, params) {
       itemStats.set(id, e);
     }
     const g = gunStats(m, me.pawn, S.assets);
-    shots += g.shots; gunHits += g.heroHits; hs += g.headshots;
+    shots += g.shots; gunHits += g.heroHits; hs += g.headshots; npcShots += g.npcHits;
   }
   const players = [...perPlayer.values()];
   const thrown = players.reduce((a, p) => a + p.thrown, 0), hit = players.reduce((a, p) => a + p.hit, 0);
   $("#h-summary").innerHTML = [
     tile("Appearances", apps.length), tile("Win rate", apps.length ? pct(wins / apps.length) : "–", "accent"),
     tile("Skill accuracy", thrown ? `${pct(hit / thrown)}<small> ${hit}/${thrown}</small>` : "–", "good"),
-    tile("Gun hit rate", shots ? pct(gunHits / shots) : "–"), tile("Headshot %", gunHits ? pct(hs / gunHits) : "–"),
+    tile("Gun hero accuracy", shots - npcShots > 0 ? pct(gunHits / (shots - npcShots)) : "–"), tile("Hero headshot %", gunHits ? pct(hs / gunHits) : "–"),
     tile("Players", players.length),
   ].join("");
   const bar = (v) => v == null ? "–" : `<span class="acc-bar"><span style="width:${v * 100}%"></span></span>${pct(v)}`;

@@ -472,3 +472,12 @@ img.slot-spirit { background: #5a3a8c !important; }
 .mc-tracked .hi { width: 22px; height: 22px; border-radius: 5px; vertical-align: middle; }
 .chip-s.muted-chip { border-color: var(--line); color: var(--muted); }
 .btn.more { grid-column: 1 / -1; justify-self: center; }
+.span-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 12px; color: var(--muted); }
+.seg { display: inline-flex; gap: 0; }
+.seg .chip { border-radius: 0; }
+.seg .chip:first-child { border-radius: 999px 0 0 999px; }
+.seg .chip:last-child { border-radius: 0 999px 999px 0; }
+.span-ctl { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.span-ctl.off { opacity: .45; }
+.tin { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 2px 5px; font: inherit; width: 54px; font-variant-numeric: tabular-nums; }
+.scrub-from { width: 160px; accent-color: var(--accent); }

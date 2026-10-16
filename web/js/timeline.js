@@ -80,7 +80,8 @@ export function createTimeline(svg, model, onSeek, onSpan) {
       for (const n of [0, maxG]) {
         outside += `<text class="axis" x="${padL - 6}" y="${gy(n) + 3}" text-anchor="end">${n}</text>`;
       }
-      g += `<text class="lane-label" x="${padL + 4}" y="${c.y + 10}">shots ${sh.n} · hero hits ${hi.n} · headshots ${hs.n}</text>`;
+      const lb = model.gunLabels || ["shots", "hero hits", "headshots"];
+      g += `<text class="lane-label" x="${padL + 4}" y="${c.y + 10}">${lb[0]} ${sh.n} · ${lb[1]} ${hi.n} · ${lb[2]} ${hs.n}</text>`;
     }
     const maxY = Math.max(casts.length, 1);
     const cy = (n) => c.y + c.h - (n / maxY) * (c.h - 4);
