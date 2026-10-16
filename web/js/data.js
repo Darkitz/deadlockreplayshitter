@@ -1,5 +1,7 @@
 // Loading + lookup helpers for index/assets/profiles and parsed matches.
 
+import { localGet } from "./local.js";
+
 export async function loadJSON(url) {
   const r = await fetch(url, { cache: "no-cache" });
   if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
@@ -92,9 +94,17 @@ export async function loadMeta(id) {
   return loadGzJSON(`data/meta/${id}.json.gz`);
 }
 
+/** forget a loaded match (a demo dropped again replaces its old parse) */
+export function forgetMatch(id) { matchCache.delete(id); }
+
 export async function loadMatch(id) {
   if (!matchCache.has(id)) {
-    matchCache.set(id, loadGzJSON(`data/matches/${id}.json.gz?v=${dataVersion}`).then(prepare).catch((e) => {
+    // demos dropped onto the page (parsed in the browser) first, then the server's parsed files
+    const load = async () => {
+      const local = await localGet(id);
+      return local || loadGzJSON(`data/matches/${id}.json.gz?v=${dataVersion}`);
+    };
+    matchCache.set(id, load().then(prepare).catch((e) => {
       matchCache.delete(id);
       throw e;
     }));

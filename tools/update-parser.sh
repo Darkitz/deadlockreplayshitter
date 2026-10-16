@@ -29,6 +29,7 @@ restore() {
 }
 
 if ! (cd "$ROOT/parser" && cargo build --release -q); then restore; exit 1; fi
+"$ROOT/tools/build-wasm.sh" || { restore; exit 1; }
 if ! "$ROOT/tools/check.sh"; then restore; exit 1; fi
 rm -rf "$ROOT/parser/vendor/haste.old" "$ROOT/parser/vendor/valveprotos.old"
 git -C "$ROOT" status --short parser/vendor | head -20

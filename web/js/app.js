@@ -10,7 +10,8 @@
 //   #/hero/<id>                          legacy: hero page of the current player
 //   #/about                              how every number is derived
 
-import { loadJSON, Assets, clearCache, setDataVersion } from "./data.js";
+import { loadJSON, Assets, clearCache, setDataVersion, forgetMatch } from "./data.js";
+import { initDropZone, localList } from "./local.js";
 import { $, esc, S, fmtDate, TZ, settings, saveSettings } from "./ui.js";
 import { viewOverview } from "./overview.js";
 import { viewMatch } from "./match.js";
@@ -23,6 +24,8 @@ import { viewAbout, explain } from "./explain.js";
 
 async function loadAll() {
   S.accounts = await loadJSON("data/accounts.json").catch(() => []);
+  S.localMatches = await localList();
+  S.onLocalMatch = (id) => forgetMatch(id);
   const [assets, profiles, valveStats, matchList, ...indexes] = await Promise.all([
     loadJSON("data/assets.json"),
     loadJSON("data/profiles.json").catch(() => ({})),
@@ -249,6 +252,7 @@ async function main() {
   }
   window.addEventListener("hashchange", route);
   initHelp();
+  initDropZone();
   route();
   initSync();
 }

@@ -32,9 +32,13 @@ export async function viewMatch(id, params) {
       return;
     }
   }
-  const me = m.player(S.index.account_id);
+  // point of view: the current tracked player, any tracked player in the match, or (dropped demos)
+  // whoever was analyzed last
+  const me = (S.index && m.player(S.index.account_id))
+    || m.players.find((p) => S.indexes?.[p.account_id]) || m.player(settings.lastAccount);
   const pawn = Number(params.get("pawn")) || me?.pawn || m.players[0].pawn;
   const subject = m.byPawn.get(pawn);
+  if (params.get("pawn") && subject.account_id !== settings.lastAccount) { settings.lastAccount = subject.account_id; saveSettings(); }
   const sigs = S.assets.signatures(subject.hero_id);
   // the hero's own melee ability rows are replaced by the light / heavy melee pseudo-abilities
   const isMeleeAb = (c) => /ability_melee_(?!parry)|hold_melee/.test(c || "");
@@ -100,7 +104,7 @@ export async function viewMatch(id, params) {
         ${d ? `<span class="muted" title="${esc(d.toString())}">${fmtDate(d)} · ${ago(d)}</span>` : ""}
         <span class="muted">${fmtClock(m.end)}</span>
         ${rankChip(e)}
-        <a class="muted small" target="_blank" rel="noopener" href="https://statlocker.gg/match/${id}">statlocker ↗</a>
+        ${id < 900000000000 ? `<a class="muted small" target="_blank" rel="noopener" href="https://statlocker.gg/match/${id}">statlocker ↗</a>` : `<span class="chip-s" title="file name has no match id">dropped demo</span>`}
       </div>
     </div>
     <section class="scoreboard">

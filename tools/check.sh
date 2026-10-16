@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Health check after a game patch / parser update:
-#   1. parse the newest local demo (canary) and fail on parse errors or format warnings
+#   1. parse the newest local demo (canary) and fail on parse errors or format warnings;
+#      the WebAssembly build must give byte-identical output
 #   2. run unit + data tests
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,13 +12,17 @@ newest=$(ls -t "$REPLAYS"/*.dem "$ROOT"/data/demos/*.dem 2>/dev/null | head -1 |
 if [[ -n "$newest" ]]; then
   echo "canary: $(basename "$newest")"
   out=$(mktemp)
-  if ! err=$("$PARSER" "$newest" "$out" 2>&1); then
+  if ! err=$("$PARSER" "$newest" "$out" "$(basename "$newest" .dem)" 2>&1); then
     echo "PARSE FAILED: $err" >&2
     rm -f "$out"
     exit 1
   fi
-  rm -f "$out"
   echo "$err" | sed 's/^/  /'
+  # the browser build (demo drop-in) must produce exactly the same JSON
+  if [[ -f "$ROOT/web/parser/dlparse.wasm" ]]; then
+    node "$ROOT/tools/wasm-check.mjs" "$newest" "$out" "$(basename "$newest" .dem)" || { rm -f "$out"; exit 3; }
+  fi
+  rm -f "$out"
   # warnings on the newest demo mean a field/message the site relies on moved
   if echo "$err" | grep -q '^warning:'; then
     echo "canary has warnings: the newest demo may use a changed format" >&2

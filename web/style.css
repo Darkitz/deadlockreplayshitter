@@ -514,3 +514,21 @@ table.mini td.accent { color: var(--accent); }
 .about .deep ul, .about .deep ol { padding-left: 20px; margin: 6px 0; }
 .about code { font-size: 12px; background: #1b1e24; padding: 1px 4px; border-radius: 4px; }
 .about-sec { scroll-margin-top: 90px; }
+
+/* demo drop-in (local.js) */
+.btn.primary { background: color-mix(in srgb, var(--accent) 18%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--text); }
+.btn.primary:hover { background: color-mix(in srgb, var(--accent) 28%, var(--panel)); }
+.top-right { display: flex; gap: 8px; align-items: center; }
+.drop-hint { margin: 0 0 14px; padding: 10px 14px; border: 1px dashed color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: var(--radius); }
+.drop-hint > div { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+#drop-zone { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: rgba(5, 6, 8, .82); pointer-events: none; }
+#drop-zone > div { display: grid; gap: 8px; text-align: center; padding: 48px 64px; border: 2px dashed var(--accent); border-radius: 16px; }
+#drop-zone b { font-size: 22px; }
+#drop-zone span { color: var(--muted); }
+#drop-status { position: fixed; inset: 0; z-index: 101; display: grid; place-items: center; background: rgba(5, 6, 8, .7); }
+#drop-status[hidden] { display: none; }
+.drop-card { width: min(460px, calc(100vw - 32px)); padding: 18px 20px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); display: grid; gap: 10px; }
+.drop-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 10px; }
+.drop-bar i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+.drop-close { justify-self: end; }
+.chip-s.forget { cursor: pointer; background: none; border-color: var(--line); color: var(--muted); font: inherit; font-size: 11px; }

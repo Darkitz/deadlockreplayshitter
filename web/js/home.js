@@ -2,7 +2,8 @@
 
 import { $, esc, S, fmtDate, ago, settings, saveSettings } from "./ui.js";
 import { fmtClock } from "./timeline.js";
-import { TEAM_NAMES } from "./data.js";
+import { TEAM_NAMES, forgetMatch } from "./data.js";
+import { localDelete } from "./local.js";
 
 export async function viewHome(params) {
   const app = $("#app");
@@ -19,6 +20,11 @@ export async function viewHome(params) {
         </a>`;
       }).join("")}
     </section>
+    <section class="drop-hint">
+      <div><b>Analyze any match:</b> drag a demo onto this page or
+        <button class="btn primary" data-pick-demo>open demo</button>
+        <span class="muted small">.dem from <code>Deadlock/game/citadel/replays</code> or .dem.bz2 · parsed in your browser, nothing is uploaded</span></div>
+    </section>
     <section class="toolbar">
       <h2 class="section-title">Matches <span class="muted small" id="match-count"></span></h2>
       <div class="controls">
@@ -31,7 +37,10 @@ export async function viewHome(params) {
     <section class="match-grid" id="match-grid"></section>`;
 
   // parsed demos plus every history game of tracked players (newest first)
-  const parsedIds = new Set(S.matchList.map((m) => m.match_id));
+  // dropped demos the server doesn't have
+  const serverIds = new Set(S.matchList.map((m) => m.match_id));
+  const local = (S.localMatches || []).filter((m) => !serverIds.has(m.match_id));
+  const parsedIds = new Set([...serverIds, ...local.map((m) => m.match_id)]);
   const fromHistory = new Map();
   for (const idx of Object.values(S.indexes)) {
     for (const e of idx.matches) {
@@ -41,7 +50,7 @@ export async function viewHome(params) {
       fromHistory.set(e.match_id, rec);
     }
   }
-  const all = [...S.matchList, ...fromHistory.values()].sort((a, b) => (b.start_time || 0) - (a.start_time || 0));
+  const all = [...S.matchList, ...local, ...fromHistory.values()].sort((a, b) => (b.start_time || 0) - (a.start_time || 0));
   let limit = 60;
 
   const render = () => {
@@ -50,15 +59,28 @@ export async function viewHome(params) {
     const list = all.filter((m) => (!demosOnly || !m.nodemo) && (!needle || String(m.match_id).includes(needle)
       || (m.players || m.tracked).some((p) => (S.profiles[p.account_id]?.name || p.name || "").toLowerCase().includes(needle)
         || S.assets.hero(p.hero_id).name.toLowerCase().includes(needle))));
-    $("#match-count").textContent = `${list.length} matches · ${S.matchList.length} with parsed demos`;
+    $("#match-count").textContent = `${list.length} matches · ${S.matchList.length + local.length} with parsed demos` +
+      (local.length ? ` · ${local.length} dropped here` : "");
     $("#match-grid").innerHTML = list.slice(0, limit).map((m) => (m.nodemo ? noDemoCard(m) : matchCard(m, tracked))).join("") +
       (list.length > limit ? `<button class="btn more" id="more">show more (${list.length - limit})</button>` : "") ||
-      `<div class="empty">No matches. Run <code>tools/sync.py</code> or download replays in Deadlock.</div>`;
+      `<div class="empty">No matches yet. Drop a demo onto the page, or run <code>tools/sync.py</code>.</div>`;
   };
   render();
-  $("#match-grid").addEventListener("click", (ev) => {
+  $("#match-grid").addEventListener("click", async (ev) => {
     if (ev.target.id === "more") { limit += 60; render(); }
+    const del = ev.target.closest("[data-forget]");
+    if (del) {
+      ev.preventDefault();
+      const id = Number(del.dataset.forget);
+      await localDelete(id);
+      forgetMatch(id);
+      const i = all.findIndex((m) => m.match_id === id && m.local);
+      if (i >= 0) all.splice(i, 1);
+      local.splice(local.findIndex((m) => m.match_id === id), 1);
+      render();
+    }
   });
+  app.querySelector("[data-pick-demo]").addEventListener("click", () => S.pickDemo?.());
   $("#demos-only").addEventListener("change", () => {
     settings.demosOnly = $("#demos-only").checked;
     saveSettings();
@@ -78,9 +100,11 @@ function matchCard(m, tracked) {
   return `<a class="match-card" href="#/match/${m.match_id}">
     <div class="mc-top">
       <b>#${m.match_id}</b>
-      <span class="muted">${d ? `${fmtDate(d)} · ${ago(d)}` : "date unknown"}</span>
+      <span class="muted">${m.local ? `dropped ${ago(new Date(m.parsed_at))}` : d ? `${fmtDate(d)} · ${ago(d)}` : "date unknown"}</span>
       <span class="muted">${fmtClock(m.duration_s)}</span>
       ${m.mode === 4 ? `<span class="chip-s">ranked</span>` : ""}
+      ${m.local ? `<span class="chip-s" title="${esc(m.file)} · parsed in this browser">dropped</span>
+        <button class="chip-s forget" data-forget="${m.match_id}" title="remove from this browser">×</button>` : ""}
     </div>
     ${teams.map((t) => {
       const ps = m.players.filter((p) => p.team === t);
