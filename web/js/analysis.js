@@ -199,6 +199,12 @@ export function aggregate(list, heroesOnly) {
   const victims = new Map(); // hero_id -> hits
   const delays = [];
   const dists = [];
+  const byTarget = new Map(); // enemy hero_id -> {thrown, scored}
+  const RANGES = [
+    { label: "< 15 m", to: 15 }, { label: "15–30 m", to: 30 },
+    { label: "30–50 m", to: 50 }, { label: "50 m +", to: Infinity },
+  ];
+  const byRange = RANGES.map((r) => ({ ...r, thrown: 0, scored: 0 }));
   const aimMiss = [];
   const aimHit = [];
   for (const { match, casts } of list) {
@@ -209,6 +215,17 @@ export function aggregate(list, heroesOnly) {
       if (ok) ph.scored++;
       if (c.delay != null && ok) delays.push(c.delay);
       if (c.dist != null && ok) dists.push(c.dist);
+      // who was the cast aimed at (within the aimed-at cone), and from how far
+      if (c.aimPawn != null && c.aimErr <= AIMED_AT_DEG) {
+        const hid = match.byPawn.get(c.aimPawn)?.hero_id;
+        const row = byTarget.get(hid) || { thrown: 0, scored: 0 };
+        row.thrown++;
+        if (c.result === "hit" && c.victims.includes(c.aimPawn)) row.scored++;
+        byTarget.set(hid, row);
+        const br = byRange.find((r) => c.aimDist < r.to);
+        br.thrown++;
+        if (ok) br.scored++;
+      }
       if (c.aimErr != null) (c.result === "miss" ? aimMiss : ok ? aimHit : []).push(c.aimErr);
       for (const v of c.victims) {
         const hid = match.byPawn.get(v)?.hero_id;
@@ -216,7 +233,10 @@ export function aggregate(list, heroesOnly) {
       }
     }
   }
-  return { phases, victims: [...victims].sort((a, b) => b[1] - a[1]), delays, dists, aimMiss, aimHit };
+  return {
+    phases, victims: [...victims].sort((a, b) => b[1] - a[1]), delays, dists, aimMiss, aimHit,
+    byTarget: [...byTarget].sort((a, b) => b[1].thrown - a[1].thrown), byRange,
+  };
 }
 
 export const median = (xs) => {

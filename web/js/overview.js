@@ -38,6 +38,7 @@ export async function viewOverview(heroId, params) {
     </section>
     <section class="summary" id="summary"><div class="muted">loading matches…</div></section>
     <section class="charts" id="charts"></section>
+    <section class="charts charts-3" id="charts2"></section>
     <section class="report" id="report"></section>
     <section id="career"></section>
     <section id="by-hero"></section>
@@ -117,6 +118,7 @@ export async function viewOverview(heroId, params) {
   benchmark(heroId, ability, list.length);
 
   renderCharts(list, agg);
+  renderTargets(list, agg, ability);
   renderAbilityReport(list, heroId, abilityCls);
 
   // match cards
@@ -334,5 +336,61 @@ async function renderByHero(current) {
   for (const tr of el.querySelectorAll("tr[data-hero]")) {
     tr.style.cursor = "pointer";
     tr.addEventListener("click", () => go(`#/hero/${tr.dataset.hero}`));
+  }
+}
+
+/** accuracy against each enemy hero, by distance, and a map of every cast */
+function renderTargets(list, agg, ability) {
+  const bar = (r) => `<span class="track"><span style="width:${r.thrown ? (r.scored / r.thrown) * 100 : 0}%"></span></span>
+    <span class="val">${r.thrown ? pct(r.scored / r.thrown) : "–"} <small>${r.scored}/${r.thrown}</small></span>`;
+  const targets = agg.byTarget.slice(0, 10).map(([hid, r]) => `
+    <div class="hbar"><span class="lbl"><img src="${esc(S.assets.hero(hid).icon)}" alt="">${esc(S.assets.hero(hid).name)}</span>${bar(r)}</div>`).join("");
+  const ranges = agg.byRange.map((r) => `<div class="hbar"><span class="lbl">${r.label}</span>${bar(r)}</div>`).join("");
+  $("#charts2").innerHTML = `
+    <div class="chart-card"><h3>Accuracy vs hero aimed at</h3>${targets || `<p class="muted">no aim data (old demos)</p>`}</div>
+    <div class="chart-card"><h3>Accuracy by distance to target</h3>${ranges}
+      <p class="small muted">Casts aimed within 15° of an enemy, grouped by their distance.</p></div>
+    <div class="chart-card"><h3>Cast map · ${esc(ability.name)}</h3><canvas class="castmap"></canvas>
+      <p class="small muted">dot = where you cast · ring = where it hit</p></div>`;
+  drawCastMap($("#charts2 .castmap"), list);
+}
+
+function drawCastMap(canvas, list) {
+  const R = S.assets.map?.radius || 10752;
+  const dpr = window.devicePixelRatio || 1;
+  const size = canvas.clientWidth || 300;
+  canvas.width = canvas.height = Math.round(size * dpr);
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width;
+  const w2p = (x, y) => [((x + R) / (2 * R)) * W, ((R - y) / (2 * R)) * W];
+  const draw = (bg) => {
+    ctx.fillStyle = "#2c241d";
+    ctx.fillRect(0, 0, W, W);
+    if (bg) ctx.drawImage(bg, 0, 0, W, W);
+    const col = { hit: "#6fd08c", other: "#e0b25a", miss: "#d9644f" };
+    for (const { casts } of list) {
+      for (const c of casts) {
+        if (!(c.x || c.y)) continue;
+        const [sx, sy] = w2p(c.x, c.y);
+        ctx.globalAlpha = 0.75;
+        if (c.hitX != null) {
+          const [hx, hy] = w2p(c.hitX, c.hitY);
+          ctx.strokeStyle = col[c.result];
+          ctx.lineWidth = 1 * dpr;
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(hx, hy); ctx.stroke();
+          ctx.lineWidth = 1.5 * dpr;
+          ctx.beginPath(); ctx.arc(hx, hy, 3 * dpr, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.fillStyle = col[c.result];
+        ctx.beginPath(); ctx.arc(sx, sy, 2 * dpr, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  };
+  draw(null);
+  if (S.assets.map?.image) {
+    const im = new Image();
+    im.onload = () => draw(im);
+    im.src = S.assets.map.image;
   }
 }
