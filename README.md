@@ -174,6 +174,37 @@ tools/check.sh || tools/update-parser.sh
 python3 tools/sync.py
 ```
 
+## Verifying a demo
+
+```bash
+python3 tools/verify_demo.py path/to/<match_id>.dem[.bz2]
+```
+
+There are three checks:
+- **Valve's md5** (`x-goog-hash` on the replay server). This only works for the original
+  `.dem.bz2`, and only while Valve still hosts it.
+- **Recorded fingerprints** (`data/demo_hashes.json`). Sync stores Valve's md5 whenever a replay
+  salt is known, before the file expires, plus a sha256 of every decompressed demo it parses.
+- **Content cross-check against Valve's metadata**: the same accounts, heroes, teams, K/D/A,
+  winner and length. The metadata outlives the demo by months, and nothing in it hashes the
+  demo, so this is the check that keeps working.
+
+## Gun and melee metrics
+
+- **Gun:**
+  - Each trigger pull (`m_nShotNumber`) is paired with the damage it caused: the first hit
+    claims the oldest unclaimed shot within 1.5 s of travel time, and pellets from one shot
+    count once.
+  - **Hero accuracy** = shots that hit a hero / (all shots − shots that only hit
+    troopers/neutrals). For single-bullet guns this lands within about 2 points of Valve's own
+    hero accuracy. Shotguns differ because Valve counts pellets.
+  - **Hero headshot %** = hero hits on hitgroup 1 or with crit damage / hero hits.
+- **Melee:**
+  - Swings come from the melee ability's `m_flAttackTriggeredTime`, and their type from
+    `m_eCurrentAttackType` (1 light, 2 heavy, 3 heavy variant).
+  - A swing counts as a hit when melee damage follows within 0.6 s.
+  - Parries come from `m_flParryStartTime` / `m_bAttackParried`.
+
 ## Tests
 
 ```bash

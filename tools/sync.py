@@ -156,6 +156,56 @@ def get_salts(match_id, steam_salts=False):
     return rec
 
 
+HASHES = ROOT / "data" / "demo_hashes.json"
+
+
+def record_hashes(match_ids, demos):
+    """Keep fingerprints that outlive Valve's copy of a demo:
+    - md5 + size of Valve's .dem.bz2 (from a HEAD request; free while the file exists)
+    - sha256 of the decompressed .dem we have locally (what Deadlock's own download produces)
+    Stored in data/demo_hashes.json and used by tools/verify_demo.py."""
+    try:
+        hashes = json.loads(HASHES.read_text())
+    except (OSError, ValueError):
+        hashes = {}
+    import base64
+    import hashlib
+    changed = 0
+    for mid in match_ids:
+        h = hashes.setdefault(str(mid), {})
+        url = (_salts or {}).get(str(mid), {}).get("demo_url")
+        if url and "valve_md5" not in h and not h.get("valve_gone"):
+            try:
+                req = urllib.request.Request(url, method="HEAD", headers=UA)
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    for v in r.headers.get_all("x-goog-hash") or []:
+                        for part in v.split(","):
+                            k, _, val = part.strip().partition("=")
+                            if k == "md5":
+                                h["valve_md5"] = val
+                    h["valve_size"] = int(r.headers.get("content-length") or 0)
+                    changed += 1
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    h["valve_gone"] = True
+            except (urllib.error.URLError, OSError):
+                pass
+        dem = demos.get(mid)
+        if dem and h.get("dem_size") != dem.stat().st_size:
+            sha = hashlib.sha256()
+            with open(dem, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 22), b""):
+                    sha.update(chunk)
+            h["dem_sha256"] = sha.hexdigest()
+            h["dem_size"] = dem.stat().st_size
+            changed += 1
+        if not h:
+            hashes.pop(str(mid))
+    HASHES.write_text(json.dumps(hashes, indent=0))
+    if changed:
+        log(f"demo hashes: {changed} recorded")
+
+
 def fetch_demo(match_id, steam_salts):
     """download the demo from Valve using deadlock-api's salt. returns (path|None, reason)."""
     salts = get_salts(match_id, steam_salts)
@@ -854,6 +904,8 @@ def main():
                                           else {"v": ctx.pver, "error": msg})
                 log(f"  {mid}: {msg}")
         MANIFEST.write_text(json.dumps(ctx.manifest))
+
+    record_hashes(sorted(set(ctx.demos) | {int(k) for k, v in (_salts or {}).items() if v.get("demo_url")}), ctx.demos)
 
     # tracked players in parsed matches their history doesn't list yet: synthetic entries
     add_unlisted_matches(indexes)
