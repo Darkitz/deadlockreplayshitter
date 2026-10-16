@@ -104,7 +104,7 @@ footer { padding: 16px 24px 28px; }
 .tile.accent .v { color: var(--accent); }
 
 /* overview charts */
-.charts { display: grid; grid-template-columns: 1.6fr 1.2fr 1.2fr 1fr 1fr 1fr; gap: 10px; }
+.charts { display: grid; grid-template-columns: 1.3fr 1.2fr 1.5fr 1fr 1fr 1fr; gap: 10px; }
 .report-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 .report-table th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 4px 8px; }
 .report-table td { padding: 5px 8px; border-top: 1px solid var(--line); }
@@ -123,7 +123,7 @@ footer { padding: 16px 24px 28px; }
 .avgline { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--accent); pointer-events: none; }
 .avgline span { position: absolute; right: 0; top: -16px; font-size: 11px; color: var(--accent); }
 .bars-axis { display: flex; justify-content: space-between; margin-top: 4px; }
-.hbar { display: grid; grid-template-columns: minmax(64px, 120px) minmax(30px, 1fr) 84px; gap: 8px; align-items: center; margin: 5px 0; font-size: 12px; }
+.hbar { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(40px, 1fr) minmax(64px, auto); gap: 8px; align-items: center; margin: 5px 0; font-size: 12px; }
 .hbar .lbl { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hbar .lbl img { width: 18px; height: 18px; border-radius: 4px; }
 .hbar .track { height: 8px; background: var(--panel-3); border-radius: 4px; overflow: hidden; }

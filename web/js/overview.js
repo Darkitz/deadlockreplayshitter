@@ -5,7 +5,7 @@ import { analyzeAbility, counts, pct, aggregate, median, incoming } from "./anal
 import { sparkline, fmtClock } from "./timeline.js";
 import {
   $, esc, S, settings, opts, fmtDate, fmtDay, ago, k1, tile, rankChip, controlsHTML,
-  wireControls, abilityButtons, histogram, go,
+  wireControls, abilityButtons, histogram, go, saveSettings,
 } from "./ui.js";
 
 export async function viewOverview(heroId, params) {
@@ -25,6 +25,8 @@ export async function viewOverview(heroId, params) {
     : (heroId === 64 ? "drifter_shadow_mark" : sigs[0]?.class_name);
   const ability = S.assets.itemByClass(abilityCls) || sigs[0];
 
+  const allEntries = S.index.matches.filter((m) => m.hero_id === heroId).sort((a, b) => b.start_time - a.start_time);
+  const entries = applyFilters(allEntries);
   app.innerHTML = `
     <nav class="hero-tabs">
       ${heroes.map(([hid, c]) => `
@@ -34,8 +36,9 @@ export async function viewOverview(heroId, params) {
     </nav>
     <section class="toolbar">
       <div class="abilities">${abilityButtons(sigs, abilityCls)}</div>
-      <div class="controls">${controlsHTML()}</div>
+      <div class="controls">${filtersHTML()}${controlsHTML()}</div>
     </section>
+    ${entries.length < allEntries.length ? `<p class="note">Filtered: ${entries.length} of ${allEntries.length} ${esc(hero.name)} matches.</p>` : ""}
     <section class="summary" id="summary"><div class="muted">loading matches…</div></section>
     <section class="charts" id="charts"></section>
     <section class="charts charts-3" id="charts2"></section>
@@ -50,8 +53,14 @@ export async function viewOverview(heroId, params) {
     b.addEventListener("click", () => go(`#/hero/${heroId}?ability=${b.dataset.ability}`));
   }
   wireControls(app, () => viewOverview(heroId, params));
+  for (const el of app.querySelectorAll("[data-filter]")) {
+    el.addEventListener("change", () => {
+      settings.filters = { ...(settings.filters || {}), [el.dataset.filter]: el.value };
+      saveSettings();
+      viewOverview(heroId, params);
+    });
+  }
 
-  const entries = S.index.matches.filter((m) => m.hero_id === heroId).sort((a, b) => b.start_time - a.start_time);
   const parsed = entries.filter((m) => m.parsed);
   const missing = entries.filter((m) => !m.parsed);
 
@@ -393,4 +402,36 @@ function drawCastMap(canvas, list) {
     im.onload = () => draw(im);
     im.src = S.assets.map.image;
   }
+}
+
+const FILTERS = {
+  period: [["all", "all time"], ["10", "last 10"], ["30", "last 30"], ["d30", "30 days"], ["d90", "90 days"]],
+  mode: [["all", "all modes"], ["ranked", "ranked"], ["unranked", "unranked"]],
+  result: [["all", "wins + losses"], ["win", "wins"], ["loss", "losses"]],
+};
+
+function filtersHTML() {
+  return Object.entries(FILTERS).map(([k, opts_]) => `
+    <label>${k}
+      <select data-filter="${k}">
+        ${opts_.map(([v, l]) => `<option value="${v}" ${(settings.filters?.[k] || "all") === v ? "selected" : ""}>${l}</option>`).join("")}
+      </select>
+    </label>`).join("");
+}
+
+/** entries sorted newest first */
+function applyFilters(entries) {
+  const f = settings.filters || {};
+  let out = entries;
+  if (f.mode === "ranked") out = out.filter((e) => e.mode === 4);
+  if (f.mode === "unranked") out = out.filter((e) => e.mode !== 4);
+  if (f.result === "win") out = out.filter((e) => e.won);
+  if (f.result === "loss") out = out.filter((e) => !e.won);
+  const p = f.period || "all";
+  if (/^\d+$/.test(p)) out = out.slice(0, Number(p));
+  if (p.startsWith("d")) {
+    const since = Date.now() / 1000 - Number(p.slice(1)) * 86400;
+    out = out.filter((e) => e.start_time >= since);
+  }
+  return out;
 }
