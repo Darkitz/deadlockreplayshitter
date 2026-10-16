@@ -22,7 +22,7 @@ use haste::valveprotos::deadlock::{
 use prost::Message;
 use serde::Serialize;
 
-const FORMAT_VERSION: u32 = 3;
+const FORMAT_VERSION: u32 = 4;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`
 const NOISY_ABILITIES: &[u32] = &[
     2573821048, // zip_line
@@ -209,11 +209,6 @@ impl V {
         (self.net_tick as i64 - self.paused_ticks as i64) as f32 * ctx.tick_interval() - start
     }
 
-    /// server curtime → game clock
-    fn curtime_to_game(&self, ctx: &Context, curtime: f32) -> f32 {
-        let paused = self.paused_ticks as f32 * ctx.tick_interval();
-        curtime - paused - self.game_start.unwrap_or(0.0)
-    }
 
     fn is_hero_pawn(&self, idx: i32) -> bool {
         self.pawn_ctrl.contains_key(&idx)
@@ -268,8 +263,9 @@ impl V {
             let cd_end: f32 = e.get_value(&COOLDOWN_END).unwrap_or(cd_start);
             let charges: i32 = e.get_value(&CHARGES).unwrap_or(0);
             let (owner, id) = (a.owner_pawn, a.id);
-            let ut = self.curtime_to_game(ctx, cd_start);
-            self.out.uses.push((ut, owner, id, cd_end - cd_start, charges));
+            // stamp with the tick we saw the change on: server curtime is not aligned with
+            // net ticks across demos (offsets of 0-50 s were observed), the tick is.
+            self.out.uses.push((t, owner, id, cd_end - cd_start, charges));
         } else if cd_start <= 0.0 {
             a.cooldown_start = cd_start;
         }
