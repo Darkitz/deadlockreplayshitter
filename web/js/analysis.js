@@ -361,7 +361,9 @@ export function playerMatchSummary(m, pawn, assets, opts) {
   }
   const g = gunStats(m, pawn, assets);
   const inc = incoming(m, pawn, assets, opts);
+  const dc = deathContexts(m, pawn);
   return {
+    deaths: dc.length, isolatedDeaths: dc.filter((d) => d.isolated).length,
     thrown, hit, skillAcc: thrown ? hit / thrown : null, skillDmg: dmg, abilities,
     shots: g.shots, bullets: g.bullets, gunHits: g.heroHits, headshots: g.headshots,
     gunAcc: g.shots ? g.heroHits / g.shots : null,
@@ -406,4 +408,31 @@ export function detectFights(m, gap = 15) {
     cur.byTeam[team]++;
   }
   return fights;
+}
+
+/** positioning at a moment: distance to the nearest alive ally and enemies within `radius` m */
+export function surroundings(m, pawn, t, radius = 30) {
+  const me = m.byPawn.get(pawn);
+  const p = posAt(m, pawn, t);
+  if (!me || !p) return null;
+  let ally = Infinity, enemies = 0;
+  for (const o of m.players) {
+    if (o.pawn === pawn) continue;
+    const h = hpAt(m, o.pawn, t);
+    if (!h || h.hp <= 0) continue;
+    const q = posAt(m, o.pawn, t);
+    if (!q) continue;
+    const d = Math.hypot(q[0] - p[0], q[1] - p[1]) * UNIT_M;
+    if (o.team === me.team) ally = Math.min(ally, d);
+    else if (d <= radius) enemies++;
+  }
+  return { ally: Number.isFinite(ally) ? ally : null, enemies };
+}
+
+/** deaths of a pawn with their surroundings a moment before (isolated = no ally within 30 m) */
+export function deathContexts(m, pawn) {
+  return m.kills.filter((k) => k[1] === pawn).map((k) => {
+    const s = surroundings(m, pawn, k[0] - 1.5);
+    return { t: k[0], killer: k[2], ...(s || {}), isolated: s ? s.ally == null || s.ally > 30 : null };
+  });
 }

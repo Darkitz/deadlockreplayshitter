@@ -5,7 +5,7 @@ import {
 } from "./data.js";
 import { digestMeta, renderReport, matchFromMeta } from "./report.js";
 import {
-  analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt, damageTaken, detectFights,
+  analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt, damageTaken, detectFights, surroundings,
 } from "./analysis.js";
 import { createTimeline, fmtClock } from "./timeline.js";
 import { createMinimap } from "./minimap.js";
@@ -232,6 +232,12 @@ export async function viewMatch(id, params) {
       const killer = m.byPawn.get(death[2]);
       recap = `<div class="recap"><b>Killed ${killer ? `by <img src="${esc(S.assets.hero(killer.hero_id).icon)}" alt=""> ${esc(S.profiles[killer.account_id]?.name || killer.name)}` : ""}</b>
         <span class="muted small"> at ${fmtClock(death[0])} · ${k1(dt.total)} hero damage in the last 10 s</span>
+        ${(() => {
+          const sr = surroundings(m, pawn, death[0] - 1.5);
+          if (!sr) return "";
+          const iso = sr.ally == null || sr.ally > 30;
+          return `<div class="small ${iso ? "bad" : "muted"}">${sr.ally != null ? `nearest ally ${Math.round(sr.ally)} m` : "no ally alive"} · ${sr.enemies} enem${sr.enemies === 1 ? "y" : "ies"} within 30 m${iso ? " · isolated" : ""}</div>`;
+        })()}
         ${dt.rows.slice(0, 8).map((r) => {
           const a = m.byPawn.get(r.attacker);
           const ab = S.assets.item(r.ability);

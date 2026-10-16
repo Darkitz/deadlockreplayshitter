@@ -420,3 +420,7 @@ img.slot-spirit { background: #5a3a8c !important; }
 .fight.lost b { color: var(--miss); }
 .fight.mine { border-color: var(--accent); }
 .fight:hover { background: var(--panel-2); }
+.report-table td img.av { width: 26px; height: 26px; border-radius: 6px; }
+.report-table td.heroes-cell img.hi { display: inline-block; width: 22px; height: 22px; border-radius: 5px; margin-right: 2px; }
+#pl-table tr[data-href] { cursor: pointer; }
+#pl-table tr[data-href]:hover td { background: var(--panel-2); }

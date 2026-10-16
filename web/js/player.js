@@ -79,6 +79,7 @@ function render(acc, rows) {
     tile("Headshot %", gunHits ? pct(hs / gunHits) : "–"),
     tile("Dodge rate", aimed ? `${pct((aimed - got) / aimed)}<small> of ${aimed}</small>` : "–"),
     tile("Skill damage", k1(sum("skillDmg"))),
+    tile("Isolated deaths", sum("deaths") ? `${pct(sum("isolatedDeaths") / sum("deaths"))}<small> ${sum("isolatedDeaths")}/${sum("deaths")}</small>` : "–"),
   ].join("") : `<div class="empty">No parsed demos with this player.</div>`;
 
   // per hero

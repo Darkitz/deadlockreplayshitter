@@ -3,6 +3,7 @@
 // Matches are the main entity; players lead to matches.
 //   #/                                   all parsed matches
 //   #/match/<id>?pawn=&ability=&from=&t=  match detail (minimap + timeline + tracker)
+//   #/players                            everyone seen in parsed demos
 //   #/player/<account>                   a player's performance across parsed matches
 //   #/player/<account>/hero/<id>?ability= per-hero ability analysis (tracked accounts)
 //   #/hero/<id>                          legacy: hero page of the current player
@@ -13,6 +14,7 @@ import { viewOverview } from "./overview.js";
 import { viewMatch } from "./match.js";
 import { viewHome } from "./home.js";
 import { viewPlayer } from "./player.js";
+import { viewPlayers } from "./players.js";
 
 async function loadAll() {
   S.accounts = await loadJSON("data/accounts.json").catch(() => []);
@@ -101,6 +103,9 @@ async function route() {
       S.view = "player";
       await viewPlayer(acc, params);
     }
+  } else if (parts[0] === "players") {
+    S.view = "players";
+    viewPlayers();
   } else if (parts[0] === "hero" && parts[1] && S.index) {
     location.replace(`#/player/${S.index.account_id}/hero/${parts[1]}${q ? `?${q}` : ""}`);
   } else {
