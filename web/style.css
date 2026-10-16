@@ -461,3 +461,9 @@ img.slot-spirit { background: #5a3a8c !important; }
 .hero-card img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; background: var(--panel-2); }
 .charts.charts-2 { grid-template-columns: 1fr 1fr; align-items: start; }
 @media (max-width: 900px) { .charts.charts-2 { grid-template-columns: 1fr; } }
+.zoom-btns { display: inline-flex; gap: 4px; }
+.rank-badge { position: relative; display: inline-block; width: 26px; height: 26px; }
+.rank-badge img { width: 100%; height: 100%; object-fit: contain; }
+.rank-badge i { position: absolute; left: 50%; bottom: -3px; transform: translateX(-50%); font-style: normal; font-size: 9px; font-weight: 700; color: #fff; text-shadow: 0 0 3px #000, 0 0 2px #000; }
+.rank-badge.lg { width: 52px; height: 52px; }
+.rank-badge.lg i { font-size: 13px; bottom: -2px; }

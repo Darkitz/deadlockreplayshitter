@@ -52,11 +52,18 @@ export const entry = (id) => S.index?.matches.find((m) => m.match_id === id)
 
 // ------------------------------------------------------------------ shared widgets
 
+const ROMAN = ["", "I", "II", "III", "IV", "V", "VI"];
+/** tier emblem with the subrank numeral on top, like the in-game badge */
+export function rankBadge(r, large = false) {
+  if (!r?.image) return "";
+  return `<span class="rank-badge ${large ? "lg" : ""}"><img src="${esc(large && r.image_lg ? r.image_lg : r.image)}" alt="">${r.subrank ? `<i>${ROMAN[r.subrank] || r.subrank}</i>` : ""}</span>`;
+}
+
 export function rankChip(e) {
   const r = e?.badge && S.assets.ranks[e.badge];
   if (!r) return "";
   const d = e.rank_delta ? ` <span class="${e.rank_delta > 0 ? "up" : "down"}">${e.rank_delta > 0 ? "+" : ""}${e.rank_delta}</span>` : "";
-  return `<span class="rank-chip" title="${esc(r.name)}"><img src="${esc(r.image)}" alt="">${d}</span>`;
+  return `<span class="rank-chip" title="${esc(r.name)}">${rankBadge(r)}${d}</span>`;
 }
 
 export function tile(k, v, cls = "") {

@@ -25,7 +25,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 
 export function createMinimap(canvas, { match, assets, profiles, onPick }) {
   const R = assets.map?.radius || 10752;
-  let state = { t: 0, subject: null, casts: [], showAll: false };
+  let state = { t: 0, subject: null, casts: [], showAll: false, zoom: 1 };
   let dots = [];
 
   const ctx = canvas.getContext("2d");
@@ -43,7 +43,11 @@ export function createMinimap(canvas, { match, assets, profiles, onPick }) {
 
   function draw() {
     const { S, dpr } = size();
-    const w2p = (x, y) => [((x + R) / (2 * R)) * S, ((R - y) / (2 * R)) * S];
+    // zoom > 1 follows the subject (spectator style)
+    const z = state.zoom || 1;
+    const c = z > 1 ? (posAt(match, state.subject, state.t) || state.lastCenter || [0, 0]) : [0, 0];
+    if (z > 1) state.lastCenter = c;
+    const w2p = (x, y) => [((x - c[0]) * z / (2 * R) + 0.5) * S, ((c[1] - y) * z / (2 * R) + 0.5) * S];
     const { t, subject, casts } = state;
     ctx.clearRect(0, 0, S, S);
 
@@ -54,7 +58,10 @@ export function createMinimap(canvas, { match, assets, profiles, onPick }) {
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, S, S);
     const bg = img(assets.map?.image, redraw);
-    if (bg?.complete && bg.naturalWidth) ctx.drawImage(bg, 0, 0, S, S);
+    if (bg?.complete && bg.naturalWidth) {
+      const [ox, oy] = w2p(-R, R);
+      ctx.drawImage(bg, ox, oy, S * z, S * z);
+    }
 
     // zipline lanes
     for (const z of assets.map?.ziplines || []) {
@@ -77,7 +84,7 @@ export function createMinimap(canvas, { match, assets, profiles, onPick }) {
       ctx.fillStyle = TEAM_COLOR[team];
       ctx.globalAlpha = 0.55;
       const s = (big ? 5 : 3.5) * dpr;
-      const ox = o.left_relative * S, oy = o.top_relative * S;
+      const [ox, oy] = w2p(o.left_relative * 2 * R - R, R - o.top_relative * 2 * R);
       ctx.beginPath();
       ctx.moveTo(ox, oy - s); ctx.lineTo(ox + s, oy); ctx.lineTo(ox, oy + s); ctx.lineTo(ox - s, oy);
       ctx.fill();

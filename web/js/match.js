@@ -123,6 +123,7 @@ export async function viewMatch(id, params) {
       <div class="map-wrap"><canvas class="minimap"></canvas>
         <div class="map-legend small muted">
           <label class="check"><input type="checkbox" class="show-all" ${settings.showAll ? "checked" : ""}> all casts</label>
+          <span class="zoom-btns">${[1, 2, 3].map((z) => `<button class="chip ${(settings.mapZoom || 1) === z ? "on" : ""}" data-zoom="${z}">${z === 1 ? "full map" : `follow ×${z}`}</button>`).join("")}</span>
           <span>click a hero to analyze them · rays = aim at cast</span>
         </div>
         <div class="state" id="state"></div></div>
@@ -144,7 +145,7 @@ export async function viewMatch(id, params) {
           <div class="tiles"></div>
           <div class="feed-wrap">
             <div class="feed-filter">
-              ${["all", "hit", "miss", "kills"].map((f) => `<button class="chip ${settings.feed === f ? "on" : ""}" data-feed="${f}">${f}</button>`).join("")}
+              ${["all", "hit", "miss", "kills", "all kills"].map((f) => `<button class="chip ${settings.feed === f ? "on" : ""}" data-feed="${f}">${f}</button>`).join("")}
             </div>
             <ol class="feed"></ol>
           </div>
@@ -427,6 +428,7 @@ export async function viewMatch(id, params) {
     match: m, assets: S.assets, profiles: S.profiles, onPick: (p) => setParams({ pawn: p.pawn, ability: null }),
   });
 
+  if (params.has("zoom")) settings.mapZoom = Number(params.get("zoom")) || 1;
   let t = Number(params.get("t")) || m.end;
   // optional span start: stats then cover [t0, t] instead of [start, t]
   let t0 = params.has("from") ? Number(params.get("from")) : null;
@@ -451,6 +453,14 @@ export async function viewMatch(id, params) {
   scrub.addEventListener("input", () => seek(Number(scrub.value)));
   $(".speed", app).addEventListener("change", (ev) => { settings.speed = Number(ev.target.value); saveSettings(); });
   $(".play", app).addEventListener("click", togglePlay);
+  for (const b of app.querySelectorAll("[data-zoom]")) {
+    b.addEventListener("click", () => {
+      settings.mapZoom = Number(b.dataset.zoom);
+      saveSettings();
+      for (const o of app.querySelectorAll("[data-zoom]")) o.classList.toggle("on", o === b);
+      seek(t);
+    });
+  }
   $(".show-all", app).addEventListener("change", (ev) => {
     settings.showAll = ev.target.checked;
     saveSettings();
@@ -508,7 +518,7 @@ export async function viewMatch(id, params) {
     $(".span-info", app).innerHTML = t0 != null
       ? `span ${fmtClock(t0)}–${fmtClock(t)} <button class="chip span-clear" title="clear span (Esc)">×</button>` : "";
     syncUrl();
-    minimap.update({ t, subject: pawn, casts, showAll: settings.showAll });
+    minimap.update({ t, subject: pawn, casts, showAll: settings.showAll, zoom: settings.mapZoom || 1 });
     renderReadout(t);
     renderTracker(t);
     renderState(t);
@@ -576,12 +586,12 @@ export async function viewMatch(id, params) {
     const f = settings.feed || "all";
     const events = [];
     for (const k of past) {
-      if (f === "kills" || (f === "hit" && k.result === "miss") || (f === "miss" && k.result !== "miss")) continue;
+      if (f === "kills" || f === "all kills" || (f === "hit" && k.result === "miss") || (f === "miss" && k.result !== "miss")) continue;
       events.push({ t: k.t, kind: "cast", k });
     }
     for (const k of m.kills) {
       if (!inSpan(k[0]) || f === "hit" || f === "miss") continue;
-      if (k[1] === pawn || k[2] === pawn || (k[4] || []).includes(pawn)) events.push({ t: k[0], kind: "kill", k });
+      if (f === "all kills" || k[1] === pawn || k[2] === pawn || (k[4] || []).includes(pawn)) events.push({ t: k[0], kind: "kill", k });
     }
     events.sort((a, b) => b.t - a.t);
     $(".feed", app).innerHTML = events.slice(0, 40).map((ev) => {
@@ -606,7 +616,7 @@ export async function viewMatch(id, params) {
       return `<li data-t="${kt}" class="${died ? "ev-death" : "ev-kill"}"><span class="t">${fmtClock(kt)}</span>
         ${a ? `<img src="${esc(S.assets.hero(a.hero_id).icon)}" title="${esc(a.name)}">` : ""}
         ${kab?.image ? `<img class="kab" src="${esc(kab.image)}" title="${esc(kab.name)}">` : kab ? `<span class="muted small">${esc(kab.name)}</span>` : ""}
-        <span>${died ? "killed" : "kill"}</span>
+        <span>${died ? "killed" : att === pawn || (ev.k[4] || []).includes(pawn) ? "kill" : "→"}</span>
         ${v ? `<img src="${esc(S.assets.hero(v.hero_id).icon)}" title="${esc(v.name)}">` : ""}</li>`;
     }).join("") || `<li class="muted">nothing yet</li>`;
   }

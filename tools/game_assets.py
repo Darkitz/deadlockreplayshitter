@@ -286,14 +286,18 @@ def build_assets(previous=None):
             pretty = (a.get("m_sTrackedStatName") or key).replace("_", " ").title()
             accolades[a["m_unAccoladeID"]] = {"name": name_of(flavor, pretty), "stat": a.get("m_sTrackedStatName")}
 
+    # current ranked UI (panorama/styles/citadel_ranked_badge.css): one emblem per tier
+    # (rankNN_sm/_lg) with the subrank drawn on top as a label; the rankN/badge_*_subrankN
+    # frames are the previous system
     ranks = {}
     for tier in range(0, 12):
         tname = loc.get(f"citadel_ranks_{tier}") or f"Rank {tier}"
+        sm = f"panorama/images/ranked/badges/rank{tier:02d}_sm_psd.vtex_c"
+        lg = f"panorama/images/ranked/badges/rank{tier:02d}_lg_psd.vtex_c"
+        icons.update((sm, lg))
         for sub in range(0, 7):
-            p = (f"panorama/images/ranked/badges/rank{tier}/badge_sm_subrank{sub}_psd.vtex_c" if sub
-                 else f"panorama/images/ranked/badges/rank{tier}/badge_sm_psd.vtex_c")
-            icons.add(p)
-            ranks[tier * 10 + sub] = {"name": f"{tname} {sub}" if sub else tname, "image": site_icon(p)}
+            ranks[tier * 10 + sub] = {"name": f"{tname} {sub}" if sub else tname, "tier": tier,
+                                      "subrank": sub, "image": site_icon(sm), "image_lg": site_icon(lg)}
 
     minimap = "panorama/images/minimap/base/minimap_midtown_mid_psd.vtex_c"
     icons.add(minimap)
@@ -320,8 +324,9 @@ def build_assets(previous=None):
         if it.get("image") and not (ROOT / "web" / it["image"]).exists():
             del it["image"]
     for r in ranks.values():
-        if not (ROOT / "web" / r["image"]).exists():
-            r["image"] = None
+        for k in ("image", "image_lg"):
+            if r.get(k) and not (ROOT / "web" / r[k]).exists():
+                r[k] = None
 
     return {"heroes": heroes, "items": items, "map": game_map, "ranks": ranks,
             "accolades": accolades, "modifiers": modifiers, "source": "game files"}

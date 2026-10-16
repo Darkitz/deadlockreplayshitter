@@ -509,6 +509,43 @@ def digest_metadata(accounts):
     log(f"metadata digest: {len(valve)} matches, career rows {sum(len(r) for r in careers.values())}")
 
 
+def add_unlisted_matches(indexes):
+    """parsed demos a tracked player played in that deadlock-api's history doesn't have yet"""
+    for idx in indexes:
+        acc = idx["account_id"]
+        known = {e["match_id"] for e in idx["matches"]}
+        for f in MATCHES.glob("*.json.gz"):
+            mid = int(f.name.split(".")[0])
+            if mid in known:
+                continue
+            try:
+                pj = read_match(mid)
+            except (OSError, ValueError):
+                continue
+            me = next((p for p in pj["players"] if p["account_id"] == acc), None)
+            if not me:
+                continue
+            start = None
+            meta = META_DIR / f"{mid}.json.gz"
+            if meta.exists():
+                with gzip.open(meta, "rt") as fh:
+                    start = (json.load(fh).get("match_info") or {}).get("start_time")
+            if not start:
+                demo = next((d / f"{mid}.dem" for d in (DEMOS, GAME_REPLAYS) if (d / f"{mid}.dem").exists()), None)
+                start = int(demo.stat().st_mtime - (pj.get("game_over_s") or pj["duration_s"])) if demo else 0
+            idx["matches"].append({
+                "match_id": mid, "start_time": start,
+                "duration_s": round(pj.get("game_over_s") or pj["duration_s"]),
+                "hero_id": me["hero_id"], "kills": me["kills"], "deaths": me["deaths"], "assists": me["assists"],
+                "net_worth": me["net_worth"], "last_hits": me["last_hits"], "level": me["level"],
+                "won": pj.get("winning_team") == me["team"], "mode": None,
+                "warnings": [], "parse_error": None, "badge": None, "rank_delta": None,
+                "parsed": True, "status": "local demo (not in match history yet)",
+            })
+            log(f"  {acc}: {mid} added from local demo (history doesn't list it yet)")
+        idx["matches"].sort(key=lambda e: -(e["start_time"] or 0))
+
+
 def write_match_list(indexes):
     """web/data/matches.json: every parsed match (any account) with its 12 players."""
     tracked = {}
@@ -799,10 +836,13 @@ def main():
         args.reparse = False  # later accounts reuse what the first run reparsed
         indexes.append(idx)
 
-    # demos parsed for other (not synced now) accounts: keep their format current too
-    stale = [int(p.name.split(".")[0]) for p in MATCHES.glob("*.json.gz")
-             if manifest_version(ctx.manifest.get(p.name.split(".")[0])) != ctx.pver
-             and int(p.name.split(".")[0]) in ctx.demos]
+    # every other local demo too: new downloads that history doesn't list yet (deadlock-api's
+    # history lags behind), demos of untracked players, and older formats
+    stale = [mid for mid in ctx.demos
+             if manifest_version(ctx.manifest.get(str(mid))) != ctx.pver
+             or not (MATCHES / f"{mid}.json.gz").exists()]
+    stale = [mid for mid in stale if not (ctx.manifest.get(str(mid)) or {}).get("error")
+             or manifest_version(ctx.manifest.get(str(mid))) != ctx.pver]
     if stale:
         log(f"reparsing {len(stale)} demos with an outdated format")
         with ThreadPoolExecutor(args.jobs) as ex:
@@ -812,7 +852,11 @@ def main():
                 ok, msg, warnings = f.result()
                 ctx.manifest[str(mid)] = ({"v": ctx.pver, "warnings": warnings} if ok
                                           else {"v": ctx.pver, "error": msg})
+                log(f"  {mid}: {msg}")
         MANIFEST.write_text(json.dumps(ctx.manifest))
+
+    # tracked players in parsed matches their history doesn't list yet: synthetic entries
+    add_unlisted_matches(indexes)
 
     if ctx.game_assets:
         (DATA / "assets.json").write_text(json.dumps(ctx.game_assets))

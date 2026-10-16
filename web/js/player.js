@@ -4,7 +4,7 @@
 import { loadMatch } from "./data.js";
 import { pct, playerMatchSummary } from "./analysis.js";
 import { fmtClock } from "./timeline.js";
-import { $, esc, S, opts, fmtDate, ago, k1, tile, settings, controlsHTML, wireControls } from "./ui.js";
+import { $, esc, S, opts, fmtDate, ago, k1, tile, settings, controlsHTML, wireControls, rankBadge } from "./ui.js";
 
 export async function viewPlayer(acc, params) {
   const app = $("#app");
@@ -33,7 +33,7 @@ export async function viewPlayer(acc, params) {
         <p class="muted">${idx ? `tracked · ${idx.matches.length} matches in history · ` : "not tracked · "}${matches.length} parsed demos
           · <a target="_blank" rel="noopener" href="${esc(prof.url || `https://steamcommunity.com/profiles/${BigInt(acc) + 76561197960265728n}/`)}">steam profile ↗</a></p>
       </div>
-      ${rank ? `<span class="rank"><img src="${esc(rank.image)}" alt=""><span>${esc(rank.name)}</span></span>` : ""}
+      ${rank ? `<span class="rank">${rankBadge(rank, true)}<span>${esc(rank.name)}</span></span>` : ""}
       <div class="controls">${controlsHTML()}</div>
     </section>
     ${idx ? `<nav class="hero-tabs">
