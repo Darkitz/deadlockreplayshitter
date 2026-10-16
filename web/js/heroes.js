@@ -45,6 +45,7 @@ export async function viewHero(heroId, params) {
   const sigs = S.assets.signatures(heroId);
   const perAbility = new Map(sigs.map((ab) => [ab.class_name, { ab, thrown: 0, hit: 0, dmg: 0 }]));
   const perPlayer = new Map();
+  const itemStats = new Map(); // item id -> {n, wins, timeSum}
   let wins = 0, shots = 0, gunHits = 0, hs = 0;
   // load matches 4 at a time, then aggregate in order
   const loaded = new Array(apps.length);
@@ -72,6 +73,18 @@ export async function viewHero(heroId, params) {
       if (c.scored + c.other > 0) { pl.thrown += c.thrown; pl.hit += c.scored; }
     }
     perPlayer.set(p.account_id, pl);
+    const firstBuy = new Map();
+    for (const it of m.items) {
+      if (it[1] !== me.pawn || it[3] !== 1 || it[0] <= 0) continue;
+      if (S.assets.item(it[2])?.type !== "upgrade" || firstBuy.has(it[2])) continue;
+      firstBuy.set(it[2], it[0]);
+    }
+    for (const [id, tt] of firstBuy) {
+      const e = itemStats.get(id) || { n: 0, wins: 0, timeSum: 0 };
+      e.n++; e.timeSum += tt;
+      if (mm.winner === me.team) e.wins++;
+      itemStats.set(id, e);
+    }
     const g = gunStats(m, me.pawn, S.assets);
     shots += g.shots; gunHits += g.heroHits; hs += g.headshots;
   }
@@ -90,6 +103,16 @@ export async function viewHero(heroId, params) {
       ${[...perAbility.values()].map((a) => `<tr><td>${a.ab.image ? `<img src="${esc(a.ab.image)}" alt="">` : ""}</td><td>${esc(a.ab.name)}</td>
         <td>${a.thrown}</td><td>${a.hit}</td><td>${bar(a.thrown ? a.hit / a.thrown : null)}</td><td>${k1(a.dmg)}</td></tr>`).join("")}
     </table></div>
+    <div class="chart-card"><h3>Items <span class="muted">· bought in how many of the ${apps.length} games, when, and win rate</span></h3>
+      <table class="report-table">
+        <tr><th></th><th>item</th><th>games</th><th>avg buy</th><th>win rate</th></tr>
+        ${[...itemStats].sort((a, b) => b[1].n - a[1].n).slice(0, 20).map(([id, e]) => {
+          const it = S.assets.item(id);
+          return `<tr><td><img class="slot-${esc(it?.slot || "x")}" src="${esc(S.assets.itemIcon(id))}" alt=""></td><td>${esc(it?.name || id)}</td>
+            <td>${e.n}</td><td>${Math.floor(e.timeSum / e.n / 60)}:${String(Math.round((e.timeSum / e.n) % 60)).padStart(2, "0")}</td>
+            <td>${bar(e.wins / e.n)}</td></tr>`;
+        }).join("")}
+      </table></div>
     <div class="chart-card"><h3>Who lands ${esc(hero.name)}'s skills best <span class="muted">(min 15 casts)</span></h3><table class="report-table">
       <tr><th>player</th><th>games</th><th>skill accuracy</th></tr>
       ${players.filter((p) => p.thrown >= 15).sort((a, b) => b.hit / b.thrown - a.hit / a.thrown).map((p) => `<tr>
