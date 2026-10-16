@@ -154,6 +154,7 @@ export async function viewMatch(id, params) {
           <b>shift+drag</b> on the timeline (or <b>[</b> at the playhead) selects a span, Esc clears</p>
       </div>
     </section>
+    <section class="chart-card laning" id="laning"></section>
     <section class="chart-card tracker" id="tracker" ${m.fromMeta ? "hidden" : ""}></section>
     <section class="chart-card incoming" id="incoming" ${m.fromMeta ? "hidden" : ""}></section>
     <section class="report" id="report"><p class="muted">loading Valve match report…</p></section>`;
@@ -321,6 +322,47 @@ export async function viewMatch(id, params) {
     if (tr) setParams({ pawn: tr.dataset.pawn });
   });
 
+  // laning phase: the subject's lane at 10:00 (souls, last hits, K/D/A), souls curve 0-10 min
+  (() => {
+    const el = $("#laning", app);
+    const LANE_END = 600;
+    const lane = m.players.filter((p) => p.lane && p.lane === subject.lane);
+    if (lane.length < 2 || m.fromMeta) { el.hidden = true; return; }
+    const at = (p, t) => statsAt(m, p.pawn, t) || [0, 0, 0, 0, 0, 0];
+    const mine = lane.filter((p) => p.team === subject.team), theirs = lane.filter((p) => p.team !== subject.team);
+    const sumNw = (ps, t) => ps.reduce((a, p) => a + at(p, t)[0], 0);
+    const diff = sumNw(mine, LANE_END) - sumNw(theirs, LANE_END);
+    // souls curve
+    const W = 420, H = 120, steps = 20;
+    const maxNw = Math.max(1, ...lane.map((p) => at(p, LANE_END)[0]));
+    const x = (t) => 6 + (t / LANE_END) * (W - 12), y = (v) => H - 6 - (v / maxNw) * (H - 12);
+    const lines = lane.map((p) => {
+      let d = "";
+      for (let i = 0; i <= steps; i++) {
+        const t = (i / steps) * LANE_END;
+        d += `${i ? "L" : "M"}${x(t)},${y(at(p, t)[0])} `;
+      }
+      return `<path class="nw-line team-${p.team} ${p.pawn === pawn ? "subject" : ""}" d="${d}"><title>${esc(S.profiles[p.account_id]?.name || p.name)}</title></path>`;
+    }).join("");
+    el.innerHTML = `
+      <h3>Laning · first 10 minutes <span class="muted">· lane ${subject.lane}</span></h3>
+      <div class="laning-grid">
+        <div>
+          <div class="summary">${tile("Lane souls diff @10", `${diff >= 0 ? "+" : ""}${k1(diff)}`, diff >= 0 ? "good" : "")}
+            ${tile("Lane kills @10", `${mine.reduce((a, p) => a + at(p, LANE_END)[2], 0)}–${theirs.reduce((a, p) => a + at(p, LANE_END)[2], 0)}`)}</div>
+          <table class="report-table">
+            <tr><th></th><th>player</th><th>souls @10</th><th>last hits</th><th>k/d/a</th></tr>
+            ${[...mine, ...theirs].map((p) => {
+              const st = at(p, LANE_END);
+              return `<tr class="team-row-${p.team} ${p.pawn === pawn ? "on" : ""}"><td><img src="${esc(S.assets.hero(p.hero_id).icon)}" alt=""></td>
+                <td>${esc(S.profiles[p.account_id]?.name || p.name)}</td><td>${k1(st[0])}</td><td>${st[5]}</td><td>${st[2]}/${st[3]}/${st[4]}</td></tr>`;
+            }).join("")}
+          </table>
+        </div>
+        <svg class="lane-chart" viewBox="0 0 ${W} ${H}">${lines}</svg>
+      </div>`;
+  })();
+
   // incoming skillshots (defense)
   const inc = incoming(m, pawn, S.assets, opts());
   $("#incoming", app).innerHTML = `
@@ -361,7 +403,7 @@ export async function viewMatch(id, params) {
     gun: gunMode ? gun : null, noChart: !!m.fromMeta,
   }, (t) => seek(t), (a, b) => setSpan(a, b));
   const minimap = createMinimap($(".minimap", app), {
-    match: m, assets: S.assets, onPick: (p) => setParams({ pawn: p.pawn, ability: null }),
+    match: m, assets: S.assets, profiles: S.profiles, onPick: (p) => setParams({ pawn: p.pawn, ability: null }),
   });
 
   let t = Number(params.get("t")) || m.end;

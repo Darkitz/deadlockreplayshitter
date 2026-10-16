@@ -1,6 +1,6 @@
 // Canvas minimap: hero positions at time t, subject trail, recent cast rays and hits.
 
-import { posAt, hpAt } from "./data.js";
+import { posAt, hpAt, statsAt, itemsAt } from "./data.js";
 
 const TEAM_COLOR = { 2: "#e8a33d", 3: "#4f8fe8" };
 const RESULT_COLOR = { hit: "#6fd08c", other: "#e0b25a", miss: "#d9644f" };
@@ -21,7 +21,9 @@ function img(src, onload) {
   return im;
 }
 
-export function createMinimap(canvas, { match, assets, onPick }) {
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+export function createMinimap(canvas, { match, assets, profiles, onPick }) {
   const R = assets.map?.radius || 10752;
   let state = { t: 0, subject: null, casts: [], showAll: false };
   let dots = [];
@@ -221,13 +223,31 @@ export function createMinimap(canvas, { match, assets, onPick }) {
     const hit = dots.slice().reverse().find((d) => Math.hypot(d.px - mx, d.py - my) <= d.r + 4);
     if (hit) onPick?.(hit.p);
   });
+  // hover card: who, health, souls, K/D/A and items at the current time
+  const tip = document.createElement("div");
+  tip.className = "map-tip";
+  tip.hidden = true;
+  canvas.parentElement.style.position = "relative";
+  canvas.parentElement.appendChild(tip);
+  canvas.addEventListener("mouseleave", () => { tip.hidden = true; });
   canvas.addEventListener("mousemove", (ev) => {
     const rect = canvas.getBoundingClientRect();
     const k = canvas.width / rect.width;
     const mx = (ev.clientX - rect.left) * k, my = (ev.clientY - rect.top) * k;
     const hit = dots.slice().reverse().find((d) => Math.hypot(d.px - mx, d.py - my) <= d.r + 4);
-    canvas.title = hit ? `${hit.p.name} (${assets.hero(hit.p.hero_id).name})` : "";
     canvas.style.cursor = hit ? "pointer" : "default";
+    if (!hit) { tip.hidden = true; return; }
+    const p = hit.p, t = state.t;
+    const h = hpAt(match, p.pawn, t), st = statsAt(match, p.pawn, t);
+    const items = itemsAt(match, p.pawn, t).filter((id) => assets.item(id)?.type === "upgrade");
+    const name = (profiles?.[p.account_id]?.name) || p.name || assets.hero(p.hero_id).name;
+    tip.innerHTML = `<b>${esc(name)}</b> <span class="muted">${esc(assets.hero(p.hero_id).name)}</span>
+      <div>${h ? `${h.hp} / ${h.max} HP` : ""}${st ? ` · ${(st[0] / 1000).toFixed(1)}k souls · ${st[2]}/${st[3]}/${st[4]}` : ""}</div>
+      <div class="tip-items">${items.map((id) => `<img class="slot-${esc(assets.item(id)?.slot || "x")}" src="${esc(assets.itemIcon(id))}" alt="">`).join("")}</div>`;
+    tip.hidden = false;
+    const wrap = canvas.getBoundingClientRect();
+    tip.style.left = `${Math.min(ev.clientX - wrap.left + 14, wrap.width - 230)}px`;
+    tip.style.top = `${ev.clientY - wrap.top + 14}px`;
   });
   const ro = new ResizeObserver(redraw);
   ro.observe(canvas);

@@ -424,3 +424,14 @@ img.slot-spirit { background: #5a3a8c !important; }
 .report-table td.heroes-cell img.hi { display: inline-block; width: 22px; height: 22px; border-radius: 5px; margin-right: 2px; }
 #pl-table tr[data-href] { cursor: pointer; }
 #pl-table tr[data-href]:hover td { background: var(--panel-2); }
+.laning h3 { font-size: 14px; color: var(--text); margin-bottom: 8px; }
+.laning-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.laning .summary { margin-bottom: 8px; }
+.lane-chart { width: 100%; height: auto; background: var(--panel-2); border-radius: 8px; }
+.laning tr.team-row-2 td:first-child { box-shadow: inset 3px 0 var(--amber); }
+.laning tr.team-row-3 td:first-child { box-shadow: inset 3px 0 var(--sapphire); }
+.laning tr.on td { background: var(--panel-3); }
+@media (max-width: 900px) { .laning-grid { grid-template-columns: 1fr; } }
+.map-tip { position: absolute; z-index: 5; pointer-events: none; background: rgba(10,11,13,.95); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 12px; max-width: 220px; }
+.tip-items { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 4px; }
+.tip-items img { width: 18px; height: 18px; border-radius: 3px; }
