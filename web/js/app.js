@@ -82,6 +82,8 @@ async function route() {
   const [path, q] = location.hash.replace(/^#/, "").split("?");
   const params = new URLSearchParams(q || "");
   const parts = (path || "/").split("/").filter(Boolean);
+  // ?gt=600-1200 sets the cross-match game-time window (linkable)
+  if (params.has("gt")) settings.gameWindow = params.get("gt") === "all" ? "" : params.get("gt");
   window.scrollTo({ top: 0 });
   for (const a of document.querySelectorAll("[data-nav]")) a.classList.toggle("on", a.dataset.nav === (parts[0] || "matches"));
 

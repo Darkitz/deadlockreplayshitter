@@ -4,7 +4,7 @@
 import { loadMatch } from "./data.js";
 import { pct, playerMatchSummary } from "./analysis.js";
 import { fmtClock } from "./timeline.js";
-import { $, esc, S, opts, fmtDate, ago, k1, tile, settings, controlsHTML, wireControls, rankBadge } from "./ui.js";
+import { $, esc, S, opts, fmtDate, ago, k1, tile, settings, controlsHTML, wireControls, rankBadge, gameWindow } from "./ui.js";
 
 export async function viewPlayer(acc, params) {
   const app = $("#app");
@@ -56,7 +56,7 @@ export async function viewPlayer(acc, params) {
       let m;
       try { m = await loadMatch(mm.match_id); } catch { continue; }
       const me = m.player(acc);
-      if (me) rows.push({ mm, me, won: mm.winner === me.team, s: playerMatchSummary(m, me.pawn, S.assets, opts()) });
+      if (me) rows.push({ mm, me, won: mm.winner === me.team, s: playerMatchSummary(m, me.pawn, S.assets, opts(), gameWindow()) });
     }
   };
   await Promise.all([worker(), worker(), worker(), worker()]);
@@ -79,6 +79,10 @@ function render(acc, rows) {
     tile("Hero headshot %", gunHits ? pct(hs / gunHits) : "–"),
     tile("Dodge rate", aimed ? `${pct((aimed - got) / aimed)}<small> of ${aimed}</small>` : "–"),
     tile("Skill damage", k1(sum("skillDmg"))),
+    tile("Melee → hero", (() => {
+      const l = sum("meleeLight"), lh = sum("meleeLightHit"), h = sum("meleeHeavy"), hh = sum("meleeHeavyHit");
+      return l + h ? `<small>light</small> ${l ? pct(lh / l) : "–"} <small>heavy</small> ${h ? pct(hh / h) : "–"}` : "–";
+    })()),
     tile("Isolated deaths", sum("deaths") ? `${pct(sum("isolatedDeaths") / sum("deaths"))}<small> ${sum("isolatedDeaths")}/${sum("deaths")}</small>` : "–"),
   ].join("") : `<div class="empty">No parsed demos with this player.</div>`;
 

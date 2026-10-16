@@ -21,6 +21,17 @@ export function saveSettings() {
 }
 export const opts = () => ({ window: settings.window, heroesOnly: settings.heroesOnly });
 
+/** game-time window applied across matches ([from, to] seconds, or null = whole match) */
+export const GAME_WINDOWS = [["", "whole match"], ["0-600", "0–10 min"], ["600-1200", "10–20 min"],
+  ["1200-1800", "20–30 min"], ["1800-99999", "30+ min"]];
+export const gameWindow = () => {
+  const v = settings.gameWindow;
+  if (!v) return null;
+  const [a, b] = v.split("-").map(Number);
+  return [a, b];
+};
+export const inWindow = (t, w = gameWindow()) => !w || (t >= w[0] && t < w[1]);
+
 // ------------------------------------------------------------------ time formatting (system tz)
 
 export const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -72,6 +83,11 @@ export function tile(k, v, cls = "") {
 
 export function controlsHTML() {
   return `
+    <label>game time
+      <select data-set="gameWindow">
+        ${GAME_WINDOWS.map(([v, l]) => `<option value="${v}" ${(settings.gameWindow || "") === v ? "selected" : ""}>${l}</option>`).join("")}
+      </select>
+    </label>
     <label>Hit window
       <select data-set="window">
         ${[1, 2, 3, 5, 8].map((w) => `<option value="${w}" ${w === settings.window ? "selected" : ""}>${w} s</option>`).join("")}
@@ -84,7 +100,7 @@ export function wireControls(root, onChange) {
   for (const el of root.querySelectorAll("[data-set]")) {
     el.addEventListener("change", () => {
       const k = el.dataset.set;
-      settings[k] = el.type === "checkbox" ? el.checked : Number(el.value);
+      settings[k] = el.type === "checkbox" ? el.checked : k === "gameWindow" ? el.value : Number(el.value);
       saveSettings();
       onChange();
     });

@@ -2,8 +2,8 @@
 // plus a leaderboard of who lands that hero's skills best.
 
 import { loadMatch } from "./data.js";
-import { analyzeAbility, counts, gunStats, pct } from "./analysis.js";
-import { $, esc, S, opts, settings, tile, k1, controlsHTML, wireControls } from "./ui.js";
+import { analyzeAbility, counts, gunStats, gunWindow, pct } from "./analysis.js";
+import { $, esc, S, opts, settings, tile, k1, controlsHTML, wireControls, gameWindow, inWindow } from "./ui.js";
 
 export function viewHeroes() {
   const app = $("#app");
@@ -67,7 +67,7 @@ export async function viewHero(heroId, params) {
     const pl = perPlayer.get(p.account_id) || { id: p.account_id, name: p.name, games: 0, thrown: 0, hit: 0 };
     pl.games++;
     for (const ab of sigs) {
-      const c = counts(analyzeAbility(m, me.pawn, ab, opts()).casts, settings.heroesOnly);
+      const c = counts(analyzeAbility(m, me.pawn, ab, opts()).casts.filter((x) => inWindow(x.t)), settings.heroesOnly);
       const a = perAbility.get(ab.class_name);
       a.thrown += c.thrown; a.hit += c.scored; a.dmg += c.dmg;
       if (c.scored + c.other > 0) { pl.thrown += c.thrown; pl.hit += c.scored; }
@@ -85,7 +85,7 @@ export async function viewHero(heroId, params) {
       if (mm.winner === me.team) e.wins++;
       itemStats.set(id, e);
     }
-    const g = gunStats(m, me.pawn, S.assets);
+    const g = gunWindow(gunStats(m, me.pawn, S.assets), gameWindow());
     shots += g.shots; gunHits += g.heroHits; hs += g.headshots; npcShots += g.npcHits;
   }
   const players = [...perPlayer.values()];

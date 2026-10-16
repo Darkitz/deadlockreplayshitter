@@ -1,11 +1,11 @@
 // Overview: per-hero ability stats across matches, career stats, match list.
 
 import { loadMatch } from "./data.js";
-import { analyzeAbility, counts, pct, aggregate, median, incoming, gunStats } from "./analysis.js";
+import { analyzeAbility, counts, pct, aggregate, median, incoming, gunStats, gunWindow } from "./analysis.js";
 import { sparkline, fmtClock } from "./timeline.js";
 import {
   $, esc, S, settings, opts, fmtDate, fmtDay, ago, k1, tile, rankChip, controlsHTML,
-  wireControls, abilityButtons, histogram, go, saveSettings,
+  wireControls, abilityButtons, histogram, go, saveSettings, gameWindow, inWindow,
 } from "./ui.js";
 
 export async function viewOverview(heroId, params) {
@@ -92,7 +92,7 @@ export async function viewOverview(heroId, params) {
       const me = m.player(S.index.account_id);
       if (!me) return null;
       const a = analyzeAbility(m, me.pawn, ability, opts());
-      return { entry: e, match: m, me, casts: a.casts, source: a.source };
+      return { entry: e, match: m, me, casts: a.casts.filter((c) => inWindow(c.t)), source: a.source };
     } catch (err) {
       console.error(err);
       return null;
@@ -449,13 +449,13 @@ function renderGun(list) {
   let vShots = 0, vHits = 0, vHs = 0;
   const per = [];
   for (const x of list) {
-    const g = gunStats(x.match, x.me.pawn, S.assets);
+    const g = gunWindow(gunStats(x.match, x.me.pawn, S.assets), gameWindow());
     if (!g.shots) continue;
     shots += g.shots; bullets += g.bullets; hits += g.heroHits; hs += g.headshots; npc += g.npcHits;
     heroDmg += g.heroDmg; mins += x.match.end / 60;
     const v = (S.valveStats?.[x.entry.match_id] || {})[S.index.account_id];
     if (v?.hero_shots) { vShots += v.hero_shots; vHits += v.hero_hits; vHs += v.hero_headshots || 0; }
-    per.push({ x, g, rate: g.heroHits / g.shots, hsr: g.heroHits ? g.headshots / g.heroHits : 0 });
+    per.push({ x, g, rate: g.heroAcc ?? g.heroHits / g.shots, hsr: g.heroHits ? g.headshots / g.heroHits : 0 });
   }
   if (!per.length) { el.innerHTML = ""; return; }
   per.sort((a, b) => a.x.entry.start_time - b.x.entry.start_time);
@@ -467,7 +467,8 @@ function renderGun(list) {
       ${tile("Shots / min", (shots / mins).toFixed(1))}
       ${tile("Bullets fired", k1(bullets))}
       ${tile("Shots hit heroes", hits, "good")}
-      ${tile("Hit rate (per shot)", pct(hits / shots), "accent")}
+      ${tile("Hero accuracy", shots - npc > 0 ? `${pct(hits / (shots - npc))}<small> excl. ${npc} trooper shots</small>` : "–", "accent")}
+      ${tile("Hit rate (all shots)", pct(hits / shots))}
       ${tile("Hero headshot %", hits ? pct(hs / hits) : "–")}
       ${tile("Trooper/NPC hits", npc)}
       ${tile("Gun hero dmg / min", Math.round(heroDmg / mins))}
