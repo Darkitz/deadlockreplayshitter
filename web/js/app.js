@@ -4,7 +4,7 @@
 //   #/match/<id>?pawn=&ability=   match detail (minimap + timeline)
 
 import { loadJSON, loadMatch, Assets, statsAt, TEAM_NAMES } from "./data.js";
-import { analyzeAbility, counts, pct, abilityTable, aggregate, median } from "./analysis.js";
+import { analyzeAbility, counts, pct, abilityTable, aggregate, median, incoming, AIMED_AT_DEG } from "./analysis.js";
 import { createTimeline, sparkline, fmtClock } from "./timeline.js";
 import { createMinimap } from "./minimap.js";
 
@@ -211,6 +211,11 @@ async function viewOverview(heroId, params) {
     tile("Per match", list.length ? `${(thrown / list.length).toFixed(1)}<small> thrown</small>` : "–") +
     tile("Avg hit delay", avgDelay != null ? `${avgDelay.toFixed(2)}<small> s</small>` : "–") +
     tile("Avg hit range", agg.dists.length ? `${Math.round(agg.dists.reduce((a, b) => a + b, 0) / agg.dists.length)}<small> m</small>` : "–") +
+    tile("Dodge rate", (() => {
+      let a = 0, h = 0;
+      for (const x of list) { const r = incoming(x.match, x.me.pawn, S.assets, opts()); a += r.aimed; h += r.hit; }
+      return a ? `${pct((a - h) / a)}<small> of ${a}</small>` : "–";
+    })()) +
     tile("Aim error on misses", agg.aimMiss.length ? `${median(agg.aimMiss).toFixed(1)}<small>° median</small>` : "–") +
     tile("Damage", k1(dmg)) +
     `<div class="tile" id="bench"><div class="k" title="same hero, other players, any of your parsed demos">Other ${esc(hero.name)}s</div><div class="v muted">…</div></div>`;
@@ -512,9 +517,10 @@ async function viewMatch(id, params) {
           <div class="tiles"></div>
           <ol class="feed"></ol>
         </div>
-        <p class="keys small muted">space play · ←/→ 5 s · shift ±30 s · , . previous/next cast · home/end</p>
+        <p class="keys small muted">space play · ←/→ 5 s · shift ±30 s · , . previous/next cast · home/end · wheel on timeline zooms</p>
       </div>
-    </section>`;
+    </section>
+    <section class="chart-card incoming" id="incoming"></section>`;
 
   // wiring
   for (const b of app.querySelectorAll(".sb-row")) {
@@ -524,6 +530,26 @@ async function viewMatch(id, params) {
     b.addEventListener("click", () => setParams({ ability: b.dataset.ability }));
   }
   wireControls(app, () => viewMatch(id, params));
+
+  // incoming skillshots (defense)
+  const inc = incoming(m, pawn, S.assets, opts());
+  $("#incoming", app).innerHTML = `
+    <h3>Incoming skillshots aimed at ${esc(S.profiles[subject.account_id]?.name || subject.name)}
+      <span class="muted">· enemy casts whose aim was within ${AIMED_AT_DEG}° of them</span></h3>
+    <div class="summary">
+      ${tile("Aimed at", inc.aimed)}${tile("Got hit", inc.hit, "")}${tile("Dodged", inc.dodged, "good")}
+      ${tile("Dodge rate", inc.aimed ? pct(inc.dodged / inc.aimed) : "–", "accent")}
+    </div>
+    <table class="report-table">
+      <tr><th></th><th>enemy</th><th>ability</th><th>aimed</th><th>hit</th><th>dodged</th></tr>
+      ${inc.rows.map((r) => `<tr>
+        <td><img src="${esc(S.assets.hero(r.player.hero_id).icon)}" alt=""></td>
+        <td>${esc(S.profiles[r.player.account_id]?.name || r.player.name)}</td>
+        <td><span class="inline-ab">${r.ability.image ? `<img src="${esc(r.ability.image)}" alt="">` : ""}${esc(r.ability.name)}</span></td>
+        <td>${r.aimed}</td><td>${r.hit}</td>
+        <td><span class="acc-bar"><span style="width:${(1 - r.hit / r.aimed) * 100}%"></span></span>${pct(1 - r.hit / r.aimed)}</td></tr>`).join("")}
+    </table>
+    <p class="small muted">AoE and lock-on abilities count too, so treat this as a rough dodge signal, not exact.</p>`;
 
   // timeline model
   const hpTrack = m.tracks.get(pawn);

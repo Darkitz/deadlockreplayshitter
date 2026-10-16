@@ -204,3 +204,36 @@ export const median = (xs) => {
   const i = s.length >> 1;
   return s.length % 2 ? s[i] : (s[i - 1] + s[i]) / 2;
 };
+
+/** casts whose aim was within this many degrees of a hero count as "aimed at" that hero */
+export const AIMED_AT_DEG = 15;
+
+/**
+ * Enemy signature-ability casts aimed at `pawn` (nearest enemy in the aim direction, within
+ * AIMED_AT_DEG): did they connect or did the subject dodge?
+ * Only abilities that hit at least one hero in the match count, so buffs/self-casts are skipped.
+ */
+export function incoming(m, pawn, assets, opts) {
+  const me = m.byPawn.get(pawn);
+  const rows = [];
+  for (const p of m.players) {
+    if (p.team === me.team) continue;
+    for (const ab of assets.signatures(p.hero_id)) {
+      const { casts } = analyzeAbility(m, p.pawn, ab, opts);
+      if (!casts.some((c) => c.result === "hit")) continue;
+      let aimed = 0, hit = 0;
+      const events = [];
+      for (const c of casts) {
+        if (c.aimPawn !== pawn || c.aimErr == null || c.aimErr > AIMED_AT_DEG) continue;
+        aimed++;
+        const got = c.victims.includes(pawn);
+        if (got) hit++;
+        events.push({ t: c.t, hit: got, err: c.aimErr });
+      }
+      if (aimed) rows.push({ player: p, ability: ab, aimed, hit, events });
+    }
+  }
+  const aimed = rows.reduce((a, r) => a + r.aimed, 0);
+  const hit = rows.reduce((a, r) => a + r.hit, 0);
+  return { rows: rows.sort((a, b) => b.aimed - a.aimed), aimed, hit, dodged: aimed - hit };
+}

@@ -264,3 +264,7 @@ table.plain td { padding: 4px 8px; border-top: 1px solid var(--line); }
 code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
 .feed li img.kab { border-radius: 50%; background: var(--panel-3); }
 .timeline .zoom-label { fill: var(--accent); font-size: 10px; }
+.incoming .summary { margin-bottom: 10px; }
+.incoming h3 { font-size: 14px; color: var(--text); }
+.inline-ab { display: inline-flex; gap: 6px; align-items: center; }
+.inline-ab img { width: 20px !important; height: 20px !important; }

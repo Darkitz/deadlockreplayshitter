@@ -92,3 +92,18 @@ test("median", () => {
   assert.equal(median([3, 1, 2]), 2);
   assert.equal(median([4, 1, 2, 3]), 2.5);
 });
+
+test("incoming: enemy casts aimed at the subject are hit or dodged", async () => {
+  const { incoming } = await import("../web/js/analysis.js");
+  const ENEMY_AB = { class_name: "enemy_shot", id: 77 };
+  // enemy (pawn 2, x=1000) aims back at me (yaw 180) three times, hits once
+  const m = fixture({
+    casts: [10, 20, 30].map((t) => [t, 2, ENEMY_AB.class_name, 1000, 1, 0, 180, 0]),
+    damage: [[20.2, 2, 1, 1, 77, 60, 1, 0, 0]],
+  });
+  const assets = { signatures: (hid) => (hid === 1 ? [ENEMY_AB] : []) };
+  const r = incoming(m, 1, assets, { window: 3 });
+  assert.equal(r.aimed, 3);
+  assert.equal(r.hit, 1);
+  assert.equal(r.dodged, 2);
+});
