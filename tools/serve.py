@@ -14,6 +14,7 @@ usage: python3 tools/serve.py [--port 8765] [--account ...] [--hero drifter] [--
 """
 import argparse
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -91,6 +92,8 @@ def watch(syncer, interval=15):
         except OSError:
             continue
         fresh = [mid for mid in now if mid not in known]
+        if os.environ.get("SKILLHITTER_DEBUG"):
+            print(f"poll: {len(now)} demos, fresh {fresh}", flush=True)
         ready = []
         for mid in fresh:
             if growing.get(mid) == now[mid]:
@@ -143,6 +146,7 @@ def main():
     ap.add_argument("--account", default=None)
     ap.add_argument("--hero", action="append", default=None)
     ap.add_argument("--no-watch", action="store_true")
+    ap.add_argument("--watch-interval", type=float, default=10, help="seconds between folder polls")
     args = ap.parse_args()
 
     base = []
@@ -153,7 +157,7 @@ def main():
     syncer = Syncer(base)
     Handler.syncer = syncer
     if not args.no_watch:
-        threading.Thread(target=watch, args=(syncer,), daemon=True).start()
+        threading.Thread(target=watch, args=(syncer, args.watch_interval), daemon=True).start()
         print(f"watching {sync.GAME_REPLAYS} and {sync.DEMOS} for new demos", flush=True)
 
     srv = ThreadingHTTPServer((args.host, args.port), partial(Handler, directory=str(WEB)))
