@@ -4,69 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Skill Hitter</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='none' stroke='%23e0b25a' stroke-width='2'/%3E%3Ccircle cx='8' cy='8' r='2' fill='%236fd08c'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="top">
-  <div class="brand">
-    <div class="avatar-wrap">
-      <img id="avatar" class="avatar" alt="">
-      <img id="hero-icon" class="hero-badge" alt="">
-    </div>
+  <a class="brand" href="#/">
+    <img id="avatar" class="avatar" alt="" hidden>
     <div>
-      <h1><a id="player-name" target="_blank" rel="noopener">Skill Hitter</a></h1>
+      <h1><span id="player-name">Skill Hitter</span></h1>
       <p id="subtitle" class="muted">loading…</p>
     </div>
+  </a>
+  <div class="top-right">
+    <a id="steam-link" class="muted small" target="_blank" rel="noopener"></a>
+    <button id="sync" class="btn" hidden>sync</button>
   </div>
-  <div class="controls">
-    <label>Ability
-      <select id="ability"></select>
-    </label>
-    <label>Hit window
-      <select id="window">
-        <option value="1">1 s</option>
-        <option value="3" selected>3 s</option>
-        <option value="6">6 s</option>
-        <option value="10">10 s</option>
-      </select>
-    </label>
-    <label class="check"><input type="checkbox" id="heroes-only" checked> heroes only</label>
-  </div>
+  <pre id="sync-log" class="sync-log" hidden></pre>
 </header>
 
-<section id="summary" class="summary"></section>
+<main id="app"></main>
 
-<main id="matches"></main>
-
-<template id="match-tpl">
-  <article class="match">
-    <div class="match-head">
-      <div class="match-title">
-        <span class="result"></span>
-        <a class="mid" target="_blank" rel="noopener"></a>
-        <span class="muted when"></span>
-      </div>
-      <div class="match-stats"></div>
-    </div>
-    <div class="match-body">
-      <svg class="chart"></svg>
-      <div class="scrub-row">
-        <button class="play" title="play / pause">▶</button>
-        <input type="range" class="scrub" min="0" step="0.5" value="0">
-        <span class="clock">0:00</span>
-      </div>
-      <div class="readout">
-        <div class="tiles"></div>
-        <ol class="feed"></ol>
-      </div>
-    </div>
-    <p class="missing muted"></p>
-  </article>
-</template>
-
-<footer class="muted">
-  data: local demos parsed with haste · match history + assets from deadlock-api.com
+<footer class="muted small">
+  Skill Hitter · demos parsed locally with haste · match history, profiles and assets from deadlock-api.com
 </footer>
-<script src="app.js"></script>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>

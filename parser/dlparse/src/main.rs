@@ -499,6 +499,10 @@ impl Visitor for V {
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--version") {
+        println!("{FORMAT_VERSION}");
+        return Ok(());
+    }
     if args.len() < 3 {
         anyhow::bail!("usage: dlparse <demo.dem> <out.json> [match_id]");
     }

@@ -1,26 +1,31 @@
 #!/usr/bin/env python3
-"""Sync a player's matches on one hero into web/data.
+"""Sync a player's matches into web/data.
 
-Steps per match:
-  1. find the demo: data/demos/<id>.dem, the game's replays folder, or a demo URL from
-     deadlock-api salts (downloaded + bz2-decompressed into data/demos)
-  2. parse it with parser/target/release/dlparse into web/data/matches/<id>.json
-  3. write web/data/index.json with every match (parsed or not, and why)
+  1. pull the player's match history from deadlock-api
+  2. locate demos: data/demos/, the game's replays folder, or a demo URL from deadlock-api
+     salts (only for the selected heroes, downloaded + bz2-decompressed into data/demos)
+  3. parse every available demo (in parallel) with parser/target/release/dlparse into
+     web/data/matches/<id>.json.gz, reparsing when the parser's format version changed
+  4. mirror Steam profiles of everyone in parsed matches, hero/ability/item icons and the
+     minimap into web/
+  5. write web/data/index.json
 
-Also mirrors hero/ability names + icons from the deadlock-api assets into web/data/assets.json
-and web/assets/.
-
-usage: python3 tools/sync.py [--account 76800555] [--hero drifter] [--steam-salts] [--reparse]
+usage: python3 tools/sync.py [--account 76561198037066283] [--hero drifter] [--hero all]
+                             [--steam-salts] [--reparse] [--no-download] [--jobs N]
 """
 import argparse
 import bz2
+import gzip
 import json
+import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,11 +34,13 @@ DATA = WEB / "data"
 MATCHES = DATA / "matches"
 ASSET_DIR = WEB / "assets"
 DEMOS = ROOT / "data" / "demos"
+MANIFEST = ROOT / "data" / "parsed.json"
 PARSER = ROOT / "parser" / "target" / "release" / "dlparse"
-GAME_REPLAYS = Path("/mnt/d/SteamLibrary/steamapps/common/Deadlock/game/citadel/replays")
+GAME_REPLAYS = Path(os.environ.get(
+    "DEADLOCK_REPLAYS", "/mnt/d/SteamLibrary/steamapps/common/Deadlock/game/citadel/replays"))
 API = "https://api.deadlock-api.com"
 STEAM_ID64_BASE = 76561197960265728
-UA = {"User-Agent": "deadlock-replay-skill-hitter/0.1"}
+UA = {"User-Agent": "deadlock-replay-skill-hitter/0.2"}
 
 
 def log(*a):
@@ -47,11 +54,28 @@ def get_json(url, timeout=60):
 
 
 def download(url, dest: Path, timeout=120):
-    tmp = dest.with_suffix(dest.suffix + ".part")
+    tmp = dest.with_name(dest.name + ".part")
     req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=timeout) as r, open(tmp, "wb") as f:
         shutil.copyfileobj(r, f, 1 << 20)
     tmp.replace(dest)
+
+
+def mirror(url, sub, name=None):
+    """download url into web/assets/<sub>/ once; returns the site-relative path (or the url
+    itself if the download fails, so the site still works online)."""
+    if not url:
+        return None
+    name = name or url.rsplit("/", 1)[-1].split("?")[0]
+    dest = ASSET_DIR / sub / name
+    if not dest.exists():
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            download(url, dest)
+        except (urllib.error.URLError, OSError) as e:
+            log(f"  asset fail {url}: {e}")
+            return url
+    return f"assets/{sub}/{name}"
 
 
 def to_account_id(v: str) -> int:
@@ -59,105 +83,30 @@ def to_account_id(v: str) -> int:
     return n - STEAM_ID64_BASE if n > STEAM_ID64_BASE else n
 
 
-# ---------------------------------------------------------------- assets
+def parser_version():
+    r = subprocess.run([str(PARSER), "--version"], capture_output=True, text=True)
+    return int(r.stdout.strip() or 0)
 
-def sync_assets(hero_ids):
-    """hero + ability names/icons for every hero seen, mirrored locally."""
-    ASSET_DIR.mkdir(parents=True, exist_ok=True)
-    heroes = get_json(f"{API}/v1/assets/heroes")
-    items = get_json(f"{API}/v1/assets/items")
 
-    def mirror(url, sub):
-        if not url:
-            return None
-        name = url.rsplit("/", 1)[-1]
-        dest = ASSET_DIR / sub / name
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        if not dest.exists():
-            try:
-                download(url, dest)
-            except (urllib.error.URLError, OSError) as e:
-                log(f"  asset fail {url}: {e}")
-                return url  # fall back to remote
-        return f"assets/{sub}/{name}"
-
-    out_heroes = {}
-    for h in heroes:
-        img = h.get("images", {})
-        full = h["id"] in hero_ids
-        out_heroes[h["id"]] = {
-            "name": h["name"],
-            "class_name": h["class_name"],
-            "icon": mirror(img.get("icon_image_small_webp"), "heroes") if full else img.get("icon_image_small_webp"),
-            "card": mirror(img.get("icon_hero_card_webp"), "heroes") if full else None,
-            "color": (h.get("colors") or {}).get("ui"),
-        }
-
-    out_items = {}
-    for it in items:
-        hero = it.get("hero")
-        is_hero_ability = it.get("type") == "ability" and hero in hero_ids
-        entry = {
-            "class_name": it["class_name"],
-            "name": it.get("name") or it["class_name"],
-            "type": it.get("type"),
-            "ability_type": it.get("ability_type"),
-            "hero": hero,
-        }
-        if is_hero_ability:
-            entry["image"] = mirror(it.get("image_webp") or it.get("image"), "abilities")
-        out_items[it["id"]] = entry
-
-    # slot order (signature1..4) so the UI can list abilities like the in-game HUD
-    order = {}
-    for h in heroes:
-        if h["id"] in hero_ids:
-            order[h["id"]] = [
-                (h.get("items") or {}).get(f"signature{i}") for i in range(1, 5)
-            ]
-    (DATA / "assets.json").write_text(
-        json.dumps({"heroes": out_heroes, "items": out_items, "signatures": order})
-    )
-    log(f"assets: {len(out_heroes)} heroes, {len(out_items)} items")
-    return out_heroes
+def load_manifest():
+    try:
+        return json.loads(MANIFEST.read_text())
+    except (OSError, ValueError):
+        return {}
 
 
 # ---------------------------------------------------------------- demos
 
-def sync_profile(account):
-    """steam name, profile url and avatar (mirrored locally)."""
-    try:
-        rows = get_json(f"{API}/v1/players/steam?account_ids={account}")
-    except (urllib.error.URLError, OSError) as e:
-        log(f"profile fetch failed: {e}")
-        return None
-    if not rows:
-        return None
-    p = rows[0]
-    avatar = p.get("avatarfull") or p.get("avatar")
-    if avatar:
-        dest = ASSET_DIR / "avatars" / f"{account}.jpg"
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            download(avatar, dest)
-            avatar = f"assets/avatars/{account}.jpg"
-        except (urllib.error.URLError, OSError) as e:
-            log(f"avatar download failed: {e}")
-    log(f"profile: {p.get('personaname')}")
-    return {
-        "name": p.get("personaname"),
-        "url": p.get("profileurl") or f"https://steamcommunity.com/profiles/{account + STEAM_ID64_BASE}/",
-        "avatar": avatar,
-        "country": p.get("countrycode"),
-        "matches_30d": p.get("matches_played_last_30d"),
-    }
-
-
-def find_local_demo(match_id):
-    for p in (DEMOS / f"{match_id}.dem", GAME_REPLAYS / f"{match_id}.dem"):
-        if p.exists() and p.stat().st_size > 0:
-            return p
-    return None
+def local_demos():
+    """match_id -> demo path for every .dem we can see locally."""
+    found = {}
+    for d in (DEMOS, GAME_REPLAYS):
+        if not d.exists():
+            continue
+        for p in d.glob("*.dem"):
+            if p.stem.isdigit() and p.stat().st_size > 0:
+                found.setdefault(int(p.stem), p)
+    return found
 
 
 def fetch_demo(match_id, steam_salts):
@@ -173,14 +122,14 @@ def fetch_demo(match_id, steam_salts):
         return None, f"salts error {e.reason}"
     demo_url = salts.get("demo_url")
     if not demo_url:
-        return None, "no demo salt known (download in-game or via GC)"
+        return None, "no replay salt known"
     DEMOS.mkdir(parents=True, exist_ok=True)
     bz = DEMOS / f"{match_id}.dem.bz2"
-    log(f"  downloading {demo_url}")
+    log(f"  {match_id}: downloading {demo_url}")
     try:
-        download(demo_url, bz, timeout=600)
+        download(demo_url, bz, timeout=900)
     except urllib.error.HTTPError as e:
-        return None, f"valve http {e.code} (demo expired?)"
+        return None, f"valve http {e.code} (demo deleted)"
     dem = DEMOS / f"{match_id}.dem"
     with bz2.open(bz, "rb") as src, open(dem, "wb") as dst:
         shutil.copyfileobj(src, dst, 1 << 20)
@@ -188,67 +137,237 @@ def fetch_demo(match_id, steam_salts):
     return dem, "downloaded"
 
 
-def parse(match_id, demo: Path, reparse):
-    out = MATCHES / f"{match_id}.json"
-    if out.exists() and not reparse:
-        return True, "cached"
+def parse(match_id, demo: Path):
+    """run the parser, gzip its output. returns (ok, message)."""
     MATCHES.mkdir(parents=True, exist_ok=True)
-    r = subprocess.run([str(PARSER), str(demo), str(out), str(match_id)],
-                       capture_output=True, text=True)
-    if r.returncode != 0:
-        return False, f"parse failed: {r.stderr.strip()[-300:]}"
+    out = MATCHES / f"{match_id}.json.gz"
+    part = out.with_name(out.name + ".part")
+    with tempfile.TemporaryDirectory() as tmp:
+        raw = Path(tmp) / "m.json"
+        r = subprocess.run([str(PARSER), str(demo), str(raw), str(match_id)],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            return False, f"parse failed: {r.stderr.strip()[-300:]}"
+        with open(raw, "rb") as src, gzip.open(part, "wb", 6) as dst:
+            shutil.copyfileobj(src, dst)
+        part.replace(out)
+    (MATCHES / f"{match_id}.json").unlink(missing_ok=True)  # pre-gzip format
     return True, r.stderr.strip()
+
+
+def read_match(match_id):
+    with gzip.open(MATCHES / f"{match_id}.json.gz", "rt") as f:
+        return json.load(f)
+
+
+# ---------------------------------------------------------------- assets + profiles
+
+def sync_assets(heroes, used_heroes, used_items):
+    items = get_json(f"{API}/v1/assets/items")
+    out_heroes = {}
+    for h in heroes:
+        img = h.get("images", {})
+        used = h["id"] in used_heroes
+        out_heroes[h["id"]] = {
+            "name": h["name"],
+            "class_name": h["class_name"],
+            "icon": mirror(img.get("icon_image_small_webp"), "heroes"),
+            "card": mirror(img.get("icon_hero_card_webp"), "heroes") if used else None,
+            "minimap": mirror(img.get("minimap_image_webp"), "heroes") if used else None,
+            "color": (h.get("colors") or {}).get("ui"),
+            "signatures": [(h.get("items") or {}).get(f"signature{i}") for i in range(1, 5)],
+            "weapon": (h.get("items") or {}).get("weapon_primary"),
+        }
+    out_items = {}
+    for it in items:
+        entry = {
+            "class_name": it["class_name"],
+            "name": it.get("name") or it["class_name"],
+            "type": it.get("type"),
+            "hero": it.get("hero"),
+        }
+        for k_src, k_dst in (("ability_type", "ability_type"), ("item_slot_type", "slot"),
+                             ("item_tier", "tier"), ("cost", "cost")):
+            if it.get(k_src):
+                entry[k_dst] = it[k_src]
+        wanted = (it.get("type") == "ability" and it.get("hero") in used_heroes) \
+            or it["id"] in used_items
+        if wanted:
+            entry["image"] = mirror(
+                it.get("shop_image_small_webp") or it.get("image_webp") or it.get("image")
+                or it.get("shop_image_webp"),
+                "abilities" if it.get("type") == "ability" else "items")
+        out_items[it["id"]] = entry
+
+    try:
+        m = get_json(f"{API}/v1/assets/map")
+        ziplines = []
+        for z in m.get("zipline_paths") or []:
+            ox, oy = z["origin"][0], z["origin"][1]
+            ziplines.append({
+                "color": z.get("color"),
+                "points": [[round(ox + p[0]), round(oy + p[1])] for p in z.get("P0_points", [])],
+            })
+        game_map = {
+            "radius": m.get("radius"),
+            "image": mirror(m["images"].get("minimap"), "map"),
+            "frame": mirror(m["images"].get("frame"), "map"),
+            "ziplines": ziplines,
+            # relative image coords (0..1), keys like team0_core / team1_tier2_3
+            "objectives": m.get("objective_positions") or {},
+        }
+    except (urllib.error.URLError, KeyError) as e:
+        log(f"map fetch failed: {e}")
+        game_map = None
+
+    (DATA / "assets.json").write_text(json.dumps(
+        {"heroes": out_heroes, "items": out_items, "map": game_map}))
+    log(f"assets: {len(out_heroes)} heroes, {len(out_items)} items")
+
+
+def sync_profiles(account_ids):
+    """steam name/avatar/profile url for every account seen; avatars mirrored locally."""
+    out = {}
+    ids = sorted(a for a in account_ids if a)
+    for i in range(0, len(ids), 100):
+        chunk = ids[i:i + 100]
+        try:
+            rows = get_json(f"{API}/v1/players/steam?account_ids={','.join(map(str, chunk))}")
+        except (urllib.error.URLError, OSError) as e:
+            log(f"profile fetch failed: {e}")
+            continue
+        for p in rows:
+            aid = p["account_id"]
+            out[aid] = {
+                "name": p.get("personaname"),
+                "url": p.get("profileurl")
+                or f"https://steamcommunity.com/profiles/{aid + STEAM_ID64_BASE}/",
+                "avatar": mirror(p.get("avatarfull") or p.get("avatarmedium") or p.get("avatar"),
+                                 "avatars", f"{aid}.jpg"),
+                "country": p.get("countrycode"),
+                "matches_30d": p.get("matches_played_last_30d"),
+            }
+    (DATA / "profiles.json").write_text(json.dumps(out))
+    log(f"profiles: {len(out)}")
+    return out
 
 
 # ---------------------------------------------------------------- main
 
+def resolve_heroes(heroes, wanted):
+    if any(w.lower() == "all" for w in wanted):
+        return None  # every hero
+    ids = set()
+    for w in wanted:
+        h = w.lower()
+        hero = next((x for x in heroes if str(x["id"]) == h or x["name"].lower() == h
+                     or x["class_name"].lower() in (h, f"hero_{h}")), None)
+        if not hero:
+            sys.exit(f"unknown hero {w}")
+        ids.add(hero["id"])
+    return ids
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--account", default="76561198037066283", help="steamid64 or account id")
-    ap.add_argument("--hero", default="drifter", help="hero name, class name or id")
+    ap.add_argument("--hero", action="append", default=None,
+                    help="hero name/class/id to download demos for (repeatable, or 'all')")
     ap.add_argument("--steam-salts", action="store_true",
                     help="let deadlock-api ask Steam for missing salts (10 req / 30 min)")
     ap.add_argument("--reparse", action="store_true")
     ap.add_argument("--no-download", action="store_true")
+    ap.add_argument("--no-refetch", action="store_true", help="use deadlock-api's cached history")
+    ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2))
     args = ap.parse_args()
+    args.hero = args.hero or ["drifter"]
 
     if not PARSER.exists():
-        sys.exit(f"parser missing: build it with `cargo build --release` in {ROOT / 'parser'}")
-
+        sys.exit(f"parser missing: run tools/get-protoc.sh && cargo build --release in {ROOT / 'parser'}")
+    pver = parser_version()
     account = to_account_id(args.account)
     heroes = get_json(f"{API}/v1/assets/heroes")
-    h = args.hero.lower()
-    hero = next((x for x in heroes if str(x["id"]) == h or x["name"].lower() == h
-                 or x["class_name"].lower() in (h, f"hero_{h}")), None)
-    if not hero:
-        sys.exit(f"unknown hero {args.hero}")
-    log(f"account {account}, hero {hero['name']} ({hero['id']})")
+    selected = resolve_heroes(heroes, args.hero)
+    names = "all heroes" if selected is None else ", ".join(
+        h["name"] for h in heroes if h["id"] in selected)
+    log(f"account {account}, downloading demos for {names}, parser v{pver}")
 
+    hist_url = f"{API}/v1/players/{account}/match-history"
     try:  # refetch pulls matches newer than deadlock-api's cache (rate limited)
-        history = get_json(f"{API}/v1/players/{account}/match-history?force_refetch=true")
+        history = get_json(hist_url + ("" if args.no_refetch else "?force_refetch=true"))
     except urllib.error.HTTPError as e:
         log(f"refetch failed ({e.code}), using cached history")
-        history = get_json(f"{API}/v1/players/{account}/match-history")
-    picks = [m for m in history if m["hero_id"] == hero["id"]]
-    log(f"{len(history)} matches in history, {len(picks)} on {hero['name']}")
+        history = get_json(hist_url)
+    log(f"{len(history)} matches in history")
+
+    demos = local_demos()
+    manifest = load_manifest()
+    status = {}
+
+    # downloads (selected heroes only; sequential to be kind to Valve)
+    for m in history:
+        mid = m["match_id"]
+        if mid in demos:
+            status[mid] = "local demo"
+            continue
+        if selected is not None and m["hero_id"] not in selected:
+            continue
+        if args.no_download:
+            status[mid] = "not downloaded (--no-download)"
+            continue
+        dem, why = fetch_demo(mid, args.steam_salts)
+        status[mid] = why
+        if dem:
+            demos[mid] = dem
+
+    # parse (parallel)
+    jobs = []
+    for m in history:
+        mid = m["match_id"]
+        if mid not in demos:
+            continue
+        have = (MATCHES / f"{mid}.json.gz").exists() and manifest.get(str(mid)) == pver
+        if have and not args.reparse:
+            status[mid] += "; parsed"
+            continue
+        jobs.append(mid)
+    if jobs:
+        log(f"parsing {len(jobs)} demos with {args.jobs} workers")
+        with ThreadPoolExecutor(args.jobs) as ex:
+            futs = {ex.submit(parse, mid, demos[mid]): mid for mid in jobs}
+            for f in as_completed(futs):
+                mid = futs[f]
+                ok, msg = f.result()
+                log(f"  {mid}: {msg}")
+                if ok:
+                    manifest[str(mid)] = pver
+                    status[mid] += "; parsed"
+                else:
+                    manifest.pop(str(mid), None)
+                    status[mid] += f"; {msg}"
+        MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+        MANIFEST.write_text(json.dumps(manifest))
+
+    # gather what the parsed matches reference
+    used_heroes, used_items, accounts = set(), set(), {account}
+    for m in history:
+        if not (MATCHES / f"{m['match_id']}.json.gz").exists():
+            continue
+        pj = read_match(m["match_id"])
+        for p in pj["players"]:
+            used_heroes.add(p["hero_id"])
+            accounts.add(p["account_id"])
+        used_items.update(i[2] for i in pj.get("items", []))
+    if selected:
+        used_heroes |= selected
+
+    DATA.mkdir(parents=True, exist_ok=True)
+    sync_assets(heroes, used_heroes, used_items)
+    profiles = sync_profiles(accounts)
 
     entries = []
-    seen_heroes = {hero["id"]}
-    for m in picks:
+    for m in history:
         mid = m["match_id"]
-        log(f"match {mid}")
-        demo = find_local_demo(mid)
-        reason = "local demo" if demo else "not downloaded (--no-download)"
-        if not demo and not args.no_download:
-            demo, reason = fetch_demo(mid, args.steam_salts)
-        parsed = False
-        if demo:
-            parsed, msg = parse(mid, demo, args.reparse)
-            reason = f"{reason}; {msg}"
-        if parsed:
-            pj = json.loads((MATCHES / f"{mid}.json").read_text())
-            seen_heroes.update(p["hero_id"] for p in pj["players"])
-        log(f"  -> {'OK' if parsed else 'missing'}: {reason}")
         entries.append({
             "match_id": mid,
             "start_time": m["start_time"],
@@ -258,23 +377,28 @@ def main():
             "deaths": m["player_deaths"],
             "assists": m["player_assists"],
             "net_worth": m["net_worth"],
+            "last_hits": m["last_hits"],
+            "level": m["hero_level"],
             "won": m["match_result"] == m["player_team"],
-            "parsed": parsed,
-            "status": reason,
+            "mode": m["match_mode"],
+            "parsed": (MATCHES / f"{mid}.json.gz").exists(),
+            "status": status.get(mid, "not tried (hero not selected)"),
         })
-
-    sync_assets(seen_heroes)
-    profile = sync_profile(account)
-    DATA.mkdir(parents=True, exist_ok=True)
+    if selected and len(selected) == 1:
+        default_hero = next(iter(selected))
+    else:
+        default_hero = max(used_heroes or {0}, key=lambda h: sum(
+            e["parsed"] and e["hero_id"] == h for e in entries))
     (DATA / "index.json").write_text(json.dumps({
         "account_id": account,
-        "profile": profile,
-        "hero_id": hero["id"],
+        "profile": profiles.get(account),
         "generated": int(time.time()),
+        "parser_version": pver,
+        "default_hero": default_hero,
         "matches": entries,
-    }, indent=1))
+    }))
     ok = sum(e["parsed"] for e in entries)
-    log(f"done: {ok}/{len(entries)} matches parsed -> {DATA / 'index.json'}")
+    log(f"done: {ok} parsed matches ({len(entries)} in history) -> {DATA / 'index.json'}")
 
 
 if __name__ == "__main__":
