@@ -857,6 +857,10 @@ def main():
 
     # tracked players in parsed matches their history doesn't list yet: synthetic entries
     add_unlisted_matches(indexes)
+    for idx in indexes:
+        idx["health"]["parsed"] = sum(1 for e in idx["matches"] if (MATCHES / f"{e['match_id']}.json.gz").exists())
+        for e in idx["matches"]:
+            e["parsed"] = (MATCHES / f"{e['match_id']}.json.gz").exists()
 
     if ctx.game_assets:
         (DATA / "assets.json").write_text(json.dumps(ctx.game_assets))

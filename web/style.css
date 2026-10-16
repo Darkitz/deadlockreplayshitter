@@ -467,3 +467,8 @@ img.slot-spirit { background: #5a3a8c !important; }
 .rank-badge i { position: absolute; left: 50%; bottom: -3px; transform: translateX(-50%); font-style: normal; font-size: 9px; font-weight: 700; color: #fff; text-shadow: 0 0 3px #000, 0 0 2px #000; }
 .rank-badge.lg { width: 52px; height: 52px; }
 .rank-badge.lg i { font-size: 13px; bottom: -2px; }
+.match-card.nodemo { opacity: .75; }
+.match-card.nodemo:hover { opacity: 1; }
+.mc-tracked .hi { width: 22px; height: 22px; border-radius: 5px; vertical-align: middle; }
+.chip-s.muted-chip { border-color: var(--line); color: var(--muted); }
+.btn.more { grid-column: 1 / -1; justify-self: center; }
