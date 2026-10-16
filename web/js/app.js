@@ -4,6 +4,7 @@
 //   #/                                   all parsed matches
 //   #/match/<id>?pawn=&ability=&from=&t=  match detail (minimap + timeline + tracker)
 //   #/players                            everyone seen in parsed demos
+//   #/heroes, #/heroes/<id>              heroes across all parsed demos
 //   #/player/<account>                   a player's performance across parsed matches
 //   #/player/<account>/hero/<id>?ability= per-hero ability analysis (tracked accounts)
 //   #/hero/<id>                          legacy: hero page of the current player
@@ -15,6 +16,7 @@ import { viewMatch } from "./match.js";
 import { viewHome } from "./home.js";
 import { viewPlayer } from "./player.js";
 import { viewPlayers } from "./players.js";
+import { viewHeroes, viewHero } from "./heroes.js";
 
 async function loadAll() {
   S.accounts = await loadJSON("data/accounts.json").catch(() => []);
@@ -54,7 +56,7 @@ async function useAccount(acc) {
 function renderHeader() {
   const sw = $("#account-switch");
   sw.hidden = !S.accounts.length;
-  sw.innerHTML = `<option value="">players…</option>` + S.accounts.map((a) =>
+  sw.innerHTML = `<option value="">tracked players…</option>` + S.accounts.map((a) =>
     `<option value="${a.account_id}">${esc(a.name)} · ${a.parsed} demos</option>`).join("");
   sw.onchange = () => {
     if (sw.value) location.hash = `#/player/${sw.value}`;
@@ -102,6 +104,14 @@ async function route() {
     } else {
       S.view = "player";
       await viewPlayer(acc, params);
+    }
+  } else if (parts[0] === "heroes") {
+    if (parts[1]) {
+      S.view = "hero";
+      await viewHero(Number(parts[1]), params);
+    } else {
+      S.view = "heroes";
+      viewHeroes();
     }
   } else if (parts[0] === "players") {
     S.view = "players";

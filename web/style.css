@@ -455,3 +455,9 @@ img.slot-spirit { background: #5a3a8c !important; }
 .acc-line.team-3 { stroke: var(--sapphire); }
 .acc-line.subject { stroke-width: 3; opacity: 1; }
 .acc-line.hl { stroke: var(--accent); stroke-width: 3.5; opacity: 1; }
+.hero-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.hero-card { display: flex; flex-direction: column; align-items: center; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; color: var(--text); }
+.hero-card:hover { border-color: var(--accent); text-decoration: none; }
+.hero-card img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; background: var(--panel-2); }
+.charts.charts-2 { grid-template-columns: 1fr 1fr; align-items: start; }
+@media (max-width: 900px) { .charts.charts-2 { grid-template-columns: 1fr; } }
