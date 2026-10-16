@@ -206,8 +206,7 @@ TYPE = {"EAbilityType_Item": "upgrade", "EAbilityType_Weapon": "weapon"}
 
 
 def build_assets(previous=None):
-    """assets.json content from the game files. `previous` (the old assets.json) only supplies
-    map zipline/objective overlays, which aren't in these scripts."""
+    """assets.json content from the game files (`previous` is accepted for compatibility)."""
     extract_scripts()
     loc = load_localization()
     heroes_kv = load_script("heroes")
@@ -298,12 +297,17 @@ def build_assets(previous=None):
 
     minimap = "panorama/images/minimap/base/minimap_midtown_mid_psd.vtex_c"
     icons.add(minimap)
-    old_map = (previous or {}).get("map") or {}
+    # zipline paths + objective positions aren't in these scripts; a static overlay ships with
+    # the repo (tools/map_overlay.json)
+    try:
+        overlay = json.loads((ROOT / "tools" / "map_overlay.json").read_text())
+    except (OSError, ValueError):
+        overlay = {}
     game_map = {
         "radius": MAP_RADIUS,
         "image": site_icon(minimap),
-        "ziplines": old_map.get("ziplines", []),
-        "objectives": old_map.get("objectives", {}),
+        "ziplines": overlay.get("ziplines", []),
+        "objectives": overlay.get("objectives", {}),
     }
 
     extract_icons(icons)
