@@ -1,0 +1,367 @@
+// Match detail: scoreboard, ability picker, minimap + timeline replay, incoming skillshots.
+
+import { loadMatch, statsAt, TEAM_NAMES } from "./data.js";
+import { analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG } from "./analysis.js";
+import { createTimeline, fmtClock } from "./timeline.js";
+import { createMinimap } from "./minimap.js";
+import {
+  $, esc, S, settings, saveSettings, opts, fmtDate, ago, k1, tile, rankChip, controlsHTML,
+  wireControls, abilityButtons, entry, setParams,
+} from "./ui.js";
+
+export async function viewMatch(id, params) {
+  const app = $("#app");
+  app.innerHTML = `<div class="muted pad">loading match ${id}…</div>`;
+  const e = entry(id);
+  let m;
+  try {
+    m = await loadMatch(id);
+  } catch (err) {
+    renderNoDemo(app, id, e);
+    return;
+  }
+  const me = m.player(S.index.account_id);
+  const pawn = Number(params.get("pawn")) || me?.pawn || m.players[0].pawn;
+  const subject = m.byPawn.get(pawn);
+  const sigs = S.assets.signatures(subject.hero_id);
+  const table = abilityTable(m, pawn, S.assets, opts());
+  const wanted = params.get("ability");
+  const row = table.find((r) => r.ability.class_name === wanted)
+    || table.find((r) => r.ability.class_name === "drifter_shadow_mark")
+    || table.find((r) => r.thrown) || table[0];
+  const ability = row?.ability || sigs[0];
+  const analysis = analyzeAbility(m, pawn, ability, opts());
+  const casts = analysis.casts;
+  const won = e ? e.won : null;
+  const d = e ? new Date(e.start_time * 1000) : null;
+
+  function abStat(ab) {
+    const r = table.find((x) => x.ability.class_name === ab.class_name);
+    return r && r.thrown ? `<span class="ab-stat">${r.scored}/${r.thrown}</span>` : `<span class="ab-stat muted">–</span>`;
+  }
+  // signature-ability accuracy of every player (who hits their skills best this match)
+  const skillAcc = new Map(m.players.map((p) => {
+    let thrown = 0, scored = 0;
+    for (const ab of S.assets.signatures(p.hero_id)) {
+      const c = counts(analyzeAbility(m, p.pawn, ab, opts()).casts, settings.heroesOnly);
+      // abilities that never connect with anything (buffs, movement) would only add noise
+      if (c.scored + c.other === 0) continue;
+      thrown += c.thrown; scored += c.scored;
+    }
+    return [p.pawn, { thrown, scored }];
+  }));
+  const bestAcc = Math.max(...[...skillAcc.values()].map((v) => (v.thrown >= 5 ? v.scored / v.thrown : 0)));
+  const teamOf = (t) => m.players.filter((p) => p.team === t).sort((a, b) => b.net_worth - a.net_worth);
+  const teams = [...new Set(m.players.map((p) => p.team))].sort();
+
+  app.innerHTML = `
+    <div class="match-header">
+      <a href="#/hero/${e?.hero_id ?? subject.hero_id}" class="back">← overview</a>
+      <div class="mh-title">
+        ${won != null ? `<span class="result ${won ? "win" : "loss"}">${won ? "WIN" : "LOSS"}</span>` : ""}
+        <h2>#${id}</h2>
+        ${d ? `<span class="muted" title="${esc(d.toString())}">${fmtDate(d)} · ${ago(d)}</span>` : ""}
+        <span class="muted">${fmtClock(m.end)}</span>
+        ${rankChip(e)}
+        <a class="muted small" target="_blank" rel="noopener" href="https://statlocker.gg/match/${id}">statlocker ↗</a>
+      </div>
+    </div>
+    <section class="scoreboard">
+      ${teams.map((t) => `
+        <div class="team team-${t}">
+          <h3>${TEAM_NAMES[t] || `Team ${t}`}${me && me.team === t ? " · " + esc(S.profiles[me.account_id]?.name || me.name) + "'s team" : ""}</h3>
+          <div class="team-head"><span></span><span></span><span>player</span><span style="text-align:right">k/d/a</span><span style="text-align:right">skill%</span><span style="text-align:right">souls</span></div>
+          ${teamOf(t).map((p) => {
+            const prof = S.profiles[p.account_id];
+            return `<button class="sb-row ${p.pawn === pawn ? "on" : ""}" data-pawn="${p.pawn}" title="analyze ${esc(p.name)}">
+              <img class="sb-hero" src="${esc(S.assets.hero(p.hero_id).icon)}" alt="">
+              ${prof?.avatar ? `<img class="sb-av" src="${esc(prof.avatar)}" alt="">` : `<span class="sb-av"></span>`}
+              <span class="sb-name">${esc(prof?.name || p.name)}</span>
+              <span class="sb-kda">${p.kills}/${p.deaths}/${p.assists}</span>
+              ${(() => { const a = skillAcc.get(p.pawn); const v = a.thrown ? a.scored / a.thrown : 0;
+                return `<span class="sb-acc ${a.thrown >= 5 && v === bestAcc ? "best" : ""}" title="signature abilities: ${a.scored}/${a.thrown} hit heroes">${a.thrown ? pct(v) : "–"}</span>`; })()}
+              <span class="sb-nw">${k1(p.net_worth)}</span>
+            </button>`;
+          }).join("")}
+        </div>`).join("")}
+    </section>
+    <section class="toolbar">
+      <div class="abilities">${abilityButtons(table.filter((r) => !r.kind).map((r) => r.ability), ability.class_name, abStat)}</div>
+      <div class="controls">${controlsHTML()}</div>
+    </section>
+    ${table.some((r) => r.kind === "extra") ? `<section class="items-row"><span class="muted small">other abilities</span>
+      <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.kind === "extra").map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}
+    ${table.some((r) => r.item) ? `<section class="items-row"><span class="muted small">active items</span>
+      <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.item).map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}
+    ${analysis.source === "cooldown" ? `<p class="note">No cast events for ${esc(ability.name)} in this demo; casts are taken from the ability going on cooldown, so there is no aim direction or aim error.</p>` : ""}
+    ${analysis.source === "none" ? `<p class="note">No casts of ${esc(ability.name)} found for this player.</p>` : ""}
+    <section class="stage">
+      <div class="map-wrap"><canvas class="minimap"></canvas>
+        <div class="map-legend small muted">
+          <label class="check"><input type="checkbox" class="show-all" ${settings.showAll ? "checked" : ""}> all casts</label>
+          <span>click a hero to analyze them · rays = aim at cast</span>
+        </div></div>
+      <div class="stage-right">
+        <svg class="timeline"></svg>
+        <div class="player-row">
+          <button class="play" title="play / pause (space)">▶</button>
+          <select class="speed" title="playback speed">
+            ${[1, 4, 10, 30, 60, 120].map((s) => `<option value="${s}" ${s === settings.speed ? "selected" : ""}>${s}×</option>`).join("")}
+          </select>
+          <input type="range" class="scrub" min="0" max="${Math.ceil(m.end)}" step="0.5">
+          <span class="clock">0:00</span>
+          <button class="btn csv" title="download casts as CSV">CSV</button>
+        </div>
+        <div class="readout">
+          <div class="tiles"></div>
+          <div class="feed-wrap">
+            <div class="feed-filter">
+              ${["all", "hit", "miss", "kills"].map((f) => `<button class="chip ${settings.feed === f ? "on" : ""}" data-feed="${f}">${f}</button>`).join("")}
+            </div>
+            <ol class="feed"></ol>
+          </div>
+        </div>
+        <p class="keys small muted">space play · ←/→ 5 s · shift ±30 s · , . previous/next cast · home/end · wheel on timeline zooms</p>
+      </div>
+    </section>
+    <section class="chart-card incoming" id="incoming"></section>`;
+
+  // wiring
+  for (const b of app.querySelectorAll(".sb-row")) {
+    b.addEventListener("click", () => setParams({ pawn: b.dataset.pawn, ability: null }));
+  }
+  for (const b of app.querySelectorAll(".abilities .ab")) {
+    b.addEventListener("click", () => setParams({ ability: b.dataset.ability }));
+  }
+  wireControls(app, () => viewMatch(id, params));
+
+  // incoming skillshots (defense)
+  const inc = incoming(m, pawn, S.assets, opts());
+  $("#incoming", app).innerHTML = `
+    <h3>Incoming skillshots aimed at ${esc(S.profiles[subject.account_id]?.name || subject.name)}
+      <span class="muted">· enemy casts whose aim was within ${AIMED_AT_DEG}° of them</span></h3>
+    <div class="summary">
+      ${tile("Aimed at", inc.aimed)}${tile("Got hit", inc.hit, "")}${tile("Dodged", inc.dodged, "good")}
+      ${tile("Dodge rate", inc.aimed ? pct(inc.dodged / inc.aimed) : "–", "accent")}
+    </div>
+    <table class="report-table">
+      <tr><th></th><th>enemy</th><th>ability</th><th>aimed</th><th>hit</th><th>dodged</th></tr>
+      ${inc.rows.map((r) => `<tr>
+        <td><img src="${esc(S.assets.hero(r.player.hero_id).icon)}" alt=""></td>
+        <td>${esc(S.profiles[r.player.account_id]?.name || r.player.name)}</td>
+        <td><span class="inline-ab">${r.ability.image ? `<img src="${esc(r.ability.image)}" alt="">` : ""}${esc(r.ability.name)}</span></td>
+        <td>${r.aimed}</td><td>${r.hit}</td>
+        <td><span class="acc-bar"><span style="width:${(1 - r.hit / r.aimed) * 100}%"></span></span>${pct(1 - r.hit / r.aimed)}</td></tr>`).join("")}
+    </table>
+    <p class="small muted">AoE and lock-on abilities count too, so treat this as a rough dodge signal, not exact.</p>`;
+
+  // timeline model
+  const hpTrack = m.tracks.get(pawn);
+  const hp = [];
+  if (hpTrack) {
+    for (let i = 0; i < hpTrack.hp.length; i += 4) {
+      const mx = hpTrack.max_hp[i];
+      hp.push([m.samples.t0 + i * m.samples.dt, mx ? hpTrack.hp[i] / mx : 0]);
+    }
+  }
+  const lead = [];
+  const nRows = Math.max(0, ...m.stats.tracks.map((t) => t.rows.length));
+  for (let i = 0; i < nRows; i++) {
+    let v = 0;
+    for (const tr of m.stats.tracks) {
+      const p = m.byPawn.get(tr.pawn);
+      const nw = tr.rows[i]?.[0] || 0;
+      v += p.team === subject.team ? nw : -nw;
+    }
+    lead.push([m.stats.t0 + i * m.stats.dt, v]);
+  }
+  const deaths = m.kills.filter((k) => k[1] === pawn).map((k) => k[0]);
+  const kills = m.kills.filter((k) => k[2] === pawn || (k[4] || []).includes(pawn)).map((k) => k[0]);
+  const items = m.items
+    .filter((it) => it[1] === pawn && it[3] === 1 && it[0] > 0)
+    .map((it) => {
+      const a = S.assets.item(it[2]);
+      return a && a.type === "upgrade" ? { t: it[0], img: a.image, name: a.name } : null;
+    }).filter(Boolean);
+
+  const timeline = createTimeline($(".timeline", app), {
+    end: m.end, casts, heroesOnly: settings.heroesOnly, hp, lead, deaths, kills, items,
+  }, (t) => seek(t));
+  const minimap = createMinimap($(".minimap", app), {
+    match: m, assets: S.assets, onPick: (p) => setParams({ pawn: p.pawn, ability: null }),
+  });
+
+  let t = Number(params.get("t")) || m.end;
+  let playing = null;
+  const scrub = $(".scrub", app);
+  scrub.addEventListener("input", () => seek(Number(scrub.value)));
+  $(".speed", app).addEventListener("change", (ev) => { settings.speed = Number(ev.target.value); saveSettings(); });
+  $(".play", app).addEventListener("click", togglePlay);
+  $(".show-all", app).addEventListener("change", (ev) => {
+    settings.showAll = ev.target.checked;
+    saveSettings();
+    seek(t);
+  });
+  $(".csv", app).addEventListener("click", () => {
+    const name = (p) => m.byPawn.get(p)?.name ?? "";
+    const rows = [["time_s", "clock", "result", "damage", "delay_s", "range_m", "victims", "x", "y", "yaw"]];
+    for (const c of casts) {
+      rows.push([c.t.toFixed(2), fmtClock(c.t), c.result, c.dmg, c.delay?.toFixed(3) ?? "",
+        c.dist != null ? Math.round(c.dist) : "", c.victims.map(name).join("|"), c.x, c.y, c.yaw?.toFixed(1) ?? ""]);
+    }
+    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `${id}_${subject.name}_${ability.class_name}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  function seek(nt) {
+    t = Math.max(Math.min(nt, m.end), Math.min(0, m.samples.t0));
+    scrub.value = t;
+    $(".clock", app).textContent = fmtClock(t);
+    timeline.setTime(t);
+    minimap.update({ t, subject: pawn, casts, showAll: settings.showAll });
+    renderReadout(t);
+  }
+
+  function renderReadout(t) {
+    const past = casts.filter((c) => c.t <= t);
+    const c = counts(past, settings.heroesOnly);
+    const st = statsAt(m, pawn, t);
+    $(".tiles", app).innerHTML =
+      tile("Thrown", c.thrown) +
+      tile(settings.heroesOnly ? "Hit heroes" : "Hit", c.scored, "good") +
+      tile("Accuracy", c.thrown ? pct(c.acc) : "–", "accent") +
+      tile("Missed", c.miss) +
+      tile("Damage", k1(c.dmg)) +
+      tile("K / D / A", st ? `${st[2]}/${st[3]}/${st[4]}` : "–") +
+      tile("Souls", st ? k1(st[0]) : "–") +
+      tile("Level", st ? st[1] : "–") +
+      tile("Hit non-hero", c.other) +
+      tile("Hits → kills", c.hit ? `${c.kills}<small> / ${c.hit}</small>` : "–") +
+      tile("Ready → recast", c.idle != null ? `${c.idle.toFixed(1)}<small> s</small>` : "–");
+
+    const f = settings.feed || "all";
+    const events = [];
+    for (const k of past) {
+      if (f === "kills" || (f === "hit" && k.result === "miss") || (f === "miss" && k.result !== "miss")) continue;
+      events.push({ t: k.t, kind: "cast", k });
+    }
+    for (const k of m.kills) {
+      if (k[0] > t || f === "hit" || f === "miss") continue;
+      if (k[1] === pawn || k[2] === pawn || (k[4] || []).includes(pawn)) events.push({ t: k[0], kind: "kill", k });
+    }
+    events.sort((a, b) => b.t - a.t);
+    $(".feed", app).innerHTML = events.slice(0, 40).map((ev) => {
+      if (ev.kind === "cast") {
+        const k = ev.k;
+        const vics = k.victims.map((v) => {
+          const p = m.byPawn.get(v);
+          return p ? `<img src="${esc(S.assets.hero(p.hero_id).icon)}" title="${esc(p.name)}">` : "";
+        }).join("");
+        const dist = k.dist != null ? ` · ${Math.round(k.dist)} m` : "";
+        const label = k.result === "hit" ? `hit${k.delay != null ? ` +${k.delay.toFixed(2)}s` : ""}${dist} · ${k.dmg} dmg`
+          : k.result === "other" ? `hit non-hero${dist} · ${k.dmg} dmg`
+          : k.aimErr != null ? `miss · ${k.aimErr.toFixed(0)}° off <img src="${esc(S.assets.hero(m.byPawn.get(k.aimPawn)?.hero_id).icon)}" title="${esc(m.byPawn.get(k.aimPawn)?.name)}"> @ ${Math.round(k.aimDist)} m`
+          : "miss · no enemy in range";
+        const extra = k.killed ? ` <b class="kill-tag">→ kill</b>` : "";
+        return `<li data-t="${k.t}"><span class="dot ${k.result}"></span><span class="t">${fmtClock(k.t)}</span>${vics}<span>${label}${extra}</span></li>`;
+      }
+      const [kt, vic, att, abilityId] = ev.k;
+      const v = m.byPawn.get(vic), a = m.byPawn.get(att);
+      const died = vic === pawn;
+      const kab = S.assets.item(abilityId);
+      return `<li data-t="${kt}" class="${died ? "ev-death" : "ev-kill"}"><span class="t">${fmtClock(kt)}</span>
+        ${a ? `<img src="${esc(S.assets.hero(a.hero_id).icon)}" title="${esc(a.name)}">` : ""}
+        ${kab?.image ? `<img class="kab" src="${esc(kab.image)}" title="${esc(kab.name)}">` : kab ? `<span class="muted small">${esc(kab.name)}</span>` : ""}
+        <span>${died ? "killed" : "kill"}</span>
+        ${v ? `<img src="${esc(S.assets.hero(v.hero_id).icon)}" title="${esc(v.name)}">` : ""}</li>`;
+    }).join("") || `<li class="muted">nothing yet</li>`;
+  }
+  for (const b of app.querySelectorAll("[data-feed]")) {
+    b.addEventListener("click", () => {
+      settings.feed = b.dataset.feed;
+      saveSettings();
+      for (const o of app.querySelectorAll("[data-feed]")) o.classList.toggle("on", o === b);
+      renderReadout(t);
+    });
+  }
+  $(".feed", app).addEventListener("click", (ev) => {
+    const li = ev.target.closest("li[data-t]");
+    if (li) seek(Number(li.dataset.t) - 1.5);
+  });
+
+  function togglePlay() {
+    const btn = $(".play", app);
+    if (playing) { cancelAnimationFrame(playing); playing = null; btn.textContent = "▶"; return; }
+    if (t >= m.end - 0.5) t = Math.min(0, m.samples.t0);
+    btn.textContent = "❚❚";
+    let last = performance.now();
+    const step = (now) => {
+      const nt = Math.min(m.end, t + ((now - last) / 1000) * settings.speed);
+      last = now;
+      seek(nt);
+      if (nt >= m.end) { playing = null; btn.textContent = "▶"; return; }
+      playing = requestAnimationFrame(step);
+    };
+    playing = requestAnimationFrame(step);
+  }
+
+  const onKey = (ev) => {
+    if (ev.target.closest("input, select, textarea")) return;
+    const big = ev.shiftKey ? 30 : 5;
+    if (ev.key === " ") { ev.preventDefault(); togglePlay(); }
+    else if (ev.key === "ArrowRight") seek(t + big);
+    else if (ev.key === "ArrowLeft") seek(t - big);
+    else if (ev.key === "Home") seek(0);
+    else if (ev.key === "End") seek(m.end);
+    else if (ev.key === ".") { const n = casts.find((c) => c.t > t + 0.1); if (n) seek(n.t + 0.6); }
+    else if (ev.key === ",") { const p = [...casts].reverse().find((c) => c.t < t - 1.2); if (p) seek(p.t + 0.6); }
+    else return;
+  };
+  document.addEventListener("keydown", onKey);
+  S.cleanup = () => {
+    document.removeEventListener("keydown", onKey);
+    if (playing) cancelAnimationFrame(playing);
+    timeline.destroy();
+    minimap.destroy();
+  };
+  seek(t);
+}
+
+function renderNoDemo(app, id, e) {
+  const c = (S.career || []).find((r) => r.match_id === id);
+  const d = e ? new Date(e.start_time * 1000) : null;
+  const hero = S.assets.hero(e?.hero_id ?? c?.hero_id);
+  const mins = (c?.duration_s || e?.duration_s || 60) / 60;
+  app.innerHTML = `
+    <div class="match-header">
+      <a href="#/hero/${e?.hero_id ?? c?.hero_id ?? ""}" class="back">← overview</a>
+      <div class="mh-title">
+        ${e ? `<span class="result ${e.won ? "win" : "loss"}">${e.won ? "WIN" : "LOSS"}</span>` : ""}
+        <img class="mh-hero" src="${esc(hero.icon)}" alt=""><h2>#${id}</h2>
+        ${d ? `<span class="muted">${fmtDate(d)} · ${ago(d)}</span>` : ""}
+        ${e ? `<span class="muted">${fmtClock(e.duration_s)}</span>` : ""}
+        <a class="muted small" target="_blank" rel="noopener" href="https://statlocker.gg/match/${id}">statlocker ↗</a>
+      </div>
+    </div>
+    <div class="empty">
+      <b>No demo for this match</b> — ${esc(e?.status || "unknown")}.<br>
+      Open the match in Deadlock and click <b>Download Replay</b>; ${S.syncAvailable ? "the server picks it up automatically" : "then run <code>tools/sync.py</code>"}.
+    </div>
+    ${c ? `<h2 class="section-title">Valve end-of-match stats</h2>
+    <div class="summary">
+      ${tile("K / D / A", `${c.kills}/${c.deaths}/${c.assists}`)}
+      ${tile("Souls", k1(c.net_worth || 0))}
+      ${tile("Gun acc. vs heroes", c.hero_shots ? pct(c.hero_hits / c.hero_shots) : "–", "good")}
+      ${tile("Headshots", c.hero_hits ? pct(c.hero_headshots / c.hero_hits) : "–")}
+      ${tile("Hero dmg / min", Math.round((c.player_damage || 0) / mins))}
+      ${tile("Dmg taken / min", Math.round((c.player_damage_taken || 0) / mins))}
+      ${tile("Healing", k1(c.player_healing || 0))}
+      ${tile("Ability kills", c.ability_kills ?? "–")}
+      ${tile("Parry misses", c.parry_miss ?? "–")}
+      ${tile("Avg badge", c.badge ?? "–")}
+    </div>` : ""}`;
+}

@@ -276,3 +276,7 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
 .rank-chip img { width: 22px; height: 22px; object-fit: contain; }
 .rank-chip .up { color: var(--hit); }
 .rank-chip .down { color: var(--miss); }
+.feed-wrap { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.feed-filter { display: flex; gap: 6px; }
+.chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
+.chip.on { border-color: var(--accent); color: var(--accent); }
