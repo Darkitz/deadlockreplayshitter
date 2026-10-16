@@ -29,7 +29,6 @@ python3 tools/sync.py --account 60372773                # one-off run for one ac
 ```
 
 Parsed demos are shared, so a match is parsed once even when several tracked players were in it.
-The header gets a player switcher, and `?account=<id>` in the URL selects a player directly.
 
 ### sync.py options
 
@@ -41,6 +40,8 @@ The header gets a player switcher, and `?account=<id>` in the URL selects a play
 | `--no-download` | only use local demos |
 | `--no-refetch` | use deadlock-api's cached match history (faster) |
 | `--steam-salts` | let deadlock-api ask Steam for missing replay salts (rate-limited) |
+| `--meta-all` | download Valve metadata for every match in history, not just demo/selected-hero ones |
+| `--no-meta` | skip metadata downloads |
 | `--reparse` | reparse every demo |
 | `--jobs N` | parallel parser processes |
 
@@ -49,33 +50,52 @@ Set the `DEADLOCK_REPLAYS` env var if your replays folder isn't
 
 ## What's on the site
 
-**Overview** (`#/hero/<id>`):
-- Hero tabs show how many matches have a demo out of the total.
-- An ability picker.
-- Totals for the selected ability: thrown, hit, accuracy, average hit delay, average hit range,
-  and damage.
-- Charts: accuracy per match, accuracy by game phase, most-hit heroes, hit delay, and hit range.
-- An ability report covering all four abilities.
-- Match cards with sparklines.
-- A **career** section built from Valve's end-of-match stats. It covers every match, even
-  without a demo: gun accuracy vs heroes, headshot rate, damage per minute, and ability damage
-  by range.
+Matches are the main thing; players are how you find them. Every page and section has a URL.
 
-**Match** (`#/match/<id>?pawn=&ability=`):
-- Scoreboard with Steam avatars and each player's signature-ability accuracy (best one
-  underlined). Click any player to analyze them instead.
-- Every ability and every active item, with hit counts.
-- Minimap:
-  - interpolated positions, health rings and the subject's trail
-  - aim rays on cast, and hit markers linked to the cast
-  - kills, ziplines and objectives
-  - an "all casts" overlay
-- Timeline lanes: cumulative thrown vs hit, cast/kill/death markers, health, team souls lead, and
-  item purchases. Click a marker to jump to it.
-- Playback at 1× to 120×, an event feed, and CSV export.
-- Keys: space, ←/→ (shift for ±30 s), `,` and `.` for the previous/next cast, home/end.
+**Matches** (`#/`): every parsed match with both teams, the winner, and the tracked players in it.
+Search by player, hero or match id.
 
-Matches without a demo still open, showing Valve's end-of-match stats.
+**Match** (`#/match/<id>?pawn=&ability=&from=&t=`):
+- Scoreboard with Steam avatars and each player's signature-skill accuracy. Click a row to
+  analyze that player, click the name to open their player page.
+- Ability picker: **Gun**, the four signature abilities, other hero abilities (melee, parry,
+  teleports) and active items, each with hits/thrown.
+- Minimap replay: positions, health rings, trail, aim rays and hit markers, kills, ziplines,
+  objectives, an "all casts" overlay, and hover cards with HP, souls, K/D/A and items.
+- Timeline: cumulative thrown vs hit (or shots / hero hits / headshots in Gun mode), cast, kill
+  and death markers, team souls lead. Wheel zooms, shift-wheel pans, double-click resets.
+- **Spans**: shift+drag on the timeline (or `[` at the playhead) selects a window; every number
+  on the page then covers only that window. **Fight chips** under the scrubber select a fight.
+- State at the playhead: HP / max HP, souls, level, ability upgrade tiers, items, active buffs
+  and enemy debuffs; while dead, a **death recap** (hero damage taken in the last 10 s by
+  attacker and ability, nearest ally, enemies nearby).
+- Event feed (filter: all / hit / miss / kills), CSV export, `in-game ↗` copies a
+  `demo_gototick` command for the real replay.
+- **Laning**: lane souls difference, last hits and K/D/A at 10:00, souls curve.
+- **Accuracy tracker**: all 12 players' skill hit %, gun hit %, headshots, HP, souls and items
+  at the playhead or within the span.
+- **Incoming skillshots**: enemy casts aimed at the player, hit vs dodged.
+- **Valve match report** (from the match metadata): objectives and souls over time, full
+  scoreboard, how each player spent the match (combat state and movement), damage matrix, damage
+  by source, gold sources, deaths with time-to-kill, accolades, power-ups and the item build.
+- Matches without a demo still replay from Valve's 1 Hz position paths and show the report.
+
+**Player** (`#/player/<id>`): win rate, KDA, skill accuracy, gun hit rate, headshot %, dodge
+rate and isolated deaths across every parsed demo the player is in, per hero, per match, and
+teammates/opponents. Tracked players also get hero tabs.
+
+**Hero analysis** (`#/player/<id>/hero/<hero>?ability=`): one ability across matches: accuracy
+per match, by game phase, by target hero and by distance, hit delay, aim error on misses, hit
+range, cast map, hits that led to kills, ready-to-recast time, a benchmark against other players
+on that hero, gun stats, career numbers from Valve's metadata, and filters (period, mode, result).
+
+**Players** (`#/players`): everyone seen in parsed demos.
+
+Section deep links: `?section=report|tracker|laning|incoming|gun|career…` scrolls to a section,
+`&solo=1` shows only that section.
+
+Match files are cached in the browser (IndexedDB, 1 hour, keyed by parser version), so revisits
+don't hit the server.
 
 ## Layout
 
@@ -85,8 +105,12 @@ Matches without a demo still open, showing Valve's end-of-match stats.
   - players and final stats
   - `ImportantAbilityUsed` casts, with caster position and aim
   - ability/item cooldown starts (`uses`), item purchases/sells, ability upgrades
-  - all hero damage (ability id, victim, position), status notifications, kills with assisters
-  - positions/health every 0.5 s, and souls/KDA every 10 s
+  - all hero damage (ability id, victim, position, hitgroup, crit), status notifications,
+    kills with assisters, the winning team
+  - weapon shots (trigger pulls), buffs/debuffs from the `ActiveModifiers` string table
+  - positions/health/max health every 0.5 s, souls/KDA every 10 s, a demo-tick mapping
+  - sanity `warnings`
+- `dlmeta`: decodes Valve's `.meta` files (match metadata) to JSON.
 
   Times are game-clock seconds taken from the server tick; they match Valve's death timestamps.
   Run `dlparse --version` to see the format version. Sync reparses whenever it changes.
