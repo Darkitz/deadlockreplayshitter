@@ -153,18 +153,21 @@ export function abilityTable(m, pawn, assets, opts) {
     const a = analyzeAbility(m, pawn, ab, opts);
     rows.push({ ability: ab, ...counts(a.casts, opts.heroesOnly), source: a.source });
   }
-  // active items: anything non-ability that started a cooldown
-  const itemUses = new Map();
+  // everything else that started a cooldown: hero sub-abilities (melee, parry, teleports...)
+  // and active items
+  const sig = new Set(rows.map((r) => r.ability.id));
+  const used = new Map();
   for (const u of m.uses) {
-    if (u[1] !== pawn) continue;
+    if (u[1] !== pawn || sig.has(u[2])) continue;
     const it = assets.item(u[2]);
-    if (!it || it.type === "ability" || it.type === "weapon") continue;
-    itemUses.set(u[2], (itemUses.get(u[2]) || 0) + 1);
+    if (!it || it.type === "weapon") continue;
+    used.set(u[2], (used.get(u[2]) || 0) + 1);
   }
-  for (const [id, n] of [...itemUses].sort((a, b) => b[1] - a[1])) {
+  for (const [id, n] of [...used].sort((a, b) => b[1] - a[1])) {
     const it = { id, ...assets.item(id) };
     const a = analyzeAbility(m, pawn, it, opts);
-    rows.push({ ability: it, ...counts(a.casts, opts.heroesOnly), source: a.source, item: true, uses: n });
+    const kind = it.type === "ability" ? "extra" : "item";
+    rows.push({ ability: it, ...counts(a.casts, opts.heroesOnly), source: a.source, item: kind === "item", kind, uses: n });
   }
   return rows;
 }

@@ -21,6 +21,8 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 export function createTimeline(svg, model, onSeek) {
   let geom = null;
   let t = model.end;
+  const full = [Math.min(0, ...(model.hp?.length ? [model.hp[0][0]] : [0])), Math.max(model.end, 60)];
+  let view = [...full]; // visible [from, to] in game seconds
 
   function draw() {
     const W = Math.max(320, Math.round(svg.clientWidth || 800));
@@ -38,17 +40,23 @@ export function createTimeline(svg, model, onSeek) {
     const H = y;
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     svg.setAttribute("height", H);
-    const dur = Math.max(model.end, 60);
-    const x = (tt) => padL + (Math.min(Math.max(tt, 0), dur) / dur) * (W - padL - padR);
+    const dur = full[1];
+    const [v0, v1] = view;
+    const span = v1 - v0;
+    // unclamped so zoomed-out-of-view elements land outside the clip
+    const x = (tt) => padL + ((tt - v0) / span) * (W - padL - padR);
     geom = { x, W, H, padL, padR, dur };
 
-    let g = "";
+    let g = `<defs><clipPath id="plot-clip"><rect x="${padL - 1}" y="0" width="${W - padL - padR + 7}" height="${H}"/></clipPath></defs>`;
     // grid + axis
-    const step = dur > 2400 ? 600 : 300;
-    for (let m = 0; m <= dur; m += step) {
+    const step = [10, 30, 60, 120, 300, 600, 900].find((s) => span / s <= 10) || 900;
+    for (let m = Math.ceil(v0 / step) * step; m <= v1; m += step) {
       g += `<line class="grid" x1="${x(m)}" x2="${x(m)}" y1="${L.chart.y}" y2="${L.axis.y}"/>`;
-      g += `<text class="axis" x="${x(m)}" y="${L.axis.y + 11}" text-anchor="middle">${m / 60}m</text>`;
+      g += `<text class="axis" x="${x(m)}" y="${L.axis.y + 11}" text-anchor="middle">${step < 60 ? fmtClock(m) : `${m / 60}m`}</text>`;
     }
+    const zoomed = span < full[1] - full[0] - 1;
+    let outside = "";
+    g += `<g clip-path="url(#plot-clip)">`;
 
     // lane: cumulative thrown vs hit
     const { casts } = model;
@@ -68,7 +76,7 @@ export function createTimeline(svg, model, onSeek) {
     g += `<path class="area-hit" d="${hit.d} V${cy(0)} H${x(0)} Z"/>`;
     g += `<path class="l-thrown" d="${thrown.d}"/><path class="l-hit" d="${hit.d}"/>`;
     for (const n of [0, maxY]) {
-      g += `<text class="axis" x="${padL - 6}" y="${cy(n) + 3}" text-anchor="end">${n}</text>`;
+      outside += `<text class="axis" x="${padL - 6}" y="${cy(n) + 3}" text-anchor="end">${n}</text>`;
     }
     g += `<text class="lane-label" x="${padL + 4}" y="${c.y + 10}">thrown ${casts.length} · hit ${hit.n}</text>`;
 
@@ -127,6 +135,10 @@ export function createTimeline(svg, model, onSeek) {
       }
     }
 
+    g += `</g>${outside}`;
+    if (zoomed) {
+      g += `<text class="zoom-label" x="${W - padR}" y="${L.chart.y + 10}" text-anchor="end">${fmtClock(v0)}–${fmtClock(v1)} · double-click to reset</text>`;
+    }
     g += `<line class="cursor" x1="0" x2="0" y1="4" y2="${L.axis.y}"/>`;
     svg.innerHTML = g;
     setTime(t);
@@ -135,6 +147,14 @@ export function createTimeline(svg, model, onSeek) {
   function setTime(nt) {
     t = nt;
     if (!geom) return;
+    // keep the playhead inside a zoomed view
+    const span = view[1] - view[0];
+    if (span < full[1] - full[0] - 1 && (t < view[0] || t > view[1])) {
+      const v0 = Math.min(Math.max(full[0], t - span * 0.1), full[1] - span);
+      view = [v0, v0 + span];
+      draw();
+      return;
+    }
     const cx = geom.x(t);
     const cur = svg.querySelector(".cursor");
     cur.setAttribute("x1", cx);
@@ -146,10 +166,31 @@ export function createTimeline(svg, model, onSeek) {
 
   const fromPointer = (ev) => {
     const r = svg.getBoundingClientRect();
-    const { padL, padR, W, dur } = geom;
+    const { padL, padR, W } = geom;
     const px = ((ev.clientX - r.left) / r.width) * W;
-    return Math.min(dur, Math.max(0, ((px - padL) / (W - padL - padR)) * dur));
+    const tt = view[0] + ((px - padL) / (W - padL - padR)) * (view[1] - view[0]);
+    return Math.min(full[1], Math.max(full[0], tt));
   };
+  svg.addEventListener("wheel", (ev) => {
+    ev.preventDefault();
+    const span = view[1] - view[0];
+    const fullSpan = full[1] - full[0];
+    if (ev.shiftKey || Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) {
+      const d = ((ev.shiftKey ? ev.deltaY : ev.deltaX) / 500) * span;
+      const v0 = Math.min(Math.max(full[0], view[0] + d), full[1] - span);
+      view = [v0, v0 + span];
+    } else {
+      const at = fromPointer(ev);
+      const k = Math.exp(ev.deltaY / 400);
+      const ns = Math.min(fullSpan, Math.max(20, span * k));
+      const f = (at - view[0]) / span;
+      let v0 = at - f * ns;
+      v0 = Math.min(Math.max(full[0], v0), full[1] - ns);
+      view = [v0, v0 + ns];
+    }
+    draw();
+  }, { passive: false });
+  svg.addEventListener("dblclick", () => { view = [...full]; draw(); });
   let dragging = false;
   svg.addEventListener("pointerdown", (ev) => {
     // clicking a marker jumps to just after that event (so the map shows its ray / hit)

@@ -263,3 +263,4 @@ table.plain td { padding: 4px 8px; border-top: 1px solid var(--line); }
 .mh-hero { width: 30px; height: 30px; border-radius: 6px; align-self: center; }
 code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
 .feed li img.kab { border-radius: 50%; background: var(--panel-3); }
+.timeline .zoom-label { fill: var(--accent); font-size: 10px; }

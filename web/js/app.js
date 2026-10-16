@@ -482,12 +482,14 @@ async function viewMatch(id, params) {
         </div>`).join("")}
     </section>
     <section class="toolbar">
-      <div class="abilities">${abilityButtons(table.filter((r) => !r.item).map((r) => r.ability), ability.class_name, abStat)}</div>
+      <div class="abilities">${abilityButtons(table.filter((r) => !r.kind).map((r) => r.ability), ability.class_name, abStat)}</div>
       <div class="controls">${controlsHTML()}</div>
     </section>
+    ${table.some((r) => r.kind === "extra") ? `<section class="items-row"><span class="muted small">other abilities</span>
+      <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.kind === "extra").map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}
     ${table.some((r) => r.item) ? `<section class="items-row"><span class="muted small">active items</span>
       <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.item).map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}
-    ${analysis.source === "cooldown" ? `<p class="note">This demo predates cast events; casts are taken from the ability going on cooldown, so there is no aim direction.</p>` : ""}
+    ${analysis.source === "cooldown" ? `<p class="note">No cast events for ${esc(ability.name)} in this demo; casts are taken from the ability going on cooldown, so there is no aim direction or aim error.</p>` : ""}
     ${analysis.source === "none" ? `<p class="note">No casts of ${esc(ability.name)} found for this player.</p>` : ""}
     <section class="stage">
       <div class="map-wrap"><canvas class="minimap"></canvas>
