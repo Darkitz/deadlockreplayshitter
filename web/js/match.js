@@ -84,6 +84,16 @@ export async function viewMatch(id, params) {
   const teamOf = (t) => m.players.filter((p) => p.team === t).sort((a, b) => b.net_worth - a.net_worth);
   const teams = [...new Set(m.players.map((p) => p.team))].sort();
 
+  // the long per-match sections live in tabs under the replay
+  const chatLines = chatLog(m);
+  const TABS = [
+    ["tracker", "Players"],
+    ["incoming", "Incoming"],
+    ["laning", "Laning"],
+    ["chat", `Chat <small>${chatLines.filter((l) => l.kind === "chat").length}</small>`],
+  ];
+  let tab = [params.get("tab"), params.get("section"), settings.matchTab].find((x) => TABS.some(([id]) => id === x)) || "tracker";
+
   app.innerHTML = `
     <div class="match-header">
       <a href="#/" class="back">← home</a>
@@ -173,9 +183,13 @@ export async function viewMatch(id, params) {
           <b>shift+drag</b> on the timeline (or <b>[</b> at the playhead) selects a span, Esc clears</p>
       </div>
     </section>
-    <section class="chart-card laning" id="laning"></section>
-    <section class="chart-card tracker" id="tracker"></section>
-    <section class="chart-card incoming" id="incoming"></section>
+    <nav class="tabs" role="tablist">
+      ${TABS.map(([id, label]) => `<button class="tab" role="tab" data-tab="${id}">${label}</button>`).join("")}
+    </nav>
+    <section class="chart-card tracker tab-panel" id="tracker"></section>
+    <section class="chart-card incoming tab-panel" id="incoming"></section>
+    <section class="chart-card laning tab-panel" id="laning"></section>
+    <section class="chart-card chat tab-panel" id="chat"></section>
 `;
 
   // wiring
@@ -354,9 +368,9 @@ export async function viewMatch(id, params) {
     const grid = [0, 0.25, 0.5, 0.75, 1].map((v) => `<line class="grid" x1="30" x2="${CW - 10}" y1="${cy(v)}" y2="${cy(v)}"/><text class="axis" x="26" y="${cy(v) + 3}" text-anchor="end">${v * 100}%</text>`).join("");
     const span = t0 != null ? `<rect class="acc-span" x="${cx(t0)}" y="4" width="${cx(t) - cx(t0)}" height="${CH - 18}"/>` : "";
     $("#tracker", app).innerHTML = `
-      <svg class="acc-chart" viewBox="0 0 ${CW} ${CH}">${grid}${span}${accLines}<line class="cursor" x1="${cx(t)}" x2="${cx(t)}" y1="4" y2="${CH - 14}"/></svg>
-      <div class="small muted">chart: ${gunMode ? "gun hero accuracy (excl. trooper shots)" : meleeMode ? `${meleeKind || "melee"} hero hits / hero melees (enemy within ${MELEE_REACH_M} m)` : "skill accuracy"} over the match</div>
       <h3>Accuracy tracker · ${t0 != null ? `${fmtClock(t0)}–${fmtClock(t)}` : `at ${fmtClock(t)}`} <span class="muted">· signature skills that connect + gun, every player</span></h3>
+      <div class="small muted">chart: ${gunMode ? "gun hero accuracy (excl. trooper shots)" : meleeMode ? `${meleeKind || "melee"} hero hits / hero melees (enemy within ${MELEE_REACH_M} m)` : "skill accuracy"} over the match</div>
+      <svg class="acc-chart" viewBox="0 0 ${CW} ${CH}">${grid}${span}${accLines}<line class="cursor" x1="${cx(t)}" x2="${cx(t)}" y1="4" y2="${CH - 14}"/></svg>
       <table class="report-table tracker-table">
         <tr><th></th><th>player</th><th>HP</th><th>souls</th><th>skills thrown</th><th>skill hit %</th><th>shots</th><th title="hero hits / (shots - shots that hit only troopers/neutrals)">hero accuracy</th><th>hero HS %</th><th title="hero hits / hero melees (swings with an enemy hero within ${MELEE_REACH_M} m); parried">melee → hero <small class="muted">light · heavy · parried</small></th><th>items</th></tr>
         ${teams.map((tm) => rows.filter((r) => r.p.team === tm).map((r) => `
@@ -458,6 +472,61 @@ export async function viewMatch(id, params) {
     </table>
     <p class="small muted">AoE and lock-on abilities count too, so treat this as a rough dodge signal, not exact.</p>`;
 
+  // tabs
+  function showTab(id) {
+    tab = id;
+    for (const b of app.querySelectorAll("[data-tab]")) b.classList.toggle("on", b.dataset.tab === id);
+    for (const el of app.querySelectorAll(".tab-panel")) el.classList.toggle("active", el.id === id);
+    if (id === "chat") renderChat(t);
+    if (id === "tracker") renderTracker(t);
+  }
+  if ($("#laning", app).hidden) $('[data-tab="laning"]', app).hidden = true;
+  for (const b of app.querySelectorAll("[data-tab]")) {
+    b.addEventListener("click", () => { settings.matchTab = b.dataset.tab; saveSettings(); showTab(b.dataset.tab); syncUrl(); });
+  }
+
+  // chat: team chat of each side and all chat, with chat-wheel pings; future lines are dimmed
+  function renderChat(t) {
+    const showPings = settings.chatPings !== false;
+    const lines = chatLines.filter((l) => showPings || l.kind === "chat");
+    const col = (title, cls, xs) => {
+      const now = xs.findIndex((l) => l.t > t);
+      const items = xs.map((l, i) => {
+        const p = m.byPawn.get(l.pawn);
+        const hero = p ? S.assets.hero(p.hero_id) : null;
+        return `${i === now ? `<li class="chat-now"><span>${fmtClock(t)}</span></li>` : ""}
+          <li class="msg ${l.kind} ${l.t > t ? "future" : ""} ${p?.pawn === pawn ? "subject" : ""}" data-t="${l.t}">
+            <span class="t">${fmtClock(Math.max(0, l.t))}</span>
+            ${hero ? `<img src="${esc(hero.icon)}" alt="" title="${esc(hero.name)}">` : `<span class="noav"></span>`}
+            <span class="body"><b class="who team-${p?.team || 0}">${esc(p?.name || "unknown")}</b>
+              ${l.kind === "ping" ? `<span class="ping-chip">ping</span> <i>${esc(l.text)}</i>` : esc(l.text)}</span>
+          </li>`;
+      }).join("");
+      return `<div class="chat-col ${cls}"><h4>${title} <small class="muted">${xs.filter((l) => l.kind === "chat").length}</small></h4>
+        <ol>${items || `<li class="muted small">nothing said</li>`}${now < 0 && xs.length ? `<li class="chat-now"><span>${fmtClock(t)}</span></li>` : ""}</ol></div>`;
+    };
+    const team = (n) => lines.filter((l) => !l.all && m.byPawn.get(l.pawn)?.team === n);
+    $("#chat", app).innerHTML = `
+      <div class="chat-head"><h3>Chat</h3>
+        <label class="check small"><input type="checkbox" class="chat-pings" ${showPings ? "checked" : ""}> chat-wheel pings</label>
+        <span class="muted small">later lines are dimmed · click a line to jump there</span></div>
+      <div class="chat-cols">
+        ${col(`${TEAM_NAMES[2]} team`, "team-2", team(2))}
+        ${col("All chat", "all", lines.filter((l) => l.all))}
+        ${col(`${TEAM_NAMES[3]} team`, "team-3", team(3))}
+      </div>`;
+  }
+  $("#chat", app).addEventListener("click", (ev) => {
+    const li = ev.target.closest("li[data-t]");
+    if (li) seek(Math.max(0, Number(li.dataset.t) - 2));
+  });
+  $("#chat", app).addEventListener("change", (ev) => {
+    if (!ev.target.classList.contains("chat-pings")) return;
+    settings.chatPings = ev.target.checked;
+    saveSettings();
+    renderChat(t);
+  });
+
   // timeline model
   const lead = [];
   const nRows = Math.max(0, ...m.stats.tracks.map((t) => t.rows.length));
@@ -525,6 +594,8 @@ export async function viewMatch(id, params) {
       const p = new URLSearchParams(q || "");
       p.set("t", Math.round(t));
       if (t0 != null) p.set("from", Math.round(t0)); else p.delete("from");
+      p.set("tab", tab);
+      p.delete("section");
       history.replaceState(null, "", `#${path}?${p}`);
     }, 300);
   }
@@ -611,7 +682,8 @@ export async function viewMatch(id, params) {
     minimap.update({ t, from: t0 ?? 0, subject: pawn, casts, showAll: settings.showAll, zoom: settings.mapZoom || 1,
       heat: settings.showHeat, deaths: settings.showDeaths });
     renderReadout(t);
-    renderTracker(t);
+    if (tab === "tracker") renderTracker(t);
+    if (tab === "chat") renderChat(t);
     renderState(t);
   }
 
@@ -843,5 +915,30 @@ export async function viewMatch(id, params) {
     timeline.destroy();
     minimap.destroy();
   };
+  showTab(tab);
   seek(t);
+}
+
+/** typed chat + chat-wheel lines in time order: {t, pawn, all, text, kind: "chat" | "ping"} */
+export function chatLog(m) {
+  const pings = S.assets.pings || {};
+  // the voice line ("<speaker>_ping_kelvin_missing_01_ping_2d", "..._ping_defend_blue_02_ping_2d")
+  // names the ping's target hero or lane, which the wheel message leaves as a placeholder
+  const heroByCode = new Map(Object.values(S.assets.heroes).map((h) => [h.class_name.replace(/^hero_/, ""), h.name]));
+  const LANES = ["yellow", "green", "blue", "purple"];
+  const lines = (m.chat || []).map(([t, pawn, all, text]) => ({ t, pawn, all: !!all, text, kind: "chat" }));
+  for (const [t, pawn, id, voice] of m.wheel || []) {
+    const p = pings[id];
+    const rest = voice.includes("_ping_") ? voice.slice(voice.indexOf("_ping_") + 6).replace(/_ping_2d$/, "") : voice;
+    const words = rest.split("_").filter((w) => w && !/^\d+$/.test(w) && w !== "alt");
+    const target = words.map((w) => heroByCode.get(w)).find(Boolean);
+    const lane = words.find((w) => LANES.includes(w));
+    let text = (lane && p?.lanes?.[lane]) || p?.text || words.join(" ") || `ping #${id}`;
+    if (text.includes("…")) text = text.replace("…", target || "someone");
+    else if (/^[a-z]/.test(text)) text = `${target || "someone"} ${text}`;
+    const laneName = lane && (S.assets.lanes?.[lane] || lane);
+    if (laneName && !p?.lanes?.[lane] && !text.includes(laneName)) text += ` · ${laneName}`;
+    lines.push({ t, pawn, all: /_ALLCHAT$/.test(p?.concept || ""), text, kind: "ping" });
+  }
+  return lines.sort((a, b) => a.t - b.t);
 }

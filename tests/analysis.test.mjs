@@ -205,3 +205,25 @@ test("melee intent: parser distances win over position samples", async () => {
   assert.deepEqual([s.swings[2].heroD, s.swings[0].npcD], [8, 4]);
   assert.equal(s.heavy.move, 1);
 });
+
+test("chat log: team / all split and ping placeholders from the voice line", async () => {
+  const { S } = await import("../web/js/ui.js");
+  const { chatLog } = await import("../web/js/match.js");
+  S.assets = {
+    heroes: { 1: { class_name: "hero_kelvin", name: "Kelvin" } },
+    lanes: { blue: "Broadway" },
+    pings: {
+      4: { concept: "CITADEL_PING_MISSING", text: "is missing" },
+      59: { concept: "CITADEL_PING_DEFEND_WALKER", text: "Defend the Walker", lanes: { blue: "Defend the Broadway Walker" } },
+      81: { concept: "CITADEL_PING_GOOD_GAME_ALLCHAT", text: "Good Game!" },
+    },
+  };
+  const lines = chatLog({
+    chat: [[10, 1, 0, "hi team"], [5, 2, 1, "glhf"]],
+    wheel: [[20, 1, 4, "haze_ping_kelvin_missing_01_ping_2d"], [30, 1, 59, "haze_ping_defend_blue_02_ping_2d"], [40, 2, 81, ""]],
+  });
+  assert.deepEqual(lines.map((l) => [l.t, l.all, l.text]), [
+    [5, true, "glhf"], [10, false, "hi team"], [20, false, "Kelvin is missing"],
+    [30, false, "Defend the Broadway Walker"], [40, true, "Good Game!"],
+  ]);
+});

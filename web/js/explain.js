@@ -80,6 +80,7 @@ export const SECTIONS = [
       ["deaths", "Deaths (map)", "Every hero death in the current point or span, crossed in team color."],
       ["incoming", "Incoming", `Enemy casts aimed at this player (within ${AIMED_AT_DEG}° of them): how many hit them and how many they dodged.`],
       ["hp", "HP", "Health and max health at the playhead (max includes items and buffs)."],
+      ["chat", "Chat", "Typed chat from the demo, split into each team's chat and all chat, plus chat-wheel pings (toggle). The ping text comes from the game's own chat-wheel messages; the hero or lane a ping refers to (\"Kelvin is missing\", \"Defend the Broadway Walker\") is read from the voice line it played. Lines after the playhead are dimmed; click one to jump there."],
     ],
   },
 ];

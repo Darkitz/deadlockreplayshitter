@@ -16,6 +16,8 @@ export class Assets {
     this.ranks = raw.ranks || {};
     this.accolades = raw.accolades || {};
     this.modifiers = raw.modifiers || {};
+    this.pings = raw.pings || {};
+    this.lanes = raw.lanes || {};
     this.byClass = new Map();
     for (const [id, it] of Object.entries(raw.items)) this.byClass.set(it.class_name, { id: Number(id), ...it });
   }

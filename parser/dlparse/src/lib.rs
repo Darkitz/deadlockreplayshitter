@@ -18,12 +18,13 @@ use haste::parser::{Context, Parser, Visitor};
 use haste::valveprotos::common::{CnetMsgTick, NetMessages};
 use haste::valveprotos::deadlock::{
     CCitadelUserMessageDamage, CCitadelUserMessageGameOver, CCitadelUserMessageImportantAbilityUsed,
-    CCitadelUserMsgAbilityNotify, CCitadelUserMsgHeroKilled, CitadelUserMessageIds,
+    CCitadelUserMsgAbilityNotify, CCitadelUserMsgChatMsg, CCitadelUserMsgHeroKilled,
+    CitadelUserMessageIds,
 };
 use prost::Message;
 use serde::Serialize;
 
-pub const FORMAT_VERSION: u32 = 12;
+pub const FORMAT_VERSION: u32 = 13;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`.
 /// sync.py passes the current ids (resolved by class name) via `--ignore-ids`; this list is only
 /// the fallback.
@@ -142,6 +143,23 @@ struct ModifierEntry {
 }
 const MODIFIER_SCAN_DT: f32 = 0.25;
 
+/// CCitadelUserMsg_ChatWheel as current demos send it (the vendored proto is outdated): field 1
+/// is a nested message with the sender's slot, the wheel message id and the voice line played
+#[derive(Clone, PartialEq, prost::Message)]
+struct ChatWheel {
+    #[prost(message, optional, tag = "1")]
+    line: Option<ChatWheelLine>,
+}
+#[derive(Clone, PartialEq, prost::Message)]
+struct ChatWheelLine {
+    #[prost(int32, optional, tag = "4")]
+    player_slot: Option<i32>,
+    #[prost(uint32, optional, tag = "5")]
+    message_id: Option<u32>,
+    #[prost(string, optional, tag = "6")]
+    voice_line: Option<String>,
+}
+
 #[derive(Default, Serialize, Clone)]
 struct Player {
     controller: i32,
@@ -235,6 +253,10 @@ pub struct Output {
     modifiers: Vec<(f32, f32, i32, i32, u32, u32, i32)>,
     /// [t, victim_pawn, attacker_pawn, killer_ability_id, [assister pawns]]
     kills: Vec<(f32, i32, i32, u32, Vec<i32>)>,
+    /// typed chat: [t, pawn, 1 = all chat / 0 = team chat, text]
+    chat: Vec<(f32, i32, u8, String)>,
+    /// chat wheel: [t, pawn, wheel message id, voice line ("haze_ping_retreat_01_ping_2d", may be empty)]
+    wheel: Vec<(f32, i32, u32, String)>,
     samples: Samples,
     stats: Stats,
     /// sanity problems found after parsing (a game patch changing the demo format shows up here)
@@ -638,6 +660,8 @@ impl Visitor for V {
         const IMPORTANT: u32 = CitadelUserMessageIds::KEUserMsgImportantAbilityUsed as u32;
         const NOTIFY: u32 = CitadelUserMessageIds::KEUserMsgAbilityNotify as u32;
         const KILLED: u32 = CitadelUserMessageIds::KEUserMsgHeroKilled as u32;
+        const CHAT: u32 = CitadelUserMessageIds::KEUserMsgChatMsg as u32;
+        const WHEEL: u32 = CitadelUserMessageIds::KEUserMsgChatWheel as u32;
         const GAME_OVER: u32 = CitadelUserMessageIds::KEUserMsgGameOver as u32;
         const NET_TICK: u32 = NetMessages::NetTick as u32;
         match ty {
@@ -693,6 +717,21 @@ impl Visitor for V {
                 let t = self.time(ctx);
                 let (a, v) = (self.ehandle_pawn(m.attacker()), self.ehandle_pawn(m.victim()));
                 self.out.notify.push((t, a, v, m.ability_id(), m.status_impact()));
+            }
+            CHAT => {
+                // optional data: a changed message must not fail the whole demo
+                let Ok(m) = CCitadelUserMsgChatMsg::decode(data) else { return Ok(()) };
+                // player_slot is the controller entity index - 1; resolved to a pawn at the end
+                let text = m.text().trim().to_string();
+                if !text.is_empty() {
+                    self.out.chat.push((self.time(ctx), m.player_slot() + 1, m.all_chat() as u8, text));
+                }
+            }
+            WHEEL => {
+                let Some(l) = ChatWheel::decode(data).ok().and_then(|m| m.line) else { return Ok(()) };
+                // controller index (slot + 1), resolved to a pawn at the end
+                let ctrl = l.player_slot.unwrap_or(-1) + 1;
+                self.out.wheel.push((self.time(ctx), ctrl, l.message_id.unwrap_or(0), l.voice_line.unwrap_or_default()));
             }
             KILLED => {
                 let m: CCitadelUserMsgHeroKilled = decode(data)?;
@@ -846,6 +885,14 @@ pub fn parse_demo<R: Read + Seek>(
     v.out.version = FORMAT_VERSION;
     v.out.map_radius = max_coord.unwrap_or(0.0);
     v.out.uses.sort_by(|a, b| a.0.total_cmp(&b.0));
+    // chat carries controller indices; the site works with pawns
+    let ctrl_pawn: HashMap<i32, i32> = v.pawn_ctrl.iter().map(|(p, c)| (*c, *p)).collect();
+    for c in &mut v.out.chat {
+        c.1 = ctrl_pawn.get(&c.1).copied().unwrap_or(-1);
+    }
+    for w in &mut v.out.wheel {
+        w.1 = ctrl_pawn.get(&w.1).copied().unwrap_or(-1);
+    }
     let end = v.out.duration_s;
     for m in &mut v.out.modifiers {
         if m.1 > end {

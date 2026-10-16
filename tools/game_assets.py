@@ -25,7 +25,7 @@ LOCALIZATION = GAME / "resource" / "localization"
 VRF = ROOT / "tools" / ".vrf" / "Source2Viewer-CLI"
 CACHE = ROOT / "data" / "game"
 ICON_DIR = ROOT / "web" / "assets" / "game"
-SCRIPTS = ["heroes", "abilities", "modifiers", "accolades"]
+SCRIPTS = ["heroes", "abilities", "modifiers", "accolades", "ping_wheel_messages"]
 MAP_RADIUS = 10752  # world units covered by the minimap image (half its width)
 
 
@@ -199,6 +199,70 @@ def extract_icons(vpk_paths):
     shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ---------------------------------------------------------------- chat wheel
+
+SERVER_DLL = GAME / "bin" / "win64" / "server.dll"
+
+
+def ping_concepts():
+    """CITADEL_PING_* concept names in enum order, read from the enum's string table in
+    server.dll (the names sit back to back in declaration order, starting with ..._NONE)."""
+    try:
+        blob = SERVER_DLL.read_bytes()
+    except OSError:
+        return []
+    i = blob.find(b"CITADEL_PING_CONCEPT_NONE\0")
+    names = []
+    while i >= 0:
+        j = blob.index(b"\0", i)
+        name = blob[i:j].decode("ascii", "replace")
+        if not name.startswith("CITADEL_PING_"):
+            break
+        names.append(name)
+        i = j
+        while i < len(blob) and blob[i] == 0:  # alignment padding
+            i += 1
+    return names
+
+
+LANE_COLORS = ("yellow", "green", "blue", "purple")
+
+
+def build_pings(loc):
+    """chat wheel message id (as demos send it) -> {concept, text, lanes: {color: text}}. Demos
+    carry the concept's position in the enum minus one (NONE = -1). Lane-specific variants
+    ("Headed to York" / "Headed to Broadway") are keyed by lane color; the site picks one from
+    the voice line the ping played."""
+    def clean(text):
+        text = re.sub(r"\{[^}]*\}", "…", text)
+        return re.sub(r"<[^>]+>", "", text).replace('\\"', '"').strip()
+
+    by_concept = {}
+    for key, msg in load_script("ping_wheel_messages").items():
+        if not isinstance(msg, dict) or not msg.get("m_ePingConcept"):
+            continue
+        toks = [(msg.get(k) or "").lstrip("#").lower() for k in ("m_strMessageToken", "m_strCommsWheelLabelToken")]
+        text = next((loc[t] for t in toks if t in loc), key)
+        entry = by_concept.setdefault(msg["m_ePingConcept"], {"text": clean(text), "lanes": {}})
+        ident = f"{key} {toks[0]}".lower()
+        color = next((c for c in LANE_COLORS if c in ident), None)
+        if color:
+            entry["lanes"].setdefault(color, clean(text))
+    out = {}
+    for i, concept in enumerate(ping_concepts()):
+        if i == 0:
+            continue
+        nice = concept.removeprefix("CITADEL_PING_").replace("_", " ").capitalize()
+        e = by_concept.get(concept, {"text": nice, "lanes": {}})
+        out[i - 1] = {"concept": concept, "text": e["text"], **({"lanes": e["lanes"]} if e["lanes"] else {})}
+    return out
+
+
+def lane_names(loc):
+    """lane color -> in-game lane name (York, Broadway, ...)"""
+    return {c: loc[f"citadel_lanename{c}"] for c in LANE_COLORS if f"citadel_lanename{c}" in loc}
+
+
 # ---------------------------------------------------------------- assets.json
 
 SLOT = {"EItemSlotType_WeaponMod": "weapon", "EItemSlotType_Armor": "vitality", "EItemSlotType_Tech": "spirit"}
@@ -329,7 +393,7 @@ def build_assets(previous=None):
                 r[k] = None
 
     return {"heroes": heroes, "items": items, "map": game_map, "ranks": ranks,
-            "accolades": accolades, "modifiers": modifiers, "source": "game files"}
+            "accolades": accolades, "modifiers": modifiers, "pings": build_pings(loc), "lanes": lane_names(loc), "source": "game files"}
 
 
 if __name__ == "__main__":

@@ -34,10 +34,15 @@ The home page lists them; × removes one.
   - Cumulative attempts vs hits, cast/kill/death markers, team souls lead.
   - Wheel zooms; **shift+drag** selects a span. Point mode counts from the start; span mode counts only inside the span.
 - **At the playhead:** HP / max HP, souls, level, ability levels, items, buffs and debuffs, and a death recap.
-- **Accuracy tracker:**
+- **Accuracy tracker** (Players tab):
   - Skills, gun hero accuracy, headshot %, and light / heavy / parried melee for every player.
   - The chart follows the selected mode.
-- **Incoming skillshots** aimed at the player: hit or dodged.
+- Below the replay, tabs: **Players** (accuracy tracker), **Incoming** (skillshots aimed at
+  the player: hit or dodged), **Laning** (first 10 minutes) and **Chat**.
+- **Chat:**
+  - Three columns: each team's chat and all chat.
+  - Hero icons, plus chat-wheel pings with the hero or lane they refer to ("Kelvin is missing", "Defend the Broadway Walker").
+  - Lines after the playhead are dimmed; click one to jump there.
 - **How it works** (`#/about`):
   - Explains every number, with walkthroughs for melee and gun.
   - Underlined labels show the same text on hover.
