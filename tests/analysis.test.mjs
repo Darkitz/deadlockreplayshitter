@@ -144,3 +144,14 @@ test("gun stats: shots, pellets, hero hits, headshots", async () => {
   assert.equal(g.npcHits, 1);
   assert.deepEqual(gunAt(g, 10.55), { shots: 3, hits: 1, hs: 0, npc: 0 });
 });
+
+test("fights chain kills within the gap", async () => {
+  const { detectFights } = await import("../web/js/analysis.js");
+  const m = fixture();
+  m.kills.push([100, 2, 1, 0, []], [108, 3, 2, 0, []], [140, 2, 1, 0, []]);
+  const f = detectFights(m, 15);
+  assert.equal(f.length, 2);
+  assert.deepEqual(f[0].byTeam, { 2: 1, 3: 1 }); // enemy (team 3) died -> point for 2; ally died -> point for 3
+  assert.equal(f[0].t1, 108);
+  assert.equal(f[1].kills.length, 1);
+});

@@ -414,3 +414,9 @@ img.slot-spirit { background: #5a3a8c !important; }
 .crumb:hover { text-decoration: none; color: var(--accent); }
 .recap { border: 1px solid var(--miss); border-radius: 8px; padding: 8px; background: rgba(229,100,90,.06); }
 .recap b img, .recap .lbl img { width: 18px; height: 18px; border-radius: 4px; vertical-align: middle; }
+.fights { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.fight { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; font-size: 11px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.fight.won b { color: var(--hit); }
+.fight.lost b { color: var(--miss); }
+.fight.mine { border-color: var(--accent); }
+.fight:hover { background: var(--panel-2); }

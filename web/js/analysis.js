@@ -384,3 +384,26 @@ export function damageTaken(m, pawn, t, window = 10) {
   }
   return { total, rows: [...by.values()].sort((a, b) => b.dmg - a.dmg) };
 }
+
+/**
+ * Fights: hero kills chained together when the next kill follows within `gap` seconds.
+ * Returns [{t0, t1, kills, byTeam: {2: n, 3: n}}] (kills credited to the killer's team).
+ */
+export function detectFights(m, gap = 15) {
+  const ks = [...m.kills].sort((a, b) => a[0] - b[0]);
+  const fights = [];
+  let cur = null;
+  for (const k of ks) {
+    const victim = m.byPawn.get(k[1]);
+    if (!victim) continue;
+    const team = victim.team === 2 ? 3 : 2;
+    if (!cur || k[0] - cur.t1 > gap) {
+      cur = { t0: k[0], t1: k[0], kills: [], byTeam: { 2: 0, 3: 0 } };
+      fights.push(cur);
+    }
+    cur.t1 = k[0];
+    cur.kills.push(k);
+    cur.byTeam[team]++;
+  }
+  return fights;
+}

@@ -5,7 +5,7 @@ import {
 } from "./data.js";
 import { digestMeta, renderReport, matchFromMeta } from "./report.js";
 import {
-  analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt, damageTaken,
+  analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt, damageTaken, detectFights,
 } from "./analysis.js";
 import { createTimeline, fmtClock } from "./timeline.js";
 import { createMinimap } from "./minimap.js";
@@ -139,6 +139,7 @@ export async function viewMatch(id, params) {
           <button class="btn csv" title="download casts as CSV">CSV</button>
           <button class="btn demo-cmd" title="copy a Deadlock console command that jumps the real replay to this moment">in-game ↗</button>
         </div>
+        <div class="fights"></div>
         <div class="readout">
           <div class="tiles"></div>
           <div class="feed-wrap">
@@ -410,6 +411,23 @@ export async function viewMatch(id, params) {
     const cmd = `demo_gototick ${demoTick(t - 3)}`;
     try { await navigator.clipboard.writeText(cmd); } catch { /* insecure context */ }
     $(".demo-hint", app).innerHTML = `Deadlock console: <code>playdemo replays/${id}</code> then <code>${cmd}</code> (copied)`;
+  });
+
+  // fights: click one to make it the span
+  const fights = detectFights(m).filter((f) => f.kills.length >= 2);
+  $(".fights", app).innerHTML = fights.length ? `<span class="muted small">fights</span>` + fights.map((f, i) => {
+    const mine = f.kills.some((k) => k[1] === pawn || k[2] === pawn || (k[4] || []).includes(pawn));
+    const won = f.byTeam[subject.team] > f.byTeam[subject.team === 2 ? 3 : 2];
+    const lost = f.byTeam[subject.team] < f.byTeam[subject.team === 2 ? 3 : 2];
+    return `<button class="fight ${won ? "won" : lost ? "lost" : ""} ${mine ? "mine" : ""}" data-fight="${i}"
+      title="${fmtClock(f.t0)}–${fmtClock(f.t1)} · ${f.kills.length} kills${mine ? " · you were involved" : ""}">
+      ${fmtClock(f.t0)} <b>${f.byTeam[subject.team]}–${f.byTeam[subject.team === 2 ? 3 : 2]}</b></button>`;
+  }).join("") : "";
+  $(".fights", app).addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-fight]");
+    if (!b) return;
+    const f = fights[Number(b.dataset.fight)];
+    setSpan(Math.max(0, f.t0 - 10), Math.min(m.end, f.t1 + 3));
   });
 
   function seek(nt) {
