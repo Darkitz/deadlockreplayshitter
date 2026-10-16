@@ -254,6 +254,61 @@ def sync_profiles(account_ids):
     return out
 
 
+CAREER_FIELDS = [
+    "player_damage", "player_damage_taken", "player_healing", "shots_hit", "shots_missed",
+    "hero_bullets_hit", "hero_bullets_hit_crit", "ability_kills", "bullet_kills", "melee_kills",
+    "headshot_kills", "creep_kills", "neutral_kills", "boss_damage", "damage_mitigated",
+    "heal_prevented", "net_worth", "level", "max_health", "weapon_power", "tech_power",
+]
+CAREER_CUSTOM = {
+    "Enemy Hero Accuracy##Shots": "hero_shots",
+    "Enemy Hero Accuracy##Hits": "hero_hits",
+    "Enemy Hero Accuracy##Headshots": "hero_headshots",
+    "Enemy Hero Accuracy - Incoming##Shots": "in_shots",
+    "Enemy Hero Accuracy - Incoming##Hits": "in_hits",
+    "Parry Miss": "parry_miss",
+}
+
+
+def sync_career(account):
+    """end-of-match stats for every match deadlock-api has metadata for (no demo needed)."""
+    url = (f"{API}/v1/matches/metadata?account_ids={account}&only_filtered_players=true"
+           "&include_info=true&include_player_info=true&include_player_final_stats=true&limit=5000")
+    try:
+        rows = get_json(url, timeout=300)
+    except (urllib.error.URLError, OSError) as e:
+        log(f"career fetch failed: {e}")
+        return
+    out = []
+    for m in rows:
+        p = next((x for x in m.get("players", []) if x["account_id"] == account), None)
+        if not p or not p.get("final_stats"):
+            continue
+        fs = p["final_stats"]
+        cs = fs.get("custom_user_stats") or {}
+        rec = {
+            "match_id": m["match_id"],
+            "hero_id": p["hero_id"],
+            "duration_s": m["duration_s"],
+            "won": m.get("winning_team") == p.get("team"),
+            "kills": p.get("kills"), "deaths": p.get("deaths"), "assists": p.get("assists"),
+            "badge": m.get("average_badge"),
+            "mode": m.get("match_mode"),
+        }
+        for k in CAREER_FIELDS:
+            rec[k] = fs.get(k)
+        for k, short in CAREER_CUSTOM.items():
+            rec[short] = cs.get(k)
+        # outgoing ability damage by distance bucket (m): {"10": dmg, ...}
+        rec["ability_dist"] = {k.split("##")[1]: v for k, v in cs.items()
+                               if k.startswith("Outgoing Ability Dist##")}
+        rec["bullet_dist"] = {k.split("##")[1]: v for k, v in cs.items()
+                              if k.startswith("Outgoing Bullet Dist##")}
+        out.append(rec)
+    (DATA / "career.json").write_text(json.dumps(out))
+    log(f"career: {len(out)} matches with end-of-match stats")
+
+
 # ---------------------------------------------------------------- main
 
 def resolve_heroes(heroes, wanted):
@@ -380,6 +435,7 @@ def main():
     DATA.mkdir(parents=True, exist_ok=True)
     sync_assets(heroes, used_heroes, used_items)
     profiles = sync_profiles(accounts)
+    sync_career(account)
 
     entries = []
     for m in history:

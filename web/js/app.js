@@ -54,11 +54,13 @@ const k1 = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 const S = { index: null, assets: null, profiles: {}, view: null };
 
 async function loadAll() {
-  const [index, assets, profiles] = await Promise.all([
+  const [index, assets, profiles, career] = await Promise.all([
     loadJSON("data/index.json"),
     loadJSON("data/assets.json"),
     loadJSON("data/profiles.json").catch(() => ({})),
+    loadJSON("data/career.json").catch(() => []),
   ]);
+  S.career = career;
   S.index = index;
   S.assets = new Assets(assets);
   S.profiles = profiles;
@@ -148,6 +150,7 @@ async function viewOverview(heroId, params) {
     <section class="summary" id="summary"><div class="muted">loading matches…</div></section>
     <section class="charts" id="charts"></section>
     <section class="report" id="report"></section>
+    <section id="career"></section>
     <h2 class="section-title">${esc(hero.name)} matches with demo</h2>
     <section class="cards" id="cards"></section>
     <details class="unparsed" id="unparsed"></details>`;
@@ -167,10 +170,11 @@ async function viewOverview(heroId, params) {
     <table class="plain">
       ${missing.map((m) => `<tr>
         <td><span class="result ${m.won ? "win" : "loss"}">${m.won ? "W" : "L"}</span></td>
-        <td>#${m.match_id}</td><td>${fmtDate(new Date(m.start_time * 1000))}</td>
+        <td><a href="#/match/${m.match_id}">#${m.match_id}</a></td><td>${fmtDate(new Date(m.start_time * 1000))}</td>
         <td>${m.kills}/${m.deaths}/${m.assists}</td><td class="muted">${esc(m.status)}</td></tr>`).join("")}
     </table>` : "";
 
+  renderCareer(heroId, entries);
   if (!parsed.length) {
     $("#summary").innerHTML = `<div class="empty">No demos for ${esc(hero.name)} yet.</div>`;
     return;
@@ -283,6 +287,69 @@ function histogram(values, bins, width, unit) {
   return b.map((n, i) => `<span class="hb" title="${i * width}–${i === bins - 1 ? "∞" : (i + 1) * width} ${unit}: ${n}"><span style="height:${(n / max) * 100}%"></span></span>`).join("");
 }
 
+/** end-of-match stats from Valve's metadata: every match of the hero, no demo needed */
+function renderCareer(heroId, entries) {
+  const el = $("#career");
+  const startOf = new Map(entries.map((e) => [e.match_id, e.start_time]));
+  const rows = (S.career || []).filter((r) => r.hero_id === heroId && startOf.has(r.match_id))
+    .map((r) => ({ ...r, start: startOf.get(r.match_id) }))
+    .sort((a, b) => a.start - b.start);
+  if (!rows.length) { el.innerHTML = ""; return; }
+  const sum = (k) => rows.reduce((a, r) => a + (r[k] || 0), 0);
+  const mins = sum("duration_s") / 60;
+  const shots = sum("hero_shots"), hits = sum("hero_hits");
+  const wins = rows.filter((r) => r.won).length;
+  const kda = (sum("kills") + sum("assists")) / Math.max(1, sum("deaths"));
+
+  // per-match series
+  const W = 100 / rows.length;
+  const accs = rows.map((r) => (r.hero_shots ? r.hero_hits / r.hero_shots : null));
+  const dpm = rows.map((r) => r.player_damage / (r.duration_s / 60));
+  const maxD = Math.max(1, ...dpm);
+  const line = (vals, max) => {
+    let d = "";
+    vals.forEach((v, i) => {
+      if (v == null) return;
+      const x = (i + 0.5) * W, y = 100 - (v / max) * 100;
+      d += `${d ? "L" : "M"}${x},${y} `;
+    });
+    return d;
+  };
+  const maxAcc = Math.max(0.05, ...accs.filter((v) => v != null));
+  const buckets = ["10", "20", "30", "40", "50", "75", "100", "Infinite"];
+  const ab = buckets.map((b) => rows.reduce((a, r) => a + ((r.ability_dist || {})[b] || 0), 0));
+  const abMax = Math.max(1, ...ab);
+  const abTotal = ab.reduce((a, b) => a + b, 0) || 1;
+
+  el.innerHTML = `
+    <h2 class="section-title">${esc(S.assets.hero(heroId).name)} career · ${rows.length} matches with Valve stats <span class="muted small">(no demo needed)</span></h2>
+    <div class="summary">
+      ${tile("Win rate", pct(wins / rows.length), "accent")}
+      ${tile("KDA ratio", kda.toFixed(2))}
+      ${tile("Gun acc. vs heroes", shots ? pct(hits / shots) : "–", "good")}
+      ${tile("Headshot rate", hits ? pct(sum("hero_headshots") / hits) : "–")}
+      ${tile("Hero dmg / min", Math.round(sum("player_damage") / mins))}
+      ${tile("Dmg taken / min", Math.round(sum("player_damage_taken") / mins))}
+      ${tile("Ability kills", `${sum("ability_kills")}<small> / ${sum("kills")}</small>`)}
+      ${tile("Parry misses", sum("parry_miss"))}
+    </div>
+    <div class="charts career-charts">
+      <div class="chart-card wide"><h3>Gun accuracy vs heroes per match <span class="muted">(line)</span> · hero damage / min <span class="muted">(bars)</span></h3>
+        <div class="bars career-bars">
+          ${rows.map((r, i) => `<a class="bar ${r.won ? "won" : "lost"}" href="#/match/${r.match_id}" style="left:${i * W}%;width:${W}%"
+              title="${fmtDay(new Date(r.start * 1000))} · ${r.won ? "win" : "loss"} · ${Math.round(dpm[i])} dmg/min · gun ${accs[i] != null ? pct(accs[i]) : "–"}">
+              <span style="height:${(dpm[i] / maxD) * 100}%"></span></a>`).join("")}
+          <svg class="overlay" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="${line(accs, maxAcc)}" vector-effect="non-scaling-stroke"/></svg>
+        </div>
+        <div class="bars-axis muted small"><span>${fmtDay(new Date(rows[0].start * 1000))}</span><span>bars: green win, red loss · line max ${pct(maxAcc)}</span><span>${fmtDay(new Date(rows.at(-1).start * 1000))}</span></div>
+      </div>
+      <div class="chart-card"><h3>Ability damage by range</h3>
+        <div class="hist">${ab.map((v, i) => `<span class="hb" title="≤${buckets[i]} m: ${k1(v)} (${pct(v / abTotal)})"><span style="height:${(v / abMax) * 100}%"></span></span>`).join("")}</div>
+        <div class="bars-axis muted small"><span>10 m</span><span>50</span><span>∞</span></div>
+      </div>
+    </div>`;
+}
+
 /** every signature ability of the hero across all loaded matches */
 function renderAbilityReport(list, heroId, selected) {
   const rows = S.assets.signatures(heroId).map((ab) => {
@@ -319,7 +386,7 @@ async function viewMatch(id, params) {
   try {
     m = await loadMatch(id);
   } catch (err) {
-    app.innerHTML = `<div class="empty">Match ${id} has no parsed demo. ${esc(e?.status || "")}</div>`;
+    renderNoDemo(app, id, e);
     return;
   }
   const me = m.player(S.index.account_id);
@@ -584,6 +651,41 @@ async function viewMatch(id, params) {
   seek(t);
 }
 
+function renderNoDemo(app, id, e) {
+  const c = (S.career || []).find((r) => r.match_id === id);
+  const d = e ? new Date(e.start_time * 1000) : null;
+  const hero = S.assets.hero(e?.hero_id ?? c?.hero_id);
+  const mins = (c?.duration_s || e?.duration_s || 60) / 60;
+  app.innerHTML = `
+    <div class="match-header">
+      <a href="#/hero/${e?.hero_id ?? c?.hero_id ?? ""}" class="back">← overview</a>
+      <div class="mh-title">
+        ${e ? `<span class="result ${e.won ? "win" : "loss"}">${e.won ? "WIN" : "LOSS"}</span>` : ""}
+        <img class="mh-hero" src="${esc(hero.icon)}" alt=""><h2>#${id}</h2>
+        ${d ? `<span class="muted">${fmtDate(d)} · ${ago(d)}</span>` : ""}
+        ${e ? `<span class="muted">${fmtClock(e.duration_s)}</span>` : ""}
+        <a class="muted small" target="_blank" rel="noopener" href="https://statlocker.gg/match/${id}">statlocker ↗</a>
+      </div>
+    </div>
+    <div class="empty">
+      <b>No demo for this match</b> — ${esc(e?.status || "unknown")}.<br>
+      Open the match in Deadlock and click <b>Download Replay</b>; ${S.syncAvailable ? "the server picks it up automatically" : "then run <code>tools/sync.py</code>"}.
+    </div>
+    ${c ? `<h2 class="section-title">Valve end-of-match stats</h2>
+    <div class="summary">
+      ${tile("K / D / A", `${c.kills}/${c.deaths}/${c.assists}`)}
+      ${tile("Souls", k1(c.net_worth || 0))}
+      ${tile("Gun acc. vs heroes", c.hero_shots ? pct(c.hero_hits / c.hero_shots) : "–", "good")}
+      ${tile("Headshots", c.hero_hits ? pct(c.hero_headshots / c.hero_hits) : "–")}
+      ${tile("Hero dmg / min", Math.round((c.player_damage || 0) / mins))}
+      ${tile("Dmg taken / min", Math.round((c.player_damage_taken || 0) / mins))}
+      ${tile("Healing", k1(c.player_healing || 0))}
+      ${tile("Ability kills", c.ability_kills ?? "–")}
+      ${tile("Parry misses", c.parry_miss ?? "–")}
+      ${tile("Avg badge", c.badge ?? "–")}
+    </div>` : ""}`;
+}
+
 // ------------------------------------------------------------------ router
 
 function go(hash) { location.hash = hash; }
@@ -625,6 +727,7 @@ async function initSync() {
   const btn = $("#sync");
   const log = $("#sync-log");
   btn.hidden = false;
+  S.syncAvailable = true;
   const show = (s) => {
     btn.disabled = s.running;
     btn.textContent = s.running ? "syncing…" : "sync";
