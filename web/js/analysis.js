@@ -31,7 +31,9 @@ export function aimError(m, me, c) {
     if (d > AIM_MAX_DIST || d < 1) continue;
     let a = (Math.atan2(dy, dx) * 180) / Math.PI - c.yaw;
     a = Math.abs(((a + 540) % 360) - 180);
-    if (!best || a < best.err) best = { err: a, pawn: p.pawn, dist: d * UNIT_M };
+    // nearly the same line (within 1°): the closer hero is the one a projectile meets first
+    const better = !best || a < best.err - 1 || (Math.abs(a - best.err) <= 1 && d * UNIT_M < best.dist);
+    if (better) best = { err: a, pawn: p.pawn, dist: d * UNIT_M };
   }
   return best;
 }
