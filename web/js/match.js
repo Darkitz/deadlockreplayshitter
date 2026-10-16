@@ -1,6 +1,7 @@
 // Match detail: scoreboard, ability picker, minimap + timeline replay, incoming skillshots.
 
-import { loadMatch, statsAt, TEAM_NAMES } from "./data.js";
+import { loadMatch, loadMeta, statsAt, TEAM_NAMES } from "./data.js";
+import { digestMeta, renderReport } from "./report.js";
 import {
   analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt,
 } from "./analysis.js";
@@ -140,7 +141,9 @@ export async function viewMatch(id, params) {
       </div>
     </section>
     <section class="chart-card tracker" id="tracker"></section>
-    <section class="chart-card incoming" id="incoming"></section>`;
+    <section class="chart-card incoming" id="incoming"></section>
+    <section class="report" id="report"><p class="muted">loading Valve match report…</p></section>`;
+  showReport($("#report", app), id, subject.account_id);
 
   // wiring
   for (const b of app.querySelectorAll(".sb-row")) {
@@ -492,6 +495,15 @@ export async function viewMatch(id, params) {
   seek(t);
 }
 
+/** Valve metadata report (independent of the demo) */
+function showReport(el, id, account) {
+  loadMeta(id)
+    .then((raw) => { if (el.isConnected) renderReport(el, digestMeta(raw), account); })
+    .catch(() => {
+      if (el.isConnected) el.innerHTML = `<p class="note">No Valve match metadata for this match (deadlock-api doesn't have it, or sync hasn't fetched it yet).</p>`;
+    });
+}
+
 function renderNoDemo(app, id, e) {
   const c = (S.career || []).find((r) => r.match_id === id);
   const d = e ? new Date(e.start_time * 1000) : null;
@@ -524,5 +536,7 @@ function renderNoDemo(app, id, e) {
       ${tile("Ability kills", c.ability_kills ?? "–")}
       ${tile("Parry misses", c.parry_miss ?? "–")}
       ${tile("Avg badge", c.badge ?? "–")}
-    </div>` : ""}`;
+    </div>` : ""}
+    <section class="report" id="report"><p class="muted">loading Valve match report…</p></section>`;
+  showReport($("#report", app), id, S.index?.account_id);
 }

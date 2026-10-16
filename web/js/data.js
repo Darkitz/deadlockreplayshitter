@@ -62,6 +62,7 @@ export class Assets {
     this.items = raw.items;
     this.map = raw.map;
     this.ranks = raw.ranks || {};
+    this.accolades = raw.accolades || {};
     this.byClass = new Map();
     for (const [id, it] of Object.entries(raw.items)) this.byClass.set(it.class_name, { id: Number(id), ...it });
   }
@@ -69,7 +70,9 @@ export class Assets {
   item(id) { return this.items[id]; }
   itemByClass(cls) { return this.byClass.get(cls); }
   abilityName(cls) { return this.byClass.get(cls)?.name || cls; }
-  abilityIcon(cls) { return this.byClass.get(cls)?.image || ""; }
+  abilityIcon(cls) { return this.byClass.get(cls)?.image || this.byClass.get(cls)?.image_remote || ""; }
+  /** local icon if mirrored, else the deadlock-api CDN url */
+  itemIcon(id) { const it = this.items[id]; return it?.image || it?.image_remote || ""; }
   /** signature abilities of a hero, as item entries (with id) */
   signatures(heroId) {
     return (this.hero(heroId).signatures || []).filter(Boolean)

@@ -107,6 +107,24 @@ async function route() {
     S.view = "home";
     await viewHome(params);
   }
+  // deep link to a section: ?section=report|tracker|incoming|gun|career|...
+  const section = params.get("section");
+  document.body.classList.toggle("solo", !!section && params.get("solo") === "1");
+  if (section) {
+    for (const el of document.querySelectorAll(".solo-target")) el.classList.remove("solo-target");
+    document.getElementById(section)?.classList.add("solo-target");
+    scrollToSection(section);
+  }
+}
+
+/** sections that render asynchronously appear a bit later; poll briefly */
+function scrollToSection(id, tries = 40) {
+  const el = document.getElementById(id);
+  if (el && el.childElementCount && !el.querySelector(":scope > .muted:only-child")) {
+    el.scrollIntoView({ block: "start" });
+    return;
+  }
+  if (tries > 0) setTimeout(() => scrollToSection(id, tries - 1), 150);
 }
 
 // ------------------------------------------------------------------ sync button (only with tools/serve.py)

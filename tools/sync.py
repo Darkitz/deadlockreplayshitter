@@ -237,6 +237,10 @@ def sync_assets(heroes, items, used_heroes, used_items, badges=()):
             entry["bullet_damage"] = wi.get("bullet_damage")
         wanted = (it.get("type") == "ability" and it.get("hero") in used_heroes) \
             or it["id"] in used_items
+        remote = (it.get("shop_image_small_webp") or it.get("image_webp") or it.get("image")
+                  or it.get("shop_image_webp"))
+        if remote:
+            entry["image_remote"] = remote
         if wanted:
             entry["image"] = mirror(
                 it.get("shop_image_small_webp") or it.get("image_webp") or it.get("image")
@@ -265,8 +269,14 @@ def sync_assets(heroes, items, used_heroes, used_items, badges=()):
         log(f"map fetch failed: {e}")
         game_map = None
 
+    try:
+        accolades = {a["id"]: {"name": a.get("flavor_name") or a.get("class_name"), "stat": a.get("tracked_stat_name")}
+                     for a in get_json(f"{API}/v1/assets/accolades")}
+    except (urllib.error.URLError, OSError):
+        accolades = {}
     (DATA / "assets.json").write_text(json.dumps(
-        {"heroes": out_heroes, "items": out_items, "map": game_map, "ranks": sync_ranks(badges)}))
+        {"heroes": out_heroes, "items": out_items, "map": game_map, "ranks": sync_ranks(badges),
+         "accolades": accolades}))
     log(f"assets: {len(out_heroes)} heroes, {len(out_items)} items")
 
 

@@ -335,3 +335,42 @@ input[type=search] { background: var(--panel-2); color: var(--text); border: 1px
 .player-head .controls { margin-left: auto; }
 .player-head h2 { font-size: 22px; }
 .avatar.big { width: 72px; height: 72px; border-radius: 14px; }
+/* Valve report */
+.report { display: flex; flex-direction: column; gap: 10px; }
+.report .hi { width: 22px; height: 22px; border-radius: 5px; vertical-align: middle; object-fit: cover; }
+.nw-chart { width: 100%; height: auto; display: block; }
+.nw-chart .axis { fill: var(--muted); font-size: 11px; }
+.nw-line { fill: none; stroke-width: 1.5; opacity: .55; }
+.nw-line.team-2 { stroke: var(--amber); }
+.nw-line.team-3 { stroke: var(--sapphire); }
+.nw-line.subject { stroke-width: 3; opacity: 1; }
+.obj-line { stroke-width: 1; stroke-dasharray: 3 3; opacity: .7; }
+.obj-line.team-2 { stroke: var(--amber); }
+.obj-line.team-3 { stroke: var(--sapphire); }
+.obj-list { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; }
+.obj-list .team-2 { color: var(--amber); }
+.obj-list .team-3 { color: var(--sapphire); }
+.board tr.team-row-2 td:first-child { box-shadow: inset 3px 0 var(--amber); }
+.board tr.team-row-3 td:first-child { box-shadow: inset 3px 0 var(--sapphire); }
+.board tr.on td { background: var(--panel-3); }
+.charts.report-2 { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; }
+.charts.report-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+.matrix { border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; width: 100%; }
+.matrix th, .matrix td { padding: 3px; text-align: center; }
+.matrix th.team-2 { box-shadow: inset 0 -2px var(--amber); }
+.matrix th.team-3 { box-shadow: inset 0 -2px var(--sapphire); }
+.matrix td { background: rgba(229, 100, 90, calc(var(--h, 0) * .85)); border: 1px solid var(--bg); }
+.matrix td.same { background: var(--panel-2); }
+.matrix td.tot { background: none; color: var(--muted); }
+.matrix tr.on th { outline: 2px solid var(--accent); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.tag { background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; font-size: 12px; }
+.tag.pu { border-color: var(--hit); color: var(--hit); }
+.build { display: flex; flex-wrap: wrap; gap: 8px; }
+.bi { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 46px; }
+.bi img { width: 40px; height: 40px; border-radius: 8px; background: var(--panel-3); object-fit: contain; }
+.bi.sold img { opacity: .35; }
+.bi.sold small { text-decoration: line-through; }
+@media (max-width: 1100px) { .charts.report-2, .charts.report-3 { grid-template-columns: 1fr; } }
+/* ?section=<id>&solo=1: show just that section (handy for sharing / printing) */
+body.solo #app > *:not(.solo-target) { display: none; }
