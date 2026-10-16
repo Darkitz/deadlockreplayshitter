@@ -123,7 +123,7 @@ async function route() {
     }
   } else if (parts[0] === "about") {
     S.view = "about";
-    viewAbout($("#app"));
+    viewAbout($("#app"), params);
   } else if (parts[0] === "players") {
     S.view = "players";
     viewPlayers();

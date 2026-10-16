@@ -194,3 +194,14 @@ test("melee: hero melees (enemy in reach) and parried swings both ways", async (
   assert.equal(meleeStats(far, 1).swings[0].near, false);
   assert.equal(parryLog(far)[0].attacker, null);
 });
+
+test("melee intent: parser distances win over position samples", async () => {
+  const { meleeStats } = await import("../web/js/analysis.js");
+  const m = fixture({ enemyX: 100 }); // samples say the enemy is 2.5 m away
+  // v12 swings: [t, pawn, id, type, heroDist dm, npcDist dm]; -1 = nothing within 30 m
+  m.melee = [[10, 1, 555, 1, -1, 40], [20, 1, 555, 2, -1, -1], [30, 1, 555, 2, 80, 20]];
+  const s = meleeStats(m, 1);
+  assert.deepEqual(s.swings.map((x) => x.intent), ["npc", "move", "hero"]);
+  assert.deepEqual([s.swings[2].heroD, s.swings[0].npcD], [8, 4]);
+  assert.equal(s.heavy.move, 1);
+});

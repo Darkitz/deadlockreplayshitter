@@ -563,19 +563,20 @@ export function meleeStats(m, pawn) {
     }
     const parriedBy = parriedAt.get(t) ?? null;
     // parser (v12+) measured the nearest enemy hero / NPC at swing time in decimeters
-    const heroD = swings[i][4] != null && swings[i][4] >= 0 ? swings[i][4] / 10 : null;
-    const npcD = swings[i][5] != null && swings[i][5] >= 0 ? swings[i][5] / 10 : null;
+    const measured = swings[i].length >= 6;
+    const heroD = measured && swings[i][4] >= 0 ? swings[i][4] / 10 : null;
+    const npcD = measured && swings[i][5] >= 0 ? swings[i][5] / 10 : null;
     let near = hero || parriedBy != null || (heroD != null && heroD <= MELEE_REACH_M), target = parriedBy;
     if (!near || target == null) {
       const p = posAt(m, pawn, t);
       let bd = Infinity;
       if (p[0] || p[1]) {
         for (const e of enemies) {
-          if (hpAt(m, e.pawn, t) <= 0) continue;
+          if (!(hpAt(m, e.pawn, t)?.hp > 0)) continue;
           const q = posAt(m, e.pawn, t);
           if (!q[0] && !q[1]) continue;
           const d = Math.hypot(q[0] - p[0], q[1] - p[1]) * UNIT_M;
-          if (d <= MELEE_REACH_M + 2 && d < bd) { bd = d; target = e.pawn; if (heroD == null && d <= MELEE_REACH_M) near = true; }
+          if (d <= MELEE_REACH_M + 2 && d < bd) { bd = d; target = e.pawn; if (!measured && d <= MELEE_REACH_M) near = true; }
         }
       }
     }
@@ -589,7 +590,10 @@ export function meleeStats(m, pawn) {
     const intent = near ? "hero" : npc || (npcD != null && npcD <= MELEE_REACH_M) ? "npc" : "move";
     if (intent === "npc") s.atNpc++;
     if (intent === "move") s.move++;
-    out.swings.push({ t, kind, result, intent, dmg: total, victims: [...victims], near, heroD, npcD,
+    // how fast the player was moving in the second before the swing (movement melees start fast)
+    const p0 = posAt(m, pawn, t - 1), p1 = posAt(m, pawn, t);
+    const speed = (p0[0] || p0[1]) && (p1[0] || p1[1]) ? Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) * UNIT_M : null;
+    out.swings.push({ t, kind, result, intent, dmg: total, victims: [...victims], near, heroD, npcD, speed, measured,
       target: hero ? [...victims][0] : near ? target : null, parriedBy });
     out.events.push({ t, kind: "shot", n: 1, melee: kind });
     if (hero) out.events.push({ t, kind: kind === "heavy" ? "hs" : "hit", n: 1, victim: [...victims][0], melee: kind });

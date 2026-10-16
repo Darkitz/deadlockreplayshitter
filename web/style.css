@@ -498,7 +498,7 @@ table.mini td.accent { color: var(--accent); }
 /* hover help: labels with an explanation (see explain.js) */
 .has-help { text-decoration: underline dotted color-mix(in srgb, var(--muted) 70%, transparent); text-underline-offset: 3px; cursor: help; }
 .help-tip { position: absolute; z-index: 50; padding: 8px 10px; border-radius: 8px; background: #1b1e24; color: var(--text);
-  border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0, 0, 0, .5); font-size: 12.5px; line-height: 1.45; pointer-events: none; }
+  border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0, 0, 0, .5); font-size: 12.5px; line-height: 1.45; pointer-events: none; white-space: pre-line; }
 .about { max-width: 860px; }
 .about-sec { margin: 22px 0; }
 .about-sec h3 { color: var(--accent); font-size: 15px; margin-bottom: 8px; }
@@ -506,3 +506,11 @@ table.mini td.accent { color: var(--accent); }
 .about dt { font-weight: 600; }
 .about dd { margin: 0; color: var(--muted); line-height: 1.5; }
 @media (max-width: 640px) { .about dl { grid-template-columns: 1fr; } .about dd { margin-bottom: 8px; } }
+.about-toc { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 4px; font-size: 13px; }
+.about .deep { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; }
+.about .deep h4 { margin: 16px 0 6px; font-size: 13.5px; }
+.about .deep p, .about .deep li { color: var(--muted); line-height: 1.55; }
+.about .deep b { color: var(--text); }
+.about .deep ul, .about .deep ol { padding-left: 20px; margin: 6px 0; }
+.about code { font-size: 12px; background: #1b1e24; padding: 1px 4px; border-radius: 4px; }
+.about-sec { scroll-margin-top: 90px; }

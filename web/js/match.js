@@ -704,7 +704,7 @@ export async function viewMatch(id, params) {
           <th title="no hero, but a trooper, neutral, crate, soul orb or objective within ${MELEE_REACH_M} m">at NPCs</th><th>hit</th>
           <th title="nothing to hit within ${MELEE_REACH_M} m: melee used to move">movement</th><th>dmg</th></tr>
         ${kinds.map(([nm, xs]) => row(nm, xs)).join("")}
-      </table></div>`;
+      </table><a class="small muted" href="#/about?s=melee">how swings are classified →</a></div>`;
     const f = settings.feed || "all";
     const evs = [];
     if (f !== "kills" && f !== "all kills") {
@@ -725,10 +725,30 @@ export async function viewMatch(id, params) {
         : x.result === "parried" ? `<b class="bad">parried by</b>`
         : x.intent === "hero" ? `whiff · hero ${x.heroD != null ? `${x.heroD.toFixed(0)} m` : "in reach"}`
         : x.intent === "npc" ? `whiff · NPC ${x.npcD != null ? `${x.npcD.toFixed(0)} m` : "near"}` : `<span class="muted">movement</span>`;
-      return `<li data-t="${x.t}"><span class="dot ${x.result === "parried" ? "miss" : x.result}"></span><span class="t">${fmtClock(x.t)}</span>
+      return `<li data-t="${x.t}" data-help="${esc(swingWhy(x))}"><span class="dot ${x.result === "parried" ? "miss" : x.result}"></span><span class="t">${fmtClock(x.t)}</span>
         <span class="chip-s ${x.kind === "heavy" ? "" : "muted-chip"}">${x.kind}</span>
         <span>${what}</span>${x.intent === "hero" ? icon(other) : ""}</li>`;
     }).join("") || `<li class="muted">no swings yet</li>`;
+  }
+
+  /** step-by-step reason for a swing's classification (hover text in the melee feed) */
+  function swingWhy(x) {
+    const nm = (pw) => S.profiles[m.byPawn.get(pw)?.account_id]?.name || m.byPawn.get(pw)?.name || "?";
+    const d = (v) => (v == null ? "none within 30 m" : `${v.toFixed(1)} m`);
+    const lines = [
+      `${x.kind === "heavy" ? "Heavy" : "Light"} melee at ${fmtClock(x.t)}.`,
+      x.measured ? `Nearest living enemy hero: ${d(x.heroD)}. Nearest NPC / crate / soul orb / objective: ${d(x.npcD)}.`
+        : "Distances not measured in this demo (reparse with the current parser); positions every 0.5 s used instead.",
+    ];
+    if (x.result === "hit") lines.push(`Melee damage on ${x.victims.map(nm).join(", ")} within 0.6 s: ${x.dmg} → hero hit.`);
+    else if (x.result === "parried") lines.push(`${nm(x.parriedBy)} parried it (successful parry within 8 m, up to 0.6 s after the swing).`);
+    else if (x.result === "other") lines.push(`Melee damage only on NPCs within 0.6 s: ${x.dmg}.`);
+    else lines.push("No melee damage within 0.6 s.");
+    lines.push(x.intent === "hero" ? `→ hero melee: an enemy hero was within ${MELEE_REACH_M} m${x.result === "hit" || x.result === "parried" ? " (or it connected)" : ""}, so it counts toward hero melee accuracy.`
+      : x.intent === "npc" ? `→ at NPCs: no enemy hero within ${MELEE_REACH_M} m, but something farmable was. Not counted toward hero accuracy.`
+      : `→ movement: nothing to hit within ${MELEE_REACH_M} m, so it was most likely used to move. Not counted toward hero accuracy.`);
+    if (x.speed != null) lines.push(`Speed in the second before: ${x.speed.toFixed(1)} m/s${x.intent === "move" && x.speed >= 7 ? " (already travelling fast, typical for movement melees)" : ""}.`);
+    return lines.join("\n");
   }
 
   function renderReadout(t) {

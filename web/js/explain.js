@@ -47,7 +47,7 @@ export const SECTIONS = [
       ["hero accuracy", "Hero accuracy", "Hero hits ÷ (shots − shots that hit only NPCs). Shots spent on troopers aren't attempts at heroes, so they leave the denominator. Close to Valve's hero accuracy."],
       ["gun hero accuracy", "Gun hero accuracy", "Hero hits ÷ (shots − shots that hit only NPCs), over all parsed matches in view."],
       ["hit rate (all shots)", "Hit rate (all shots)", "Hero hits ÷ all shots, troopers included."],
-      ["headshots", "Headshots", "Hero hits whose damage hit the head hitgroup."],
+      ["headshots", "Headshots", "Hero hits whose damage landed on the head hitgroup or carried crit damage (matches Valve's crit count)."],
       ["hero headshot %", "Hero headshot %", "Headshots ÷ hero hits."],
       ["hero hs %", "Hero HS %", "Headshots ÷ hero hits in the current point or span."],
       ["valve: hero accuracy", "Valve: hero accuracy", "Valve's own end-of-match number (hero bullets hit ÷ hero bullets fired), from the metadata. Whole match only."],
@@ -110,15 +110,100 @@ export function explain(label) {
   return best ? best[1].text : null;
 }
 
-export function viewAbout(app) {
+/** long-form walkthroughs for the derived numbers that need more than a hover */
+export const DEEP_DIVES = [
+  {
+    id: "melee",
+    title: "Melee in depth: what each swing was for",
+    body: `
+      <p>Every melee swing gets two labels: what it was <b>for</b> (intent) and what <b>came of it</b> (outcome).
+      Hero melee accuracy only counts swings that were plausibly attacks on a hero, so farming troopers or
+      melee-hopping across the map doesn't drag it down.</p>
+      <h4>1. Finding swings</h4>
+      <p>The hero's melee ability sets a new <code>m_flAttackTriggeredTime</code> on every attack. Each change is one
+      swing. <code>m_eCurrentAttackType</code> says light (1) or heavy (2 and 3; 3 is a heavy variant).</p>
+      <h4>2. Measuring the surroundings</h4>
+      <p>When the swing starts, the parser looks at every entity in the demo and records two distances (3D, exact,
+      not the 0.5 s position samples):</p>
+      <ul>
+        <li><b>Nearest living enemy hero.</b></li>
+        <li><b>Nearest non-allied target:</b> troopers, neutral camps, guardians, walkers, the patron, shrines, the
+        mid boss, sentries, Sinner's Sacrifice, breakable crates and <b>soul orbs</b> (either team's, since both sides
+        hit them to secure or deny).</li>
+      </ul>
+      <p>The class list was checked against every damage victim in real demos: 99.8&nbsp;% of melee swings that damaged
+      an NPC had one of these within ${MELEE_REACH_M} m.</p>
+      <h4>3. Intent</h4>
+      <ol>
+        <li><b>At heroes</b> (a "hero melee") when an enemy hero was within <b>${MELEE_REACH_M} m</b>, or when the swing hit
+        a hero or got parried by one. In real demos the median hero hit started 2.9 m away and 95&nbsp;% within 6.6 m
+        (heavy lunges cover distance), so ${MELEE_REACH_M} m catches the attempts without counting far-off swings.</li>
+        <li><b>At NPCs</b> when no enemy hero was within ${MELEE_REACH_M} m but a trooper, crate, orb or objective was.</li>
+        <li><b>Movement</b> when nothing hittable was within ${MELEE_REACH_M} m. Players melee to move: the heavy melee lunges
+        forward, and a light melee keeps momentum. These swings start while the player is already moving fast:
+        median 8.0 m/s for light movement swings against 4.7 m/s for light swings at heroes (heavy: 6.9 against 5.0).</li>
+      </ol>
+      <p>Across the parsed demos about 12&nbsp;% of swings are at heroes, 65&nbsp;% at NPCs and 23&nbsp;% movement.</p>
+      <h4>4. Outcome</h4>
+      <ul>
+        <li><b>Hit</b>: melee damage on an enemy hero within 0.6 s of the swing (ends early if the next swing starts).</li>
+        <li><b>Parried</b>: an enemy's successful parry (their <code>m_bAttackParried</code>) within 8 m, from 0.6 s
+        before to 0.2 s after their parry flag flips. The closest swing in time gets the blame.</li>
+        <li><b>Hit NPC</b>: melee damage only on non-heroes.</li>
+        <li><b>Whiff</b>: no damage and no parry.</li>
+      </ul>
+      <h4>5. The numbers</h4>
+      <ul>
+        <li><b>Hero melee accuracy</b> = hero hits ÷ hero melees, per light and heavy.</li>
+        <li><b>Got parried</b> = own swings an enemy parried, also as a share of hero melees.</li>
+        <li><b>Parries</b> = own successful parries ÷ attempts; the feed shows which enemy swing each one caught.</li>
+        <li><b>Melee use %</b> = share of swings at heroes · at NPCs · movement.</li>
+      </ul>
+      <h4>Limits</h4>
+      <ul>
+        <li>Intent is inferred from what was in reach. A swing toward a hero 11 m away counts as movement or NPC.
+        A movement swing that happens to pass an enemy within ${MELEE_REACH_M} m counts as a hero melee.</li>
+        <li>Demos parsed before parser version 12 have no measured distances. Hero distance then comes from the
+        0.5 s position samples and NPCs are only known when they were hit.</li>
+        <li>Parries against trooper attacks or abilities have no enemy swing to pair with. They still count as
+        successful parries but the feed shows no attacker.</li>
+      </ul>
+      <p>Hover a swing in the melee feed of a match for its own step-by-step breakdown.</p>`,
+  },
+  {
+    id: "gun",
+    title: "Gun accuracy in depth",
+    body: `
+      <p>Server demos don't record which bullet hit what, so shots and hits are paired after the fact.</p>
+      <ol>
+        <li><b>Shots</b>: each increase of the weapon's <code>m_nShotNumber</code> is one trigger pull. Shotguns
+        fire several pellets per pull (from the weapon's game data), so bullets = shots × pellets.</li>
+        <li><b>Hits</b>: bullet damage packets from the same server tick are grouped (one pull, several pellets or
+        targets). Each group claims the <b>oldest unclaimed shot of the last 1.5 s</b>, which covers projectile
+        travel time.</li>
+        <li><b>What it hit</b>: a group with an enemy hero is a hero hit, a headshot if any packet hit the head.
+        A group with only troopers, neutrals or objectives is an NPC shot.</li>
+        <li><b>Hero accuracy</b> = hero hits ÷ (shots − NPC shots). A shot spent on a trooper was not an attempt at a
+        hero, so it leaves the denominator. On single-bullet guns this lands within about 2 points of Valve's own
+        hero accuracy from the match metadata.</li>
+      </ol>`,
+  },
+];
+
+export function viewAbout(app, params) {
   app.innerHTML = `
     <section class="about">
       <h2>How the numbers are made</h2>
       <p class="muted">Hover any underlined label on the site for the same text.</p>
-      ${SECTIONS.map((s) => `
-        <div class="about-sec">
+      <nav class="about-toc">${[...DEEP_DIVES.map((d) => [d.id, d.title]), ...SECTIONS.map((x, i) => [`s${i}`, x.title])]
+        .map(([id, t]) => `<a href="#/about?s=${id}" data-jump="${id}">${t}</a>`).join("")}</nav>
+      ${DEEP_DIVES.map((d) => `<div class="about-sec deep" id="about-${d.id}"><h3>${d.title}</h3>${d.body}</div>`).join("")}
+      ${SECTIONS.map((s, i) => `
+        <div class="about-sec" id="about-s${i}">
           <h3>${s.title}</h3>
           <dl>${s.items.map(([, label, text]) => `<dt>${label}</dt><dd>${text}</dd>`).join("")}</dl>
         </div>`).join("")}
     </section>`;
+  const jump = params?.get("s");
+  if (jump) requestAnimationFrame(() => document.getElementById(`about-${jump}`)?.scrollIntoView());
 }

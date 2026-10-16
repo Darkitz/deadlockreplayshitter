@@ -58,8 +58,9 @@ Search by player, hero or match id.
 **Match** (`#/match/<id>?pawn=&ability=&from=&t=`):
 - Scoreboard with Steam avatars and each player's signature-skill accuracy. Click a row to
   analyze that player, click the name to open their player page.
-- Ability picker: **Gun**, the four signature abilities, other hero abilities (melee, parry,
-  teleports) and active items, each with hits/thrown.
+- Ability picker: **Gun**, **Light melee**, **Heavy melee**, the four signature abilities,
+  other hero abilities (parry, teleports) and active items, each with hits/thrown (melee:
+  hero hits / hero melees).
 - Minimap replay: positions, health rings, trail, aim rays and hit markers, kills, ziplines,
   objectives, an "all casts" overlay, and hover cards with HP, souls, K/D/A and items.
 - Timeline: cumulative thrown vs hit (or shots / hero hits / headshots in Gun mode), cast, kill
@@ -209,7 +210,16 @@ There are three checks:
   - Swings come from the melee ability's `m_flAttackTriggeredTime`, and their type from
     `m_eCurrentAttackType` (1 light, 2 heavy, 3 heavy variant).
   - A swing counts as a hit when melee damage follows within 0.6 s.
-  - Parries come from `m_flParryStartTime` / `m_bAttackParried`.
+  - Parries come from `m_flParryStartTime` / `m_bAttackParried`. A successful parry is paired
+    with the enemy swing it caught (within 8 m, swing 0.6 s before to 0.2 s after), so swings
+    can be "parried" and a player's parries list which light or heavy swing they caught.
+  - **Intent** (parser v12): at each swing the parser records the distance to the nearest
+    living enemy hero and to the nearest NPC, crate, soul orb or objective. Enemy hero within
+    10 m = **hero melee**, else something farmable within 10 m = **at NPCs**, else
+    **movement**. Hero melee accuracy = hero hits / hero melees.
+  - The site's **How it works** page (`#/about`) explains every number in detail, and every
+    underlined label has a hover explanation. Each swing in the melee feed has its own
+    step-by-step breakdown on hover.
 
 ## Tests
 
