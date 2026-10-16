@@ -481,3 +481,7 @@ img.slot-spirit { background: #5a3a8c !important; }
 .span-ctl.off { opacity: .45; }
 .tin { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 2px 5px; font: inherit; width: 54px; font-variant-numeric: tabular-nums; }
 .scrub-from { width: 160px; accent-color: var(--accent); }
+.cmp td, .cmp th { font-size: 14px; }
+.cmp .win-cell { color: var(--accent); font-weight: 700; }
+td.w { color: var(--hit); } td.l { color: var(--miss); }
+.report-table td img.hi { display: inline-block; width: 20px; height: 20px; border-radius: 4px; vertical-align: middle; }

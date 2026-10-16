@@ -91,6 +91,12 @@ on that hero, gun stats, career numbers from Valve's metadata, and filters (peri
 
 **Players** (`#/players`): everyone seen in parsed demos.
 
+**Compare** (`#/compare/<a>/<b>`): two players side by side (skills, gun hero accuracy,
+headshots, light/heavy melee, dodge rate, isolated deaths) plus the games they shared.
+
+All cross-match pages take a **game-time window** (whole match / 0–10 / 10–20 / 20–30 / 30+ min,
+linkable as `?gt=600-1200`).
+
 Section deep links: `?section=report|tracker|laning|incoming|gun|career…` scrolls to a section,
 `&solo=1` shows only that section.
 

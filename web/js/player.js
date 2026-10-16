@@ -6,6 +6,43 @@ import { pct, playerMatchSummary } from "./analysis.js";
 import { fmtClock } from "./timeline.js";
 import { $, esc, S, opts, fmtDate, ago, k1, tile, settings, controlsHTML, wireControls, rankBadge, gameWindow } from "./ui.js";
 
+/** one summary row per parsed match the player is in (loaded 4 at a time) */
+export async function loadPlayerRows(acc) {
+  const matches = S.matchList.filter((m) => m.players.some((p) => p.account_id === acc));
+  const rows = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < matches.length) {
+      const mm = matches[next++];
+      let m;
+      try { m = await loadMatch(mm.match_id); } catch { continue; }
+      const me = m.player(acc);
+      if (me) rows.push({ mm, me, won: mm.winner === me.team, s: playerMatchSummary(m, me.pawn, S.assets, opts(), gameWindow()) });
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  return rows;
+}
+
+/** totals over summary rows */
+export function totals(rows) {
+  const sum = (k) => rows.reduce((a, r) => a + (r.s[k] || 0), 0);
+  const ksum = (k) => rows.reduce((a, r) => a + (r.me[k] || 0), 0);
+  const shots = sum("shots"), npc = sum("npcShots"), gh = sum("gunHits");
+  return {
+    games: rows.length, wins: rows.filter((r) => r.won).length,
+    kda: (ksum("kills") + ksum("assists")) / Math.max(1, ksum("deaths")),
+    skill: sum("thrown") ? sum("hit") / sum("thrown") : null, thrown: sum("thrown"),
+    gun: shots - npc > 0 ? gh / (shots - npc) : null, shots,
+    hs: gh ? sum("headshots") / gh : null,
+    dodge: sum("aimedAt") ? (sum("aimedAt") - sum("gotHit")) / sum("aimedAt") : null,
+    light: sum("meleeLight") ? sum("meleeLightHit") / sum("meleeLight") : null,
+    heavy: sum("meleeHeavy") ? sum("meleeHeavyHit") / sum("meleeHeavy") : null,
+    isolated: sum("deaths") ? sum("isolatedDeaths") / sum("deaths") : null,
+    skillDmg: sum("skillDmg"),
+  };
+}
+
 export async function viewPlayer(acc, params) {
   const app = $("#app");
   const prof = S.profiles[acc] || {};
@@ -31,7 +68,9 @@ export async function viewPlayer(acc, params) {
       <div>
         <h2>${esc(name)}</h2>
         <p class="muted">${idx ? `tracked · ${idx.matches.length} matches in history · ` : "not tracked · "}${matches.length} parsed demos
-          · <a target="_blank" rel="noopener" href="${esc(prof.url || `https://steamcommunity.com/profiles/${BigInt(acc) + 76561197960265728n}/`)}">steam profile ↗</a></p>
+          · <a target="_blank" rel="noopener" href="${esc(prof.url || `https://steamcommunity.com/profiles/${BigInt(acc) + 76561197960265728n}/`)}">steam profile ↗</a>
+          · compare with <select class="cmp-pick"><option value="">…</option>${S.accounts.filter((a) => a.account_id !== acc)
+            .map((a) => `<option value="${a.account_id}">${esc(a.name)}</option>`).join("")}</select></p>
       </div>
       ${rank ? `<span class="rank">${rankBadge(rank, true)}<span>${esc(rank.name)}</span></span>` : ""}
       <div class="controls">${controlsHTML()}</div>
@@ -46,20 +85,9 @@ export async function viewPlayer(acc, params) {
     <section class="charts charts-3" id="p-charts"></section>
     <section id="p-matches"></section>`;
   wireControls(app, () => viewPlayer(acc, params));
+  $(".cmp-pick", app)?.addEventListener("change", (ev) => { if (ev.target.value) location.hash = `#/compare/${acc}/${ev.target.value}`; });
 
-  // load in parallel (4 at a time: each file is a few MB once unzipped)
-  const rows = [];
-  let next = 0;
-  const worker = async () => {
-    while (next < matches.length) {
-      const mm = matches[next++];
-      let m;
-      try { m = await loadMatch(mm.match_id); } catch { continue; }
-      const me = m.player(acc);
-      if (me) rows.push({ mm, me, won: mm.winner === me.team, s: playerMatchSummary(m, me.pawn, S.assets, opts(), gameWindow()) });
-    }
-  };
-  await Promise.all([worker(), worker(), worker(), worker()]);
+  const rows = await loadPlayerRows(acc);
   if (S.view !== "player") return;
   render(acc, rows);
 }

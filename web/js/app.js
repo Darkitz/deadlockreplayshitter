@@ -17,6 +17,7 @@ import { viewHome } from "./home.js";
 import { viewPlayer } from "./player.js";
 import { viewPlayers } from "./players.js";
 import { viewHeroes, viewHero } from "./heroes.js";
+import { viewCompare } from "./compare.js";
 
 async function loadAll() {
   S.accounts = await loadJSON("data/accounts.json").catch(() => []);
@@ -107,6 +108,9 @@ async function route() {
       S.view = "player";
       await viewPlayer(acc, params);
     }
+  } else if (parts[0] === "compare" && parts[1] && parts[2]) {
+    S.view = "compare";
+    await viewCompare(Number(parts[1]), Number(parts[2]));
   } else if (parts[0] === "heroes") {
     if (parts[1]) {
       S.view = "hero";
