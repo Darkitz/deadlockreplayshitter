@@ -35,6 +35,8 @@ MATCHES = DATA / "matches"
 ASSET_DIR = WEB / "assets"
 DEMOS = ROOT / "data" / "demos"
 MANIFEST = ROOT / "data" / "parsed.json"
+FETCH_CACHE = ROOT / "data" / "fetch_cache.json"
+NO_SALT_RECHECK = 6 * 3600  # someone may submit the salt later
 PARSER = ROOT / "parser" / "target" / "release" / "dlparse"
 GAME_REPLAYS = Path(os.environ.get(
     "DEADLOCK_REPLAYS", "/mnt/d/SteamLibrary/steamapps/common/Deadlock/game/citadel/replays"))
@@ -305,6 +307,11 @@ def main():
     status = {}
 
     # downloads (selected heroes only; sequential to be kind to Valve)
+    try:
+        fetch_cache = json.loads(FETCH_CACHE.read_text())
+    except (OSError, ValueError):
+        fetch_cache = {}
+    now = time.time()
     for m in history:
         mid = m["match_id"]
         if mid in demos:
@@ -315,10 +322,19 @@ def main():
         if args.no_download:
             status[mid] = "not downloaded (--no-download)"
             continue
+        cached = fetch_cache.get(str(mid))
+        if cached and (cached["dead"] or now - cached["at"] < NO_SALT_RECHECK) and not args.steam_salts:
+            status[mid] = cached["why"]
+            continue
         dem, why = fetch_demo(mid, args.steam_salts)
         status[mid] = why
         if dem:
             demos[mid] = dem
+            fetch_cache.pop(str(mid), None)
+        else:
+            fetch_cache[str(mid)] = {"why": why, "at": now, "dead": "valve http" in why}
+    FETCH_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    FETCH_CACHE.write_text(json.dumps(fetch_cache))
 
     # parse (parallel)
     jobs = []

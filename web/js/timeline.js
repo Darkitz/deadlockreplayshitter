@@ -152,6 +152,12 @@ export function createTimeline(svg, model, onSeek) {
   };
   let dragging = false;
   svg.addEventListener("pointerdown", (ev) => {
+    // clicking a marker jumps to just after that event (so the map shows its ray / hit)
+    const mark = ev.target.closest?.("[data-t]");
+    if (mark) {
+      onSeek(Number(mark.dataset.t) + 0.6);
+      return;
+    }
     dragging = true;
     svg.setPointerCapture(ev.pointerId);
     onSeek(fromPointer(ev));

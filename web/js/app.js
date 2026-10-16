@@ -17,6 +17,7 @@ const settings = {
   window: 3,
   heroesOnly: true,
   speed: 30,
+  showAll: false,
   ...readStore("skillhitter.settings"),
 };
 function readStore(k) {
@@ -146,6 +147,7 @@ async function viewOverview(heroId, params) {
     </section>
     <section class="summary" id="summary"><div class="muted">loading matches…</div></section>
     <section class="charts" id="charts"></section>
+    <section class="report" id="report"></section>
     <h2 class="section-title">${esc(hero.name)} matches with demo</h2>
     <section class="cards" id="cards"></section>
     <details class="unparsed" id="unparsed"></details>`;
@@ -204,9 +206,11 @@ async function viewOverview(heroId, params) {
     tile("Accuracy", thrown ? pct(scored / thrown) : "–", "accent") +
     tile("Per match", list.length ? `${(thrown / list.length).toFixed(1)}<small> thrown</small>` : "–") +
     tile("Avg hit delay", avgDelay != null ? `${avgDelay.toFixed(2)}<small> s</small>` : "–") +
+    tile("Avg hit range", agg.dists.length ? `${Math.round(agg.dists.reduce((a, b) => a + b, 0) / agg.dists.length)}<small> m</small>` : "–") +
     tile("Damage", k1(dmg));
 
   renderCharts(list, agg);
+  renderAbilityReport(list, heroId, abilityCls);
 
   // match cards
   $("#cards").innerHTML = list.map((x) => {
@@ -267,7 +271,42 @@ function renderCharts(list, agg) {
     <div class="chart-card"><h3>By game phase</h3>${phases}</div>
     <div class="chart-card"><h3>Most hit heroes</h3>${victims || `<p class="muted">no hero hits</p>`}</div>
     <div class="chart-card"><h3>Hit delay</h3><div class="hist">${hist}</div>
-      <div class="bars-axis muted small"><span>0 s</span><span>1 s</span><span>2 s+</span></div></div>`;
+      <div class="bars-axis muted small"><span>0 s</span><span>1 s</span><span>2 s+</span></div></div>
+    <div class="chart-card"><h3>Hit range</h3><div class="hist">${histogram(agg.dists, 10, 5, "m")}</div>
+      <div class="bars-axis muted small"><span>0 m</span><span>25 m</span><span>50 m+</span></div></div>`;
+}
+
+function histogram(values, bins, width, unit) {
+  const b = new Array(bins).fill(0);
+  for (const v of values) b[Math.min(bins - 1, Math.floor(v / width))]++;
+  const max = Math.max(1, ...b);
+  return b.map((n, i) => `<span class="hb" title="${i * width}–${i === bins - 1 ? "∞" : (i + 1) * width} ${unit}: ${n}"><span style="height:${(n / max) * 100}%"></span></span>`).join("");
+}
+
+/** every signature ability of the hero across all loaded matches */
+function renderAbilityReport(list, heroId, selected) {
+  const rows = S.assets.signatures(heroId).map((ab) => {
+    let thrown = 0, scored = 0, other = 0, dmg = 0, matches = 0;
+    for (const x of list) {
+      const c = counts(analyzeAbility(x.match, x.me.pawn, ab, opts()).casts, settings.heroesOnly);
+      thrown += c.thrown; scored += c.scored; other += c.other; dmg += c.dmg;
+      if (c.thrown) matches++;
+    }
+    return { ab, thrown, scored, other, dmg, matches };
+  });
+  $("#report").innerHTML = `<div class="chart-card"><h3>Ability report · ${list.length} matches</h3>
+    <table class="report-table">
+      <tr><th></th><th>ability</th><th>thrown</th><th>per match</th><th>${settings.heroesOnly ? "hit heroes" : "hit"}</th><th>non-hero</th><th>accuracy</th><th>damage</th></tr>
+      ${rows.map((r) => `<tr class="${r.ab.class_name === selected ? "on" : ""}" data-ability="${esc(r.ab.class_name)}">
+        <td>${r.ab.image ? `<img src="${esc(r.ab.image)}" alt="">` : ""}</td><td>${esc(r.ab.name)}</td>
+        <td>${r.thrown}</td><td>${list.length ? (r.thrown / list.length).toFixed(1) : "–"}</td>
+        <td>${r.scored}</td><td>${r.other}</td>
+        <td><span class="acc-bar"><span style="width:${r.thrown ? (r.scored / r.thrown) * 100 : 0}%"></span></span>${r.thrown ? pct(r.scored / r.thrown) : "–"}</td>
+        <td>${k1(r.dmg)}</td></tr>`).join("")}
+    </table></div>`;
+  for (const tr of $("#report").querySelectorAll("tr[data-ability]")) {
+    tr.addEventListener("click", () => go(`#/hero/${heroId}?ability=${tr.dataset.ability}`));
+  }
 }
 
 // ------------------------------------------------------------------ match detail
@@ -357,7 +396,10 @@ async function viewMatch(id, params) {
     ${analysis.source === "none" ? `<p class="note">No casts of ${esc(ability.name)} found for this player.</p>` : ""}
     <section class="stage">
       <div class="map-wrap"><canvas class="minimap"></canvas>
-        <div class="map-legend small muted">click a hero to analyze them · rays = aim at cast</div></div>
+        <div class="map-legend small muted">
+          <label class="check"><input type="checkbox" class="show-all" ${settings.showAll ? "checked" : ""}> all casts</label>
+          <span>click a hero to analyze them · rays = aim at cast</span>
+        </div></div>
       <div class="stage-right">
         <svg class="timeline"></svg>
         <div class="player-row">
@@ -367,6 +409,7 @@ async function viewMatch(id, params) {
           </select>
           <input type="range" class="scrub" min="0" max="${Math.ceil(m.end)}" step="0.5">
           <span class="clock">0:00</span>
+          <button class="btn csv" title="download casts as CSV">CSV</button>
         </div>
         <div class="readout">
           <div class="tiles"></div>
@@ -427,13 +470,32 @@ async function viewMatch(id, params) {
   scrub.addEventListener("input", () => seek(Number(scrub.value)));
   $(".speed", app).addEventListener("change", (ev) => { settings.speed = Number(ev.target.value); saveSettings(); });
   $(".play", app).addEventListener("click", togglePlay);
+  $(".show-all", app).addEventListener("change", (ev) => {
+    settings.showAll = ev.target.checked;
+    saveSettings();
+    seek(t);
+  });
+  $(".csv", app).addEventListener("click", () => {
+    const name = (p) => m.byPawn.get(p)?.name ?? "";
+    const rows = [["time_s", "clock", "result", "damage", "delay_s", "range_m", "victims", "x", "y", "yaw"]];
+    for (const c of casts) {
+      rows.push([c.t.toFixed(2), fmtClock(c.t), c.result, c.dmg, c.delay?.toFixed(3) ?? "",
+        c.dist != null ? Math.round(c.dist) : "", c.victims.map(name).join("|"), c.x, c.y, c.yaw?.toFixed(1) ?? ""]);
+    }
+    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `${id}_${subject.name}_${ability.class_name}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
 
   function seek(nt) {
     t = Math.max(Math.min(nt, m.end), Math.min(0, m.samples.t0));
     scrub.value = t;
     $(".clock", app).textContent = fmtClock(t);
     timeline.setTime(t);
-    minimap.update({ t, subject: pawn, casts });
+    minimap.update({ t, subject: pawn, casts, showAll: settings.showAll });
     renderReadout(t);
   }
 
@@ -466,8 +528,9 @@ async function viewMatch(id, params) {
           const p = m.byPawn.get(v);
           return p ? `<img src="${esc(S.assets.hero(p.hero_id).icon)}" title="${esc(p.name)}">` : "";
         }).join("");
-        const label = k.result === "hit" ? `hit${k.delay != null ? ` +${k.delay.toFixed(2)}s` : ""} · ${k.dmg} dmg`
-          : k.result === "other" ? `hit non-hero · ${k.dmg} dmg` : "miss";
+        const dist = k.dist != null ? ` · ${Math.round(k.dist)} m` : "";
+        const label = k.result === "hit" ? `hit${k.delay != null ? ` +${k.delay.toFixed(2)}s` : ""}${dist} · ${k.dmg} dmg`
+          : k.result === "other" ? `hit non-hero${dist} · ${k.dmg} dmg` : "miss";
         return `<li data-t="${k.t}"><span class="dot ${k.result}"></span><span class="t">${fmtClock(k.t)}</span>${vics}<span>${label}</span></li>`;
       }
       const [kt, vic, att] = ev.k;

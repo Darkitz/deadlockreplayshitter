@@ -23,7 +23,7 @@ function img(src, onload) {
 
 export function createMinimap(canvas, { match, assets, onPick }) {
   const R = assets.map?.radius || 10752;
-  let state = { t: 0, subject: null, casts: [] };
+  let state = { t: 0, subject: null, casts: [], showAll: false };
   let dots = [];
 
   const ctx = canvas.getContext("2d");
@@ -97,6 +97,33 @@ export function createMinimap(canvas, { match, assets, onPick }) {
       ctx.setLineDash([4 * dpr, 4 * dpr]);
       ctx.stroke();
       ctx.setLineDash([]);
+    }
+
+    // whole-match overview of every cast: origin dot, hit ring, connecting line
+    if (state.showAll) {
+      for (const c of casts) {
+        if (!(c.x || c.y)) continue;
+        const col = RESULT_COLOR[c.result];
+        const [sx, sy] = w2p(c.x, c.y);
+        ctx.globalAlpha = c.t <= t ? 0.85 : 0.25;
+        if (c.hitX != null) {
+          const [hx, hy] = w2p(c.hitX, c.hitY);
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 1 * dpr;
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(hx, hy); ctx.stroke();
+          ctx.lineWidth = 2 * dpr;
+          ctx.beginPath(); ctx.arc(hx, hy, 4 * dpr, 0, Math.PI * 2); ctx.stroke();
+        } else if (c.yaw != null) {
+          const a = (c.yaw * Math.PI) / 180;
+          const [ex, ey] = w2p(c.x + Math.cos(a) * 900, c.y + Math.sin(a) * 900);
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 1 * dpr;
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+        }
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(sx, sy, 2.5 * dpr, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
     }
 
     // recent casts: aim ray + hit marker

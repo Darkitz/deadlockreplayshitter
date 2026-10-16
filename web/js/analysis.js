@@ -8,6 +8,9 @@
 
 import { posAt } from "./data.js";
 
+/** world units → meters (Source units are inches) */
+export const UNIT_M = 0.0254;
+
 export const PHASES = [
   { key: "lane", label: "0–10 min", from: -Infinity, to: 600 },
   { key: "mid", label: "10–20 min", from: 600, to: 1200 },
@@ -81,10 +84,13 @@ export function analyzeAbility(m, pawn, ability, opts) {
     c.delay = first ? first[0] - c.t : null;
     c.victims = [...victims];
     if (first) {
+      // damage origin is often 0,0 for DoT ticks; fall back to the victim's position
       const vp = heroHit ? posAt(m, heroHit[1], heroHit[0]) : null;
-      c.hitX = first[3] ?? vp?.[0] ?? null;
-      c.hitY = first[4] ?? vp?.[1] ?? null;
+      const hasOrigin = first[3] || first[4];
+      c.hitX = hasOrigin ? first[3] : vp?.[0] ?? null;
+      c.hitY = hasOrigin ? first[4] : vp?.[1] ?? null;
       c.hitT = first[0];
+      if (c.hitX != null && (c.x || c.y)) c.dist = Math.hypot(c.hitX - c.x, c.hitY - c.y) * UNIT_M;
     }
   }
   const res = { source, casts };
@@ -135,6 +141,7 @@ export function aggregate(list, heroesOnly) {
   const phases = PHASES.map((ph) => ({ ...ph, thrown: 0, scored: 0 }));
   const victims = new Map(); // hero_id -> hits
   const delays = [];
+  const dists = [];
   for (const { match, casts } of list) {
     for (const c of casts) {
       const ph = phases.find((x) => c.t >= x.from && c.t < x.to);
@@ -142,11 +149,12 @@ export function aggregate(list, heroesOnly) {
       const ok = c.result === "hit" || (!heroesOnly && c.result === "other");
       if (ok) ph.scored++;
       if (c.delay != null && ok) delays.push(c.delay);
+      if (c.dist != null && ok) dists.push(c.dist);
       for (const v of c.victims) {
         const hid = match.byPawn.get(v)?.hero_id;
         victims.set(hid, (victims.get(hid) || 0) + 1);
       }
     }
   }
-  return { phases, victims: [...victims].sort((a, b) => b[1] - a[1]), delays };
+  return { phases, victims: [...victims].sort((a, b) => b[1] - a[1]), delays, dists };
 }
