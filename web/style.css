@@ -435,3 +435,13 @@ img.slot-spirit { background: #5a3a8c !important; }
 .map-tip { position: absolute; z-index: 5; pointer-events: none; background: rgba(10,11,13,.95); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 12px; max-width: 220px; }
 .tip-items { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 4px; }
 .tip-items img { width: 18px; height: 18px; border-radius: 3px; }
+.legend-row { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 8px; color: var(--muted); }
+.legend-row span { display: inline-flex; align-items: center; gap: 5px; }
+.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.ts-row { display: grid; grid-template-columns: 24px 150px minmax(0, 3fr) minmax(0, 1fr); gap: 8px; align-items: center; margin: 3px 0; font-size: 12px; }
+.ts-row.on { background: var(--panel-3); border-radius: 6px; }
+.ts-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ts-bar { display: flex; height: 12px; border-radius: 3px; overflow: hidden; background: var(--panel-3); }
+.ts-bar span { display: block; height: 100%; }
+.c-hero { background: #e5645a; } .c-npc { background: #e0b25a; } .c-neutral { background: #5fd38d; } .c-out { background: #3a3f48; }
+.m-zip { background: #4f8fe8; } .m-slide { background: #a98bff; } .m-dash { background: #e8a33d; } .m-air { background: #8b919c; } .m-abil { background: #5fd38d; }

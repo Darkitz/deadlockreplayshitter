@@ -74,6 +74,7 @@ export function digestMeta(raw) {
       .sort((a, b) => a.t - b.t),
     midBoss: (mi.mid_boss || []).map((b) => ({ t: b.destroyed_time_s, killed: TEAM(b.team_killed), claimed: TEAM(b.team_claimed) })),
     paths: mi.match_paths || null,
+    timeSplit: timeSplit(mi.match_paths),
     badges: [mi.average_badge_team0, mi.average_badge_team1],
   };
 }
@@ -144,7 +145,7 @@ export function renderReport(el, d, subjectAccount) {
   // subject detail
   // "Ability" and "Bullets" are Valve's roll-ups of the specific sources; showing both double counts
   const src = [...(d.bySource.get(subject.slot) || new Map())]
-    .filter(([n]) => n !== "Ability" && n !== "Bullets")
+    .filter(([n]) => n !== "Ability" && n !== "Bullet" && n !== "Bullets")
     .sort((a, b) => b[1] - a[1]).slice(0, 12);
   const srcMax = Math.max(1, ...src.map((s) => s[1]));
   const srcTotal = src.reduce((a, s) => a + s[1], 0) || 1;
@@ -168,6 +169,19 @@ export function renderReport(el, d, subjectAccount) {
       <div class="obj-list small">${d.objectives.map((o) => `<span class="team-${o.team === 2 ? 3 : 2}">${fmtClock(o.t)} ${esc(o.name)}</span>`).join("")}</div>
     </div>
     <div class="chart-card"><h3>Scoreboard</h3>${board}</div>
+    ${d.timeSplit ? `<div class="chart-card"><h3>How each player spent the match <span class="muted">· from Valve's 1 Hz paths</span></h3>
+      <div class="legend-row small">${COMBAT.map((c) => `<span><i class="sw ${c.cls}"></i>${c.label}</span>`).join("")}
+        <span class="muted">· right column: movement</span>${MOVES.map((c) => `<span><i class="sw ${c.cls}"></i>${c.label}</span>`).join("")}</div>
+      ${sorted.map((p) => {
+        const ts = d.timeSplit.get(p.slot);
+        if (!ts) return "";
+        const bar = (parts, total) => parts.map((c) => {
+          const v = ts[c.key] || 0;
+          return v ? `<span class="${c.cls}" style="width:${(v / total) * 100}%" title="${c.label}: ${fmtClock(v)} (${Math.round((v / total) * 100)}%)"></span>` : "";
+        }).join("");
+        return `<div class="ts-row ${p === subject ? "on" : ""}">${heroImg(p.hero_id, pname(p))}<span class="ts-name">${esc(pname(p))}</span>
+          <span class="ts-bar">${bar(COMBAT, ts.total)}</span><span class="ts-bar small-bar">${bar(MOVES, ts.total)}</span></div>`;
+      }).join("")}</div>` : ""}
     <div class="charts report-2">
       <div class="chart-card"><h3>Damage matrix <span class="muted">· row = dealer, column = target, whole match</span></h3>${matrix}</div>
       <div class="chart-card"><h3>${heroImg(subject.hero_id)} ${esc(pname(subject))}: hero damage by source</h3>
@@ -278,4 +292,37 @@ export function matchFromMeta(raw, matchId) {
     kills, samples: { t0: 0, dt, tracks }, stats: { t0: 0, dt: step, tracks: statTracks },
     warnings: [], fromMeta: true,
   };
+}
+
+const COMBAT = [
+  { key: "c1", label: "fighting heroes", cls: "c-hero" },
+  { key: "c2", label: "fighting troopers/objectives", cls: "c-npc" },
+  { key: "c3", label: "farming neutrals", cls: "c-neutral" },
+  { key: "c0", label: "out of combat", cls: "c-out" },
+];
+const MOVES = [
+  { key: "m6", label: "zipline", cls: "m-zip" },
+  { key: "m4", label: "slide", cls: "m-slide" },
+  { key: "m3", label: "dash", cls: "m-dash" },
+  { key: "m7", label: "airborne", cls: "m-air" },
+  { key: "m1", label: "ability move", cls: "m-abil" },
+];
+
+/** seconds per combat_type / move_type for every player slot (alive samples only) */
+function timeSplit(mp) {
+  if (!mp?.paths?.length) return null;
+  const dt = mp.interval_s || 1;
+  const out = new Map();
+  for (const p of mp.paths) {
+    const r = { total: 0 };
+    for (let i = 0; i < (p.health || []).length; i++) {
+      if (!p.health[i]) continue; // dead
+      r.total += dt;
+      const c = `c${p.combat_type?.[i] ?? 0}`, mv = `m${p.move_type?.[i] ?? 0}`;
+      r[c] = (r[c] || 0) + dt;
+      r[mv] = (r[mv] || 0) + dt;
+    }
+    out.set(p.player_slot, r);
+  }
+  return out;
 }
