@@ -4,10 +4,8 @@
 //   end,                         // match length (s)
 //   casts: [{t, result}],        // analyzed casts
 //   heroesOnly,
-//   hp: [[t, frac]],             // subject health fraction samples
 //   lead: [[t, souls]],          // subject team's net worth lead
 //   deaths: [t], kills: [t],     // subject deaths / kill participations
-//   items: [{t, img, name}],     // purchases
 // }
 
 const NS = "http://www.w3.org/2000/svg";
@@ -22,21 +20,19 @@ export function createTimeline(svg, model, onSeek, onSpan) {
   let geom = null;
   let t = model.end;
   let t0 = null; // span start (null = whole match up to t)
-  const full = [Math.min(0, ...(model.hp?.length ? [model.hp[0][0]] : [0])), Math.max(model.end, 60)];
+  const full = [0, Math.max(model.end, 60)];
   let view = [...full]; // visible [from, to] in game seconds
 
   function draw() {
     const W = Math.max(320, Math.round(svg.clientWidth || 800));
     const padL = 36, padR = 12;
-    const lanes = { chart: 120, marks: 22, hp: 34, lead: 34, items: 24, axis: 16 };
+    const lanes = { chart: 120, marks: 22, lead: 34, axis: 16 };
     let y = 8;
     const L = {};
     if (model.noChart) { lanes.chart = 0; }
     for (const [k, h] of Object.entries(lanes)) {
       if (k === "chart" && model.noChart) { L.chart = { y, h: 0 }; continue; }
-      if (k === "hp" && !model.hp?.length) continue;
       if (k === "lead" && !model.lead?.length) continue;
-      if (k === "items" && !model.items?.length) continue;
       L[k] = { y, h };
       y += h + 4;
     }
@@ -124,16 +120,6 @@ export function createTimeline(svg, model, onSeek, onSpan) {
       g += `<circle data-i="${i}" data-t="${k.t}" class="m-${k.result}" cx="${x(k.t)}" cy="${my}" r="4.5"><title>${fmtClock(k.t)} ${k.result}${k.dmg ? ` · ${k.dmg} dmg` : ""}</title></circle>`;
     });
 
-    // lane: health
-    if (L.hp) {
-      const { y: hy, h: hh } = L.hp;
-      let d = `M${x(model.hp[0][0])},${hy + hh}`;
-      for (const [tt, f] of model.hp) d += ` L${x(tt)},${hy + hh - f * hh}`;
-      d += ` L${x(model.hp.at(-1)[0])},${hy + hh} Z`;
-      g += `<path class="area-hp" d="${d}"/>`;
-      g += `<text class="lane-label" x="${padL + 4}" y="${hy + 10}">health</text>`;
-    }
-
     // lane: team soul lead
     if (L.lead) {
       const { y: ly, h: lh } = L.lead;
@@ -149,21 +135,6 @@ export function createTimeline(svg, model, onSeek, onSpan) {
       g += `<path class="area-lead-dn" clip-path="url(#lead-dn)" d="${d}"/>`;
       g += `<line class="lane-base" x1="${padL}" x2="${W - padR}" y1="${mid}" y2="${mid}"/>`;
       g += `<text class="lane-label" x="${padL + 4}" y="${ly + 10}">team souls lead (±${Math.round(max / 1000)}k)</text>`;
-    }
-
-    // lane: item purchases (staggered so icons don't overlap)
-    if (L.items) {
-      const { y: iy, h: ih } = L.items;
-      let lastX = -99, row = 0;
-      for (const it of model.items) {
-        const ix = x(it.t);
-        row = ix - lastX < 18 ? (row + 1) % 2 : 0;
-        lastX = ix;
-        const sz = 18, yy = iy + (row ? 6 : 0);
-        g += it.img
-          ? `<image data-t="${it.t}" href="${esc(it.img)}" x="${ix - sz / 2}" y="${yy}" width="${sz}" height="${sz}"><title>${fmtClock(it.t)} ${esc(it.name)}</title></image>`
-          : `<rect data-t="${it.t}" class="m-item" x="${ix - 3}" y="${yy + 6}" width="6" height="6"><title>${fmtClock(it.t)} ${esc(it.name)}</title></rect>`;
-      }
     }
 
     g += `</g>${outside}`;

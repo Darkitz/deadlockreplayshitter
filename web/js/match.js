@@ -320,14 +320,6 @@ export async function viewMatch(id, params) {
     <p class="small muted">AoE and lock-on abilities count too, so treat this as a rough dodge signal, not exact.</p>`;
 
   // timeline model
-  const hpTrack = m.tracks.get(pawn);
-  const hp = [];
-  if (hpTrack) {
-    for (let i = 0; i < hpTrack.hp.length; i += 4) {
-      const mx = hpTrack.max_hp[i];
-      hp.push([m.samples.t0 + i * m.samples.dt, mx ? hpTrack.hp[i] / mx : 0]);
-    }
-  }
   const lead = [];
   const nRows = Math.max(0, ...m.stats.tracks.map((t) => t.rows.length));
   for (let i = 0; i < nRows; i++) {
@@ -341,15 +333,9 @@ export async function viewMatch(id, params) {
   }
   const deaths = m.kills.filter((k) => k[1] === pawn).map((k) => k[0]);
   const kills = m.kills.filter((k) => k[2] === pawn || (k[4] || []).includes(pawn)).map((k) => k[0]);
-  const items = m.items
-    .filter((it) => it[1] === pawn && it[3] === 1 && it[0] > 0)
-    .map((it) => {
-      const a = S.assets.item(it[2]);
-      return a && a.type === "upgrade" ? { t: it[0], img: a.image, name: a.name } : null;
-    }).filter(Boolean);
 
   const timeline = createTimeline($(".timeline", app), {
-    end: m.end, casts, heroesOnly: settings.heroesOnly, hp, lead, deaths, kills, items,
+    end: m.end, casts, heroesOnly: settings.heroesOnly, lead, deaths, kills,
     gun: gunMode ? gun : null, noChart: !!m.fromMeta,
   }, (t) => seek(t), (a, b) => setSpan(a, b));
   const minimap = createMinimap($(".minimap", app), {
