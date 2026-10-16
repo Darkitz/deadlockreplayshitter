@@ -4,16 +4,20 @@
 //   #/match/<id>?pawn=&ability=   match detail (minimap + timeline)
 
 import { loadJSON, Assets } from "./data.js";
-import { $, esc, S, fmtDate, fmtDay, TZ } from "./ui.js";
+import { $, esc, S, fmtDate, fmtDay, TZ, settings, saveSettings } from "./ui.js";
 import { viewOverview } from "./overview.js";
 import { viewMatch } from "./match.js";
 
 async function loadAll() {
+  S.accounts = await loadJSON("data/accounts.json").catch(() => []);
+  const fromUrl = Number(new URLSearchParams(location.search).get("account"));
+  const ids = S.accounts.map((a) => a.account_id);
+  const acc = [fromUrl, settings.account].find((a) => a && ids.includes(a)) ?? ids[0];
   const [index, assets, profiles, career] = await Promise.all([
-    loadJSON("data/index.json"),
+    acc ? loadJSON(`data/index-${acc}.json`) : loadJSON("data/index.json"),
     loadJSON("data/assets.json"),
     loadJSON("data/profiles.json").catch(() => ({})),
-    loadJSON("data/career.json").catch(() => []),
+    loadJSON(acc ? `data/career-${acc}.json` : "data/career.json").catch(() => []),
   ]);
   S.career = career;
   S.index = index;
@@ -30,6 +34,17 @@ function renderHeader() {
   $("#player-name").textContent = prof.name || `account ${acc}`;
   $("#steam-link").href = prof.url || `https://steamcommunity.com/profiles/${BigInt(acc) + 76561197960265728n}/`;
   $("#steam-link").textContent = "steam profile ↗";
+  const sw = $("#account-switch");
+  sw.hidden = (S.accounts || []).length < 2;
+  sw.innerHTML = (S.accounts || []).map((a) =>
+    `<option value="${a.account_id}" ${a.account_id === acc ? "selected" : ""}>${esc(a.name)} · ${a.parsed} demos</option>`).join("");
+  sw.onchange = async () => {
+    settings.account = Number(sw.value);
+    saveSettings();
+    await loadAll();
+    location.hash = "#/";
+    route();
+  };
   const parsed = S.index.matches.filter((m) => m.parsed).length;
   const lastRanked = S.index.matches.filter((m) => m.badge).sort((a, b) => b.start_time - a.start_time)[0];
   const rank = lastRanked && S.assets.ranks[lastRanked.badge];

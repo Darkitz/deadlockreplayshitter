@@ -35,6 +35,8 @@ MATCHES = DATA / "matches"
 ASSET_DIR = WEB / "assets"
 DEMOS = ROOT / "data" / "demos"
 MANIFEST = ROOT / "data" / "parsed.json"
+CONFIG = ROOT / "data" / "config.json"
+DEFAULT_ACCOUNT = 76800555
 FETCH_CACHE = ROOT / "data" / "fetch_cache.json"
 NO_SALT_RECHECK = 6 * 3600  # someone may submit the salt later
 PARSER = ROOT / "parser" / "target" / "release" / "dlparse"
@@ -308,7 +310,8 @@ CAREER_CUSTOM = {
 
 
 def sync_career(account):
-    """end-of-match stats for every match deadlock-api has metadata for (no demo needed)."""
+    """end-of-match stats for every match deadlock-api has metadata for (no demo needed).
+    written to web/data/career-<account>.json"""
     url = (f"{API}/v1/matches/metadata?account_ids={account}&only_filtered_players=true"
            "&include_info=true&include_player_info=true&include_player_final_stats=true&limit=5000")
     try:
@@ -342,7 +345,7 @@ def sync_career(account):
         rec["bullet_dist"] = {k.split("##")[1]: v for k, v in cs.items()
                               if k.startswith("Outgoing Bullet Dist##")}
         out.append(rec)
-    (DATA / "career.json").write_text(json.dumps(out))
+    (DATA / f"career-{account}.json").write_text(json.dumps(out))
     log(f"career: {len(out)} matches with end-of-match stats")
 
 
@@ -362,33 +365,49 @@ def resolve_heroes(heroes, wanted):
     return ids
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--account", default="76561198037066283", help="steamid64 or account id")
-    ap.add_argument("--hero", action="append", default=None,
-                    help="hero name/class/id to download demos for (repeatable, or 'all')")
-    ap.add_argument("--steam-salts", action="store_true",
-                    help="let deadlock-api ask Steam for missing salts (10 req / 30 min)")
-    ap.add_argument("--reparse", action="store_true")
-    ap.add_argument("--no-download", action="store_true")
-    ap.add_argument("--no-refetch", action="store_true", help="use deadlock-api's cached history")
-    ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2))
-    args = ap.parse_args()
-    args.hero = args.hero or ["drifter"]
+def load_config():
+    try:
+        cfg = json.loads(CONFIG.read_text())
+    except (OSError, ValueError):
+        cfg = {}
+    cfg.setdefault("accounts", [DEFAULT_ACCOUNT])
+    cfg.setdefault("heroes", ["drifter"])
+    return cfg
 
-    if not PARSER.exists():
-        sys.exit(f"parser missing: run tools/get-protoc.sh && cargo build --release in {ROOT / 'parser'}")
-    pver = parser_version()
-    account = to_account_id(args.account)
-    heroes = get_json(f"{API}/v1/assets/heroes")
-    items = get_json(f"{API}/v1/assets/items")
-    ignore_ids = [it["id"] for it in items if it.get("class_name") in NOISY_CLASSES]
-    if len(ignore_ids) != len(NOISY_CLASSES):
-        log(f"note: only {len(ignore_ids)}/{len(NOISY_CLASSES)} movement abilities found in assets")
-    selected = resolve_heroes(heroes, args.hero)
+
+def save_config(cfg):
+    CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG.write_text(json.dumps(cfg, indent=1))
+
+
+class Ctx:
+    """per-run shared state: assets, demos on disk, parse manifest, failed-download cache"""
+
+    def __init__(self, args):
+        self.args = args
+        self.pver = parser_version()
+        self.heroes = get_json(f"{API}/v1/assets/heroes")
+        self.items = get_json(f"{API}/v1/assets/items")
+        self.ignore_ids = [it["id"] for it in self.items if it.get("class_name") in NOISY_CLASSES]
+        if len(self.ignore_ids) != len(NOISY_CLASSES):
+            log(f"note: only {len(self.ignore_ids)}/{len(NOISY_CLASSES)} movement abilities found in assets")
+        self.selected = resolve_heroes(self.heroes, args.hero)
+        self.demos = local_demos()
+        self.manifest = load_manifest()
+        try:
+            self.fetch_cache = json.loads(FETCH_CACHE.read_text())
+        except (OSError, ValueError):
+            self.fetch_cache = {}
+        self.used_heroes, self.used_items, self.accounts = set(), set(), set()
+        self.badges = []
+
+
+def sync_account(ctx, account):
+    args = ctx.args
+    selected = ctx.selected
     names = "all heroes" if selected is None else ", ".join(
-        h["name"] for h in heroes if h["id"] in selected)
-    log(f"account {account}, downloading demos for {names}, parser v{pver}")
+        h["name"] for h in ctx.heroes if h["id"] in selected)
+    log(f"== account {account}: demos for {names}, parser v{ctx.pver}")
 
     hist_url = f"{API}/v1/players/{account}/match-history"
     try:  # refetch pulls matches newer than deadlock-api's cache (rate limited)
@@ -398,27 +417,21 @@ def main():
         history = get_json(hist_url)
     log(f"{len(history)} matches in history")
 
-    demos = local_demos()
-    manifest = load_manifest()
-    status = {}
+    demos, manifest, status = ctx.demos, ctx.manifest, {}
 
     # downloads (selected heroes only; sequential to be kind to Valve)
-    try:
-        fetch_cache = json.loads(FETCH_CACHE.read_text())
-    except (OSError, ValueError):
-        fetch_cache = {}
     now = time.time()
     for m in history:
         mid = m["match_id"]
         if mid in demos:
             status[mid] = "local demo"
             continue
-        if selected is not None and m["hero_id"] not in selected:
+        if selected is not None and m.get("hero_id") not in selected:
             continue
         if args.no_download:
             status[mid] = "not downloaded (--no-download)"
             continue
-        cached = fetch_cache.get(str(mid))
+        cached = ctx.fetch_cache.get(str(mid))
         if cached and (cached["dead"] or now - cached["at"] < NO_SALT_RECHECK) and not args.steam_salts:
             status[mid] = cached["why"]
             continue
@@ -426,19 +439,19 @@ def main():
         status[mid] = why
         if dem:
             demos[mid] = dem
-            fetch_cache.pop(str(mid), None)
+            ctx.fetch_cache.pop(str(mid), None)
         else:
-            fetch_cache[str(mid)] = {"why": why, "at": now, "dead": "valve http" in why}
+            ctx.fetch_cache[str(mid)] = {"why": why, "at": now, "dead": "valve http" in why}
     FETCH_CACHE.parent.mkdir(parents=True, exist_ok=True)
-    FETCH_CACHE.write_text(json.dumps(fetch_cache))
+    FETCH_CACHE.write_text(json.dumps(ctx.fetch_cache))
 
-    # parse (parallel)
+    # parse (parallel); the manifest is shared, so a demo is parsed once for all accounts
     jobs = []
     for m in history:
         mid = m["match_id"]
         if mid not in demos:
             continue
-        have = (MATCHES / f"{mid}.json.gz").exists() and manifest_version(manifest.get(str(mid))) == pver
+        have = (MATCHES / f"{mid}.json.gz").exists() and manifest_version(manifest.get(str(mid))) == ctx.pver
         if have and not args.reparse:
             status[mid] += "; parsed"
             continue
@@ -446,36 +459,36 @@ def main():
     if jobs:
         log(f"parsing {len(jobs)} demos with {args.jobs} workers")
         with ThreadPoolExecutor(args.jobs) as ex:
-            futs = {ex.submit(parse, mid, demos[mid], ignore_ids): mid for mid in jobs}
+            futs = {ex.submit(parse, mid, demos[mid], ctx.ignore_ids): mid for mid in jobs}
             for f in as_completed(futs):
                 mid = futs[f]
                 ok, msg, warnings = f.result()
                 log(f"  {mid}: {msg}" + "".join(f"\n    warning: {w}" for w in warnings))
                 if ok:
-                    manifest[str(mid)] = {"v": pver, "warnings": warnings}
+                    manifest[str(mid)] = {"v": ctx.pver, "warnings": warnings}
                     status[mid] += "; parsed"
                 else:
-                    manifest[str(mid)] = {"v": pver, "error": msg}
+                    manifest[str(mid)] = {"v": ctx.pver, "error": msg}
                     status[mid] += f"; {msg}"
         MANIFEST.parent.mkdir(parents=True, exist_ok=True)
         MANIFEST.write_text(json.dumps(manifest))
 
     # gather what the parsed matches reference
-    used_heroes, used_items, accounts = set(), set(), {account}
+    hero_parsed = {}
+    ctx.accounts.add(account)
     for m in history:
         if not (MATCHES / f"{m['match_id']}.json.gz").exists():
             continue
         pj = read_match(m["match_id"])
         for p in pj["players"]:
-            used_heroes.add(p["hero_id"])
-            accounts.add(p["account_id"])
-        used_items.update(i[2] for i in pj.get("items", []))
+            ctx.used_heroes.add(p["hero_id"])
+            ctx.accounts.add(p["account_id"])
+        ctx.used_items.update(i[2] for i in pj.get("items", []))
+        hero_parsed[m.get("hero_id")] = hero_parsed.get(m.get("hero_id"), 0) + 1
     if selected:
-        used_heroes |= selected
+        ctx.used_heroes |= selected
+    ctx.badges += [m.get("ranked_display_badge") for m in history]
 
-    DATA.mkdir(parents=True, exist_ok=True)
-    sync_assets(heroes, items, used_heroes, used_items, [m.get("ranked_display_badge") for m in history])
-    profiles = sync_profiles(accounts)
     sync_career(account)
 
     entries = []
@@ -502,16 +515,14 @@ def main():
             "parsed": (MATCHES / f"{mid}.json.gz").exists(),
             "status": status.get(mid, "not tried (hero not selected)"),
         })
-    if selected and len(selected) == 1:
+    if selected and len(selected) == 1 and hero_parsed.get(next(iter(selected))):
         default_hero = next(iter(selected))
     else:
-        default_hero = max(used_heroes or {0}, key=lambda h: sum(
-            e["parsed"] and e["hero_id"] == h for e in entries))
-    (DATA / "index.json").write_text(json.dumps({
+        default_hero = max(hero_parsed or {0: 0}, key=lambda h: hero_parsed.get(h, 0))
+    return {
         "account_id": account,
-        "profile": profiles.get(account),
         "generated": int(time.time()),
-        "parser_version": pver,
+        "parser_version": ctx.pver,
         "health": {
             "parsed": sum(1 for e in entries if e["parsed"]),
             "failed": [e["match_id"] for e in entries if e["parse_error"]],
@@ -519,9 +530,73 @@ def main():
         },
         "default_hero": default_hero,
         "matches": entries,
-    }))
-    ok = sum(e["parsed"] for e in entries)
-    log(f"done: {ok} parsed matches ({len(entries)} in history) -> {DATA / 'index.json'}")
+    }
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--account", action="append", default=None,
+                    help="steamid64 or account id for this run (repeatable); default: data/config.json")
+    ap.add_argument("--add-account", action="append", default=[], help="remember an account in data/config.json")
+    ap.add_argument("--remove-account", action="append", default=[], help="forget an account")
+    ap.add_argument("--hero", action="append", default=None,
+                    help="hero name/class/id to download demos for (repeatable, or 'all')")
+    ap.add_argument("--steam-salts", action="store_true",
+                    help="let deadlock-api ask Steam for missing salts (10 req / 30 min)")
+    ap.add_argument("--reparse", action="store_true")
+    ap.add_argument("--no-download", action="store_true")
+    ap.add_argument("--no-refetch", action="store_true", help="use deadlock-api's cached history")
+    ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2))
+    args = ap.parse_args()
+
+    cfg = load_config()
+    for a in args.add_account:
+        if to_account_id(a) not in cfg["accounts"]:
+            cfg["accounts"].append(to_account_id(a))
+    for a in args.remove_account:
+        cfg["accounts"] = [x for x in cfg["accounts"] if x != to_account_id(a)]
+    if args.hero:
+        cfg["heroes"] = args.hero
+    if args.add_account or args.remove_account or args.hero:
+        save_config(cfg)
+    args.hero = cfg["heroes"]
+    accounts = [to_account_id(a) for a in args.account] if args.account else cfg["accounts"]
+
+    if not PARSER.exists():
+        sys.exit(f"parser missing: run tools/get-protoc.sh && cargo build --release in {ROOT / 'parser'}")
+    DATA.mkdir(parents=True, exist_ok=True)
+    ctx = Ctx(args)
+
+    indexes = []
+    for acc in accounts:
+        idx = sync_account(ctx, acc)
+        args.reparse = False  # later accounts reuse what the first run reparsed
+        indexes.append(idx)
+
+    sync_assets(ctx.heroes, ctx.items, ctx.used_heroes, ctx.used_items, ctx.badges)
+    profiles = sync_profiles(ctx.accounts)
+    for idx in indexes:
+        idx["profile"] = profiles.get(idx["account_id"])
+        (DATA / f"index-{idx['account_id']}.json").write_text(json.dumps(idx))
+
+    # the account list the site's switcher shows (everything synced so far, newest run first)
+    try:
+        known = json.loads((DATA / "accounts.json").read_text())
+    except (OSError, ValueError):
+        known = []
+    listed = {a["account_id"]: a for a in known}
+    for idx in indexes:
+        listed[idx["account_id"]] = {
+            "account_id": idx["account_id"],
+            "name": (idx["profile"] or {}).get("name") or str(idx["account_id"]),
+            "avatar": (idx["profile"] or {}).get("avatar"),
+            "parsed": idx["health"]["parsed"],
+            "matches": len(idx["matches"]),
+        }
+    order = [a for a in cfg["accounts"] if a in listed] + [a for a in listed if a not in cfg["accounts"]]
+    (DATA / "accounts.json").write_text(json.dumps([listed[a] for a in order]))
+    for idx in indexes:
+        log(f"done {idx['account_id']}: {idx['health']['parsed']} parsed matches ({len(idx['matches'])} in history)")
 
 
 if __name__ == "__main__":

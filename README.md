@@ -19,11 +19,23 @@ python3 tools/serve.py                    # http://127.0.0.1:8765 (sync button +
 `serve.py` watches the game's replays folder. When you click **Download Replay** in Deadlock, the
 match is parsed and shows up on the site without any further steps.
 
+### Several players
+
+```bash
+python3 tools/sync.py --add-account 76561198000000000   # remember another player (steamid64 or account id)
+python3 tools/sync.py                                   # syncs every remembered account
+python3 tools/sync.py --account 60372773                # one-off run for one account
+```
+
+Parsed demos are shared, so a match is parsed once even when several tracked players were in it.
+The header gets a player switcher, and `?account=<id>` in the URL selects a player directly.
+
 ### sync.py options
 
 | flag | |
 | --- | --- |
-| `--account <steamid64 or account id>` | player to track (default 76561198037066283) |
+| `--account <id>` (repeatable) | accounts for this run (default: remembered accounts, initially 76800555) |
+| `--add-account <id>` / `--remove-account <id>` | edit the remembered accounts in `data/config.json` |
 | `--hero drifter` (repeatable, or `all`) | heroes to try demo downloads for |
 | `--no-download` | only use local demos |
 | `--no-refetch` | use deadlock-api's cached match history (faster) |
