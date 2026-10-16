@@ -290,3 +290,10 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
 .timeline .l-hs { fill: none; stroke: var(--accent); stroke-width: 2; }
 .m-hs { fill: var(--accent); }
 #gun { display: flex; flex-direction: column; gap: 10px; }
+.tracker h3 { font-size: 14px; color: var(--text); margin-bottom: 8px; }
+.tracker-table tr[data-pawn] { cursor: pointer; }
+.tracker-table tr[data-pawn]:hover td { background: var(--panel-2); }
+.tracker-table tr.on td { background: var(--panel-3); }
+.tracker-table td.best { color: var(--accent); font-weight: 600; }
+.tracker-table tr.team-row-2 td:first-child { box-shadow: inset 3px 0 var(--amber); }
+.tracker-table tr.team-row-3 td:first-child { box-shadow: inset 3px 0 var(--sapphire); }

@@ -137,6 +137,7 @@ export async function viewMatch(id, params) {
         <p class="keys small muted">space play · ←/→ 5 s · shift ±30 s · , . previous/next cast · home/end · wheel on timeline zooms</p>
       </div>
     </section>
+    <section class="chart-card tracker" id="tracker"></section>
     <section class="chart-card incoming" id="incoming"></section>`;
 
   // wiring
@@ -147,6 +148,55 @@ export async function viewMatch(id, params) {
     b.addEventListener("click", () => setParams({ ability: b.dataset.ability }));
   }
   wireControls(app, () => viewMatch(id, params));
+
+  // accuracy tracker: every player's skill + gun accuracy up to the scrub time
+  const tracked = m.players.map((p) => {
+    const skill = [];
+    for (const ab of S.assets.signatures(p.hero_id)) {
+      const cs = analyzeAbility(m, p.pawn, ab, opts()).casts;
+      if (!cs.some((c) => c.result !== "miss")) continue; // never connects: buff / passive
+      skill.push(...cs);
+    }
+    skill.sort((a, b) => a.t - b.t);
+    return { p, skill, gun: gunStats(m, p.pawn, S.assets) };
+  });
+  function renderTracker(t) {
+    const rows = tracked.map(({ p, skill, gun: g }) => {
+      let thrown = 0, hit = 0;
+      for (const c of skill) {
+        if (c.t > t) break;
+        thrown++;
+        if (c.result === "hit" || (!settings.heroesOnly && c.result === "other")) hit++;
+      }
+      const ga = gunAt(g, t);
+      return { p, thrown, hit, sAcc: thrown ? hit / thrown : null, ...ga, gAcc: ga.shots ? ga.hits / ga.shots : null };
+    });
+    const best = (k) => Math.max(...rows.filter((r) => (k === "sAcc" ? r.thrown >= 5 : r.shots >= 20)).map((r) => r[k] ?? 0));
+    const bS = best("sAcc"), bG = best("gAcc");
+    const cell = (v, n, d, isBest) => v == null ? `<td class="muted">–</td>`
+      : `<td class="${isBest ? "best" : ""}"><span class="acc-bar"><span style="width:${v * 100}%"></span></span>${pct(v)} <small class="muted">${n}/${d}</small></td>`;
+    const teams = [...new Set(rows.map((r) => r.p.team))].sort();
+    $("#tracker", app).innerHTML = `
+      <h3>Accuracy tracker · at ${fmtClock(t)} <span class="muted">· signature skills that connect + gun, every player</span></h3>
+      <table class="report-table tracker-table">
+        <tr><th></th><th>player</th><th>skills thrown</th><th>skill hit %</th><th>shots</th><th>gun hit %</th><th>headshots</th><th>HS %</th></tr>
+        ${teams.map((tm) => rows.filter((r) => r.p.team === tm).map((r) => `
+          <tr class="team-row-${tm} ${r.p.pawn === pawn ? "on" : ""}" data-pawn="${r.p.pawn}">
+            <td><img src="${esc(S.assets.hero(r.p.hero_id).icon)}" alt=""></td>
+            <td>${esc(S.profiles[r.p.account_id]?.name || r.p.name)}</td>
+            <td>${r.thrown}</td>
+            ${cell(r.sAcc, r.hit, r.thrown, r.thrown >= 5 && r.sAcc === bS)}
+            <td>${r.shots}</td>
+            ${cell(r.gAcc, r.hits, r.shots, r.shots >= 20 && r.gAcc === bG)}
+            <td>${r.hs}</td>
+            <td>${r.hits ? pct(r.hs / r.hits) : "–"}</td>
+          </tr>`).join("")).join("")}
+      </table>`;
+  }
+  $("#tracker", app).addEventListener("click", (ev) => {
+    const tr = ev.target.closest("tr[data-pawn]");
+    if (tr) setParams({ pawn: tr.dataset.pawn });
+  });
 
   // incoming skillshots (defense)
   const inc = incoming(m, pawn, S.assets, opts());
@@ -249,6 +299,7 @@ export async function viewMatch(id, params) {
     timeline.setTime(t);
     minimap.update({ t, subject: pawn, casts, showAll: settings.showAll });
     renderReadout(t);
+    renderTracker(t);
   }
 
   function renderGunReadout(t) {

@@ -313,6 +313,43 @@ CAREER_CUSTOM = {
 }
 
 
+META_DIR = DATA / "meta"
+META_MISSING = ROOT / "data" / "meta_missing.json"
+
+
+def sync_metadata(match_ids):
+    """Valve's full match metadata (objectives, per-player stat timelines, items, deaths,
+    damage matrix, 1 Hz position paths, ...) as web/data/meta/<id>.json.gz. Only deadlock-api's
+    cache is asked (no Steam fallback); misses are retried after a day."""
+    META_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        missing = json.loads(META_MISSING.read_text())
+    except (OSError, ValueError):
+        missing = {}
+    now = time.time()
+    got = 0
+    for mid in match_ids:
+        dest = META_DIR / f"{mid}.json.gz"
+        if dest.exists() or now - missing.get(str(mid), 0) < 86400:
+            continue
+        try:
+            req = urllib.request.Request(f"{API}/v1/matches/{mid}/metadata?disable_steam=true", headers=UA)
+            with urllib.request.urlopen(req, timeout=120) as r:
+                raw = r.read()
+        except (urllib.error.URLError, OSError) as e:
+            missing[str(mid)] = now
+            log(f"  metadata {mid}: {getattr(e, 'code', e)}")
+            continue
+        with gzip.open(dest.with_name(dest.name + ".part"), "wb", 6) as f:
+            f.write(raw)
+        dest.with_name(dest.name + ".part").replace(dest)
+        missing.pop(str(mid), None)
+        got += 1
+        time.sleep(0.15)  # 100 req / 10 s from S3
+    META_MISSING.write_text(json.dumps(missing))
+    log(f"metadata: {got} new, {len(list(META_DIR.glob('*.json.gz')))} total")
+
+
 VALVE_STATS = DATA / "valve-stats.json"
 VALVE_FIELDS = ["shots_hit", "shots_missed", "hero_bullets_hit", "hero_bullets_hit_crit",
                 "player_damage", "player_damage_taken", "player_healing", "net_worth", "kills",
@@ -442,6 +479,7 @@ class Ctx:
             self.fetch_cache = {}
         self.used_heroes, self.used_items, self.accounts = set(), set(), set()
         self.badges = []
+        self.meta_ids = set()
 
 
 def sync_account(ctx, account):
@@ -530,6 +568,9 @@ def sync_account(ctx, account):
     if selected:
         ctx.used_heroes |= selected
     ctx.badges += [m.get("ranked_display_badge") for m in history]
+    ctx.meta_ids |= {m["match_id"] for m in history
+                     if (MATCHES / f"{m['match_id']}.json.gz").exists()
+                     or selected is None or m.get("hero_id") in selected}
 
     sync_career(account)
 
@@ -588,6 +629,7 @@ def main():
     ap.add_argument("--reparse", action="store_true")
     ap.add_argument("--no-download", action="store_true")
     ap.add_argument("--no-refetch", action="store_true", help="use deadlock-api's cached history")
+    ap.add_argument("--no-meta", action="store_true", help="skip Valve match metadata downloads")
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2))
     args = ap.parse_args()
 
@@ -632,6 +674,8 @@ def main():
 
     sync_assets(ctx.heroes, ctx.items, ctx.used_heroes, ctx.used_items, ctx.badges)
     sync_valve_stats(sorted({int(p.name.split(".")[0]) for p in MATCHES.glob("*.json.gz")}))
+    if not args.no_meta:
+        sync_metadata(sorted(ctx.meta_ids, reverse=True))
     profiles = sync_profiles(ctx.accounts)
     for idx in indexes:
         idx["profile"] = profiles.get(idx["account_id"])
