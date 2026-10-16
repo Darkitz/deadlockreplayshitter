@@ -1,0 +1,44 @@
+[package]
+name = "valveprotos"
+version = "0.0.0"
+edition = "2024"
+# Lets dependent build scripts locate the generated file descriptor set via
+# DEP_VALVEPROTOS_DESCRIPTORS (only emitted when the `reflect` feature is on).
+links = "valveprotos"
+
+[lib]
+path = "lib.rs"
+
+# Only referenced by the generated code include!d from OUT_DIR.
+[package.metadata.cargo-machete]
+ignored = ["prost"]
+
+[dependencies]
+prost = "0.14.4"
+prost-reflect = { version = "0.16", features = ["derive"], optional = true }
+serde = { version = "1.0.229", optional = true, features = ["derive"] }
+ureq = { version = "3.4", features = ["json"], optional = true }
+
+[build-dependencies]
+heck = "0.5"
+prost-build = "0.14.4"
+prost-types = "0.14.4"
+prost-reflect-build = { version = "0.16", optional = true }
+
+[features]
+gc-common = []
+gc-client = ["gc-common"]
+game-msgs = ["gc-common"]
+user-msgs = ["gc-common"]
+serde = ["dep:serde"]
+reflect = ["dep:prost-reflect", "dep:prost-reflect-build"]
+requests = ["dep:ureq"]
+
+[[bin]]
+name = "fetch-protos"
+path = "scripts/fetch-protos.rs"
+required-features = ["requests"]
+
+[[bin]]
+name = "graph-imports"
+path = "scripts/graph-imports.rs"

@@ -1,0 +1,84 @@
+use core::future::Future;
+use dungers::varint::{CONTINUE_BIT, PAYLOAD_BITS, VarintError, max_varint_size};
+use tokio::io::{AsyncRead, AsyncReadExt};
+use valveprotos::common::{CDemoClassInfo, CDemoFullPacket, CDemoSendTables};
+
+use crate::demostream::{
+    self, CmdFormat, CmdHeader, DecodeCmdError, ReadCmdError, ReadCmdHeaderError, decode_demo_cmd,
+};
+
+async fn read_uvarint_async<R>(rdr: &mut R) -> Result<(u32, usize), VarintError>
+where
+    R: AsyncRead + Unpin,
+{
+    let mut buf = [0u8; 1];
+
+    rdr.read_exact(&mut buf).await?;
+    let byte = buf[0];
+    if (byte & CONTINUE_BIT) == 0 {
+        return Ok((u32::from(byte), 1));
+    }
+
+    let mut value = u32::from(byte & PAYLOAD_BITS);
+    for count in 1..max_varint_size::<u32>() {
+        rdr.read_exact(&mut buf).await?;
+        let byte = buf[0];
+        value |= u32::from(byte & PAYLOAD_BITS) << (count * 7);
+        if (byte & CONTINUE_BIT) == 0 {
+            return Ok((value, count + 1));
+        }
+    }
+
+    Err(VarintError::MalformedVarint)
+}
+
+pub trait AsyncDemoStream {
+    /// encoding of command bodies; drives the default `decode_cmd_*` implementations.
+    const CMD_FORMAT: CmdFormat = CmdFormat::Demo;
+
+    fn read_cmd_header(
+        &mut self,
+    ) -> impl Future<Output = Result<CmdHeader, ReadCmdHeaderError>> + Send;
+
+    fn read_cmd(
+        &mut self,
+        cmd_header: &CmdHeader,
+    ) -> impl Future<Output = Result<&[u8], ReadCmdError>> + Send;
+
+    fn decode_cmd_send_tables(data: &[u8]) -> Result<CDemoSendTables, DecodeCmdError> {
+        demostream::decode_cmd_send_tables(Self::CMD_FORMAT, data)
+    }
+
+    fn decode_cmd_class_info(data: &[u8]) -> Result<CDemoClassInfo, DecodeCmdError> {
+        demostream::decode_cmd_class_info(data)
+    }
+
+    /// the packet data of a `DemPacket` / `DemSignonPacket` command body, without copying it.
+    fn cmd_packet_data(data: &[u8]) -> Result<&[u8], DecodeCmdError> {
+        demostream::cmd_packet_data(Self::CMD_FORMAT, data)
+    }
+
+    fn decode_cmd_full_packet(data: &[u8]) -> Result<CDemoFullPacket, DecodeCmdError> {
+        demostream::decode_cmd_full_packet(Self::CMD_FORMAT, data)
+    }
+
+    fn start_position(&self) -> u64;
+}
+
+pub(crate) async fn read_cmd_header_async<R>(rdr: &mut R) -> Result<CmdHeader, ReadCmdHeaderError>
+where
+    R: AsyncRead + Unpin,
+{
+    let (cmd_raw, cmd_n) = read_uvarint_async(rdr).await?;
+    let (cmd, body_compressed) = decode_demo_cmd(cmd_raw)?;
+    let (tick, tick_n) = read_uvarint_async(rdr).await?;
+    let (body_size, body_size_n) = read_uvarint_async(rdr).await?;
+
+    Ok(CmdHeader {
+        cmd,
+        body_compressed,
+        tick: tick as i32,
+        body_size,
+        size: (cmd_n + tick_n + body_size_n) as u8,
+    })
+}

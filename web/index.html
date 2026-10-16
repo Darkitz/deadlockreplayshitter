@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill Hitter</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="avatar-wrap">
+      <img id="avatar" class="avatar" alt="">
+      <img id="hero-icon" class="hero-badge" alt="">
+    </div>
+    <div>
+      <h1><a id="player-name" target="_blank" rel="noopener">Skill Hitter</a></h1>
+      <p id="subtitle" class="muted">loading…</p>
+    </div>
+  </div>
+  <div class="controls">
+    <label>Ability
+      <select id="ability"></select>
+    </label>
+    <label>Hit window
+      <select id="window">
+        <option value="1">1 s</option>
+        <option value="3" selected>3 s</option>
+        <option value="6">6 s</option>
+        <option value="10">10 s</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" id="heroes-only" checked> heroes only</label>
+  </div>
+</header>
+
+<section id="summary" class="summary"></section>
+
+<main id="matches"></main>
+
+<template id="match-tpl">
+  <article class="match">
+    <div class="match-head">
+      <div class="match-title">
+        <span class="result"></span>
+        <a class="mid" target="_blank" rel="noopener"></a>
+        <span class="muted when"></span>
+      </div>
+      <div class="match-stats"></div>
+    </div>
+    <div class="match-body">
+      <svg class="chart"></svg>
+      <div class="scrub-row">
+        <button class="play" title="play / pause">▶</button>
+        <input type="range" class="scrub" min="0" step="0.5" value="0">
+        <span class="clock">0:00</span>
+      </div>
+      <div class="readout">
+        <div class="tiles"></div>
+        <ol class="feed"></ol>
+      </div>
+    </div>
+    <p class="missing muted"></p>
+  </article>
+</template>
+
+<footer class="muted">
+  data: local demos parsed with haste · match history + assets from deadlock-api.com
+</footer>
+<script src="app.js"></script>
+</body>
+</html>

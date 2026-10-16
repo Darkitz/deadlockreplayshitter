@@ -1,0 +1,17 @@
+[package]
+name = "haste"
+version = "0.0.0"
+edition.workspace = true
+
+[features]
+# Async, source-driven streaming parser (AsyncStreamingParser + AsyncDemoStream
+# implementations). Forwards to haste_core's async feature.
+async = ["haste_core/async"]
+
+[dependencies]
+haste_broadcast.workspace = true
+haste_core.workspace = true
+
+[dev-dependencies]
+prost.workspace = true
+thiserror.workspace = true

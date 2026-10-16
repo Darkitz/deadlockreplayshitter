@@ -1,0 +1,188 @@
+use std::sync::Arc;
+
+// NOTE: looking into public/dt_common.h might help to get more ideas about field value thing.
+
+// NOTE: don't bother creating variants for ints that are smaller then 64 bits. that will not make
+// enum consume less space; that will not make decoding any faster (the exception could be i8/u8
+// cause those won't branch, but that ain't worth it really).
+//
+// NOTE: Clone derive is needed here because Entity in entities.rs needs to be
+// clonable which means that all members of it also should be clonable. strings are reference
+// counted so that cloning an entity (every create clones its class's cached baseline) does not
+// copy them.
+#[derive(Clone)]
+pub enum FieldValue {
+    I64(i64),
+    U64(u64),
+    F32(f32),
+    Bool(bool),
+    Vector3([f32; 3]),
+    Vector2([f32; 2]),
+    Vector4([f32; 4]),
+    QAngle([f32; 3]),
+    /// NOTE: not all strings are valid utf8 strings.
+    ///
+    /// deadlock has `CCitadelPlayerPawn` entity which has a `m_sHeroBuildSerialized` field of type
+    /// `CUtlString` which, as the name suggests, contains serialized data which canno't be
+    /// successfully converted to str/String.
+    ///
+    /// in c/cpp there's no enforcement on validation of strings. but in rust there is, see
+    /// `<https://doc.rust-lang.org/stable/std/string/struct.String.html#utf-8>`.
+    ///
+    /// it doesn't seem like there's a reliable way to know which strings are treated as actual
+    /// strings and which ones are represent non-utf8 byte sequences to encode other data.
+    ///
+    /// also note that there's no data type in demo files that is dedicated specifically for
+    /// transfering bytes.
+    ///
+    /// use `String::from_utf8_lossy` in your code to convert this to an actual string, and handle
+    /// conversion errors.
+    String(Arc<[u8]>),
+}
+
+// TODO(blukai): when you'll be unfucking errors - rename this one to FieldValueInvalidConversion
+// or something..
+#[derive(Debug, thiserror::Error)]
+#[error("incompatible types or out of range integer type conversion attempted")]
+pub enum FieldValueConversionError {
+    #[error("incompatible types or out of range integer type conversion attempted")]
+    IncompatibleTypeOrOutOfRangeInteger,
+    #[error("utf-8 conversion error: {0}")]
+    FromUtf8Error(#[from] std::string::FromUtf8Error),
+}
+
+// conversions are implemented for `&FieldValue` (so that getters do not have to clone the value
+// first); the owned `FieldValue` conversions delegate to them.
+
+macro_rules! impl_try_from_ref {
+    ($ty:ty, $value:ident => $body:expr) => {
+        impl TryFrom<&FieldValue> for $ty {
+            type Error = FieldValueConversionError;
+
+            fn try_from($value: &FieldValue) -> Result<$ty, Self::Error> {
+                $body
+            }
+        }
+
+        impl TryInto<$ty> for FieldValue {
+            type Error = FieldValueConversionError;
+
+            fn try_into(self) -> Result<$ty, Self::Error> {
+                <$ty>::try_from(&self)
+            }
+        }
+    };
+}
+
+macro_rules! impl_try_from_numeric {
+    ($($variant:ident => $ty:ty),+) => {
+        $(
+            impl_try_from_ref!($ty, value => match value {
+                FieldValue::$variant(value) => (*value).try_into().map_err(|_| FieldValueConversionError::IncompatibleTypeOrOutOfRangeInteger),
+                _ => Err(FieldValueConversionError::IncompatibleTypeOrOutOfRangeInteger),
+            });
+        )+
+    }
+}
+
+impl_try_from_numeric! {
+    I64 => i8,
+    I64 => i16,
+    I64 => i32,
+    I64 => i64,
+    U64 => u8,
+    U64 => u16,
+    U64 => u32,
+    U64 => u64,
+    F32 => f32
+}
+
+macro_rules! impl_try_from_inner {
+    ($($variant:ident => $ty:ty),+) => {
+        $(
+            impl_try_from_ref!($ty, value => match value {
+                FieldValue::$variant(value) => Ok(*value),
+                _ => Err(FieldValueConversionError::IncompatibleTypeOrOutOfRangeInteger),
+            });
+        )+
+    }
+}
+
+impl_try_from_inner! {
+    Bool => bool,
+    Vector2 => [f32; 2],
+    Vector4 => [f32; 4]
+}
+
+// and some specials...
+
+impl_try_from_ref!([f32; 3], value => match value {
+    FieldValue::Vector3(value) | FieldValue::QAngle(value) => Ok(*value),
+    _ => Err(FieldValueConversionError::IncompatibleTypeOrOutOfRangeInteger),
+});
+
+impl_try_from_ref!(String, value => match value {
+    FieldValue::String(value) => String::from_utf8(value.to_vec())
+        .map_err(FieldValueConversionError::FromUtf8Error),
+    _ => Err(FieldValueConversionError::IncompatibleTypeOrOutOfRangeInteger),
+});
+
+impl_try_from_ref!(Box<[u8]>, value => match value {
+    FieldValue::String(value) => Ok(Box::from(&**value)),
+    _ => Err(FieldValueConversionError::IncompatibleTypeOrOutOfRangeInteger),
+});
+
+impl_try_from_ref!(Arc<[u8]>, value => match value {
+    FieldValue::String(value) => Ok(Arc::clone(value)),
+    _ => Err(FieldValueConversionError::IncompatibleTypeOrOutOfRangeInteger),
+});
+
+// debug and display...
+
+macro_rules! impl_debug {
+    ($($variant:ident),+) => {
+        impl core::fmt::Debug for FieldValue {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                match self {
+                    $(Self::$variant(value) => f.debug_tuple(stringify!($variant)).field(value).finish(),)+
+                }
+            }
+        }
+    };
+}
+
+impl_debug! {
+    I64,
+    U64,
+    Bool,
+    F32,
+    Vector3,
+    Vector2,
+    Vector4,
+    QAngle,
+    String
+}
+
+macro_rules! impl_display {
+    ($($variant:ident),+) => {
+        impl core::fmt::Display for FieldValue {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                match self {
+                    $(Self::$variant(value) => write!(f, "{:?}", value),)+
+                }
+            }
+        }
+    };
+}
+
+impl_display! {
+    I64,
+    U64,
+    Bool,
+    F32,
+    Vector3,
+    Vector2,
+    Vector4,
+    QAngle,
+    String
+}

@@ -1,0 +1,11 @@
+# build output
+parser/target/
+parser/.protoc/
+
+# demos + generated data (rebuild with tools/sync.py)
+data/
+web/data/
+web/assets/
+
+__pycache__/
+*.pyc

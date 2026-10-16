@@ -1,0 +1,14 @@
+[package]
+name = "dungers"
+version = "0.0.0"
+edition.workspace = true
+
+[dependencies]
+dungers_bitbuf = { workspace = true, optional = true }
+dungers_charsor = { workspace = true, optional = true }
+dungers_varint = { workspace = true, optional = true }
+
+[features]
+bitbuf = ["dep:dungers_bitbuf"]
+charsor = ["dep:dungers_charsor"]
+varint = ["dep:dungers_varint", "dungers_bitbuf?/varint"]
