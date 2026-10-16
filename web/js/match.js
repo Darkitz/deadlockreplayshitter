@@ -118,7 +118,7 @@ export async function viewMatch(id, params) {
       (Deadlock: <b>Download Replay</b>).</p>` : ""}
     <section class="toolbar" ${m.fromMeta ? "hidden" : ""}>
       <div class="abilities">${abilityButtons([gunAbility, meleeAbility, ...table.filter((r) => !r.kind).map((r) => r.ability)], ability.class_name, abStat)}</div>
-      <div class="controls">${controlsHTML()}</div>
+      <div class="controls">${controlsHTML(false)}</div>
     </section>
     ${!m.fromMeta && table.some((r) => r.kind === "extra") ? `<section class="items-row"><span class="muted small">other abilities</span>
       <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.kind === "extra").map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}

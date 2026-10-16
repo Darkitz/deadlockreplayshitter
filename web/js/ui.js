@@ -81,13 +81,13 @@ export function tile(k, v, cls = "") {
   return `<div class="tile ${cls}"><div class="k">${k}</div><div class="v">${v}</div></div>`;
 }
 
-export function controlsHTML() {
-  return `
+export function controlsHTML(withWindow = true) {
+  return `${withWindow ? `
     <label>game time
       <select data-set="gameWindow">
         ${GAME_WINDOWS.map(([v, l]) => `<option value="${v}" ${(settings.gameWindow || "") === v ? "selected" : ""}>${l}</option>`).join("")}
       </select>
-    </label>
+    </label>` : ""}
     <label>Hit window
       <select data-set="window">
         ${[1, 2, 3, 5, 8].map((w) => `<option value="${w}" ${w === settings.window ? "selected" : ""}>${w} s</option>`).join("")}
