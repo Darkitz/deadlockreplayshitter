@@ -219,3 +219,63 @@ function powerups(list) {
   return [...by].sort((a, b) => b[1] - a[1])
     .map(([k, n]) => `<span class="tag pu">${esc(k)} ×${n}</span>`).join("") || `<span class="muted">no power-ups</span>`;
 }
+
+/**
+ * A demo-shaped match object from Valve metadata (match_paths = 1 Hz position + health per
+ * player), so the match view can replay matches we have no demo for. No casts, shots or damage
+ * events: those only exist in demos.
+ */
+export function matchFromMeta(raw, matchId) {
+  const mi = raw.match_info || raw;
+  const mp = mi.match_paths;
+  if (!mp?.paths?.length) return null;
+  const dt = mp.interval_s || 1;
+  const players = (mi.players || []).map((p) => ({
+    pawn: p.player_slot, controller: p.player_slot, account_id: p.account_id,
+    name: S.profiles[p.account_id]?.name || "", hero_id: p.hero_id, team: TEAM(p.team), lane: p.assigned_lane,
+    net_worth: p.net_worth, level: p.level, kills: p.kills, deaths: p.deaths, assists: p.assists,
+    last_hits: p.last_hits, denies: p.denies,
+  }));
+  const tracks = mp.paths.map((p) => {
+    const xr = mp.x_resolution || 16383, yr = mp.y_resolution || 16383;
+    const pos = [];
+    for (let i = 0; i < p.x_pos.length; i++) {
+      pos.push(Math.round(p.x_min + (p.x_pos[i] / xr) * (p.x_max - p.x_min)));
+      pos.push(Math.round(p.y_min + (p.y_pos[i] / yr) * (p.y_max - p.y_min)));
+    }
+    return { pawn: p.player_slot, pos, hp: p.health.slice(), max_hp: p.health.map(() => 100) };
+  });
+  const items = [];
+  for (const p of mi.players || []) {
+    for (const it of p.items || []) {
+      if (it.game_time_s > 0) items.push([it.game_time_s, p.player_slot, it.item_id, 1]);
+      if (it.sold_time_s) items.push([it.sold_time_s, p.player_slot, it.item_id, -1]);
+    }
+  }
+  items.sort((a, b) => a[0] - b[0]);
+  const kills = [];
+  for (const p of mi.players || []) {
+    for (const d of p.death_details || []) {
+      kills.push([d.game_time_s, p.player_slot, d.killer_player_slot ?? -1, 0, []]);
+    }
+  }
+  kills.sort((a, b) => a[0] - b[0]);
+  // stat snapshots are every few minutes; spread them on a fixed grid for statsAt()
+  const step = 60;
+  const end = mi.duration_s;
+  const statTracks = (mi.players || []).map((p) => {
+    const rows = [];
+    for (let t = 0; t <= end; t += step) {
+      const s = [...(p.stats || [])].reverse().find((x) => x.time_stamp_s <= t) || {};
+      rows.push([s.net_worth || 0, s.level || 0, s.kills || 0, s.deaths || 0, s.assists || 0, s.creep_kills || 0]);
+    }
+    return { pawn: p.player_slot, rows };
+  });
+  return {
+    version: 0, match_id: matchId, tick_interval: 1 / 64, duration_s: end, game_over_s: end,
+    winning_team: mi.winning_team != null ? TEAM(mi.winning_team) : null,
+    players, casts: [], uses: [], items, upgrades: [], damage: [], notify: [], shots: [],
+    kills, samples: { t0: 0, dt, tracks }, stats: { t0: 0, dt: step, tracks: statTracks },
+    warnings: [], fromMeta: true,
+  };
+}

@@ -31,7 +31,9 @@ export function createTimeline(svg, model, onSeek, onSpan) {
     const lanes = { chart: 120, marks: 22, hp: 34, lead: 34, items: 24, axis: 16 };
     let y = 8;
     const L = {};
+    if (model.noChart) { lanes.chart = 0; }
     for (const [k, h] of Object.entries(lanes)) {
+      if (k === "chart" && model.noChart) { L.chart = { y, h: 0 }; continue; }
       if (k === "hp" && !model.hp?.length) continue;
       if (k === "lead" && !model.lead?.length) continue;
       if (k === "items" && !model.items?.length) continue;
@@ -95,7 +97,7 @@ export function createTimeline(svg, model, onSeek, onSpan) {
       }
       return { d: d + ` H${x(dur)}`, n };
     };
-    if (!model.gun) {
+    if (!model.gun && !model.noChart) {
       const thrown = stepPath(() => true), hit = stepPath(scored);
       g += `<path class="area-hit" d="${hit.d} V${cy(0)} H${x(0)} Z"/>`;
       g += `<path class="l-thrown" d="${thrown.d}"/><path class="l-hit" d="${hit.d}"/>`;

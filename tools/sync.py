@@ -270,13 +270,17 @@ def sync_assets(heroes, items, used_heroes, used_items, badges=()):
         game_map = None
 
     try:
+        modifiers = {m["id"]: m.get("class_name") for m in get_json(f"{API}/v1/assets/modifiers")}
+    except (urllib.error.URLError, OSError):
+        modifiers = {}
+    try:
         accolades = {a["id"]: {"name": a.get("flavor_name") or a.get("class_name"), "stat": a.get("tracked_stat_name")}
                      for a in get_json(f"{API}/v1/assets/accolades")}
     except (urllib.error.URLError, OSError):
         accolades = {}
     (DATA / "assets.json").write_text(json.dumps(
         {"heroes": out_heroes, "items": out_items, "map": game_map, "ranks": sync_ranks(badges),
-         "accolades": accolades}))
+         "accolades": accolades, "modifiers": modifiers}))
     log(f"assets: {len(out_heroes)} heroes, {len(out_items)} items")
 
 
@@ -733,6 +737,13 @@ def main():
     if not args.no_meta:
         parsed_ids = {int(p.name.split(".")[0]) for p in MATCHES.glob("*.json.gz")}
         sync_metadata(sorted(ctx.meta_ids | parsed_ids, reverse=True))
+    # players from downloaded metadata (matches without a demo) get profiles too
+    for f in META_DIR.glob("*.json.gz") if META_DIR.exists() else []:
+        try:
+            with gzip.open(f, "rt") as fh:
+                ctx.accounts.update(p.get("account_id") for p in json.load(fh).get("match_info", {}).get("players", []))
+        except (OSError, ValueError):
+            continue
     profiles = sync_profiles(ctx.accounts)
     for idx in indexes:
         idx["profile"] = profiles.get(idx["account_id"])

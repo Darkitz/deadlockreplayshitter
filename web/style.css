@@ -18,6 +18,7 @@
   --radius: 10px;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { color-scheme: dark; }
 body {
   margin: 0;
@@ -374,3 +375,28 @@ input[type=search] { background: var(--panel-2); color: var(--text); border: 1px
 @media (max-width: 1100px) { .charts.report-2, .charts.report-3 { grid-template-columns: 1fr; } }
 /* ?section=<id>&solo=1: show just that section (handy for sharing / printing) */
 body.solo #app > *:not(.solo-target) { display: none; }
+/* player state panel */
+.state { margin-top: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.st-head { display: grid; grid-template-columns: 36px 1fr auto auto; gap: 10px; align-items: center; }
+.st-head > img { width: 36px; height: 36px; border-radius: 8px; }
+.st-bar { height: 8px; background: var(--panel-3); border-radius: 4px; overflow: hidden; }
+.st-bar span { display: block; height: 100%; }
+.st-hp small, .st-num small { color: var(--muted); font-size: 11px; }
+.st-num { display: flex; flex-direction: column; align-items: center; font-variant-numeric: tabular-nums; }
+.st-abs { display: flex; gap: 8px; }
+.st-ab { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.st-ab img { width: 34px; height: 34px; border-radius: 7px; background: var(--panel-3); }
+.st-ab.locked img { opacity: .3; filter: grayscale(1); }
+.pips { display: flex; gap: 3px; }
+.pips i { width: 7px; height: 7px; border-radius: 2px; background: var(--panel-3); }
+.pips i.on { background: var(--accent); }
+.st-items { display: flex; flex-wrap: wrap; gap: 4px; }
+.st-items img { width: 30px; height: 30px; border-radius: 6px; background: var(--panel-3); border-bottom: 2px solid var(--line); object-fit: contain; }
+.st-items img.slot-weapon { border-color: #e8a33d; }
+.st-items img.slot-vitality { border-color: #5fd38d; }
+.st-items img.slot-spirit { border-color: #b07cf0; }
+.st-mods { display: flex; flex-wrap: wrap; gap: 4px; max-height: 160px; overflow: auto; }
+.mod { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px 1px 2px; }
+.mod img { width: 16px; height: 16px; border-radius: 50%; }
+.mod small { color: var(--muted); }
+.mod.debuff { border-color: var(--miss); color: #ffb3ab; }

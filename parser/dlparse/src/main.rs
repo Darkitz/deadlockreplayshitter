@@ -23,7 +23,7 @@ use haste::valveprotos::deadlock::{
 use prost::Message;
 use serde::Serialize;
 
-const FORMAT_VERSION: u32 = 8;
+const FORMAT_VERSION: u32 = 10;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`.
 /// sync.py passes the current ids (resolved by class name) via `--ignore-ids`; this list is only
 /// the fallback.
@@ -65,6 +65,8 @@ const PAWN_CONTROLLER: u64 = fkey_from_path(&["m_hController"]);
 const PAWN_HERO_ID: u64 =
     fkey_from_path(&["m_CCitadelHeroComponent", "m_spawnedHero", "m_nHeroID"]);
 const HEALTH: u64 = fkey_from_path(&["m_iHealth"]);
+/// controller-side max health includes item and level bonuses (the pawn's m_iMaxHealth doesn't)
+const CTRL_HEALTH_MAX: u64 = fkey_from_path(&["m_PlayerDataGlobal", "m_iHealthMax"]);
 const MAX_HEALTH: u64 = fkey_from_path(&["m_iMaxHealth"]);
 const LIFE_STATE: u64 = fkey_from_path(&["m_lifeState"]);
 const EYE_ANGLES: u64 = fkey_from_path(&["m_angEyeAngles"]);
@@ -85,6 +87,29 @@ const CHARGES: u64 = fkey_from_path(&["m_iRemainingCharges"]);
 const SHOT_NUMBER: u64 = fkey_from_path(&["m_nShotNumber"]);
 
 const STEAM_ID64_BASE: u64 = 76561197960265728;
+
+/// subset of CModifierTableEntry (SteamDatabase/Protobufs deadlock/base_modifier.proto); the
+/// ActiveModifiers string table holds one per buff/debuff
+#[derive(Clone, PartialEq, prost::Message)]
+struct ModifierEntry {
+    #[prost(int32, optional, tag = "1")]
+    entry_type: Option<i32>,
+    #[prost(uint32, optional, tag = "2")]
+    parent: Option<u32>,
+    #[prost(uint32, optional, tag = "3")]
+    serial_number: Option<u32>,
+    #[prost(uint32, optional, tag = "4")]
+    modifier_subclass: Option<u32>,
+    #[prost(int32, optional, tag = "5")]
+    stack_count: Option<i32>,
+    #[prost(float, optional, tag = "8")]
+    duration: Option<f32>,
+    #[prost(uint32, optional, tag = "9")]
+    caster: Option<u32>,
+    #[prost(uint32, optional, tag = "13")]
+    ability_subclass: Option<u32>,
+}
+const MODIFIER_SCAN_DT: f32 = 0.25;
 
 #[derive(Default, Serialize, Clone)]
 struct Player {
@@ -168,6 +193,9 @@ struct Output {
     shots: Vec<(f32, i32, u32, i32)>,
     /// [t, attacker_pawn, victim_pawn, ability_id, status_impact]
     notify: Vec<(f32, i32, i32, u32, u32)>,
+    /// buffs/debuffs on heroes: [start, end, parent_pawn, caster_pawn_or_-1, modifier_id,
+    ///  ability_id, max_stacks]; end = removal time (or start + duration if never seen removed)
+    modifiers: Vec<(f32, f32, i32, i32, u32, u32, i32)>,
     /// [t, victim_pawn, attacker_pawn, killer_ability_id, [assister pawns]]
     kills: Vec<(f32, i32, i32, u32, Vec<i32>)>,
     samples: Samples,
@@ -198,6 +226,9 @@ struct V {
     pawn_hero: HashMap<i32, u32>,
     abilities: HashMap<i32, AbilityState>,
     noisy: Vec<u32>,
+    /// ActiveModifiers row index -> (hash of user data, index into out.modifiers)
+    mod_rows: HashMap<i32, (u64, Option<usize>)>,
+    next_mod_scan: f32,
     next_sample: f32,
     next_stat: f32,
     track_idx: HashMap<i32, usize>,
@@ -327,12 +358,18 @@ impl V {
                     max_hp: vec![0; missing],
                 });
             }
+            let ctrl_max: Option<i32> = self
+                .pawn_ctrl
+                .get(&pawn)
+                .and_then(|c| entities.get(c))
+                .and_then(|c| c.get_value(&CTRL_HEALTH_MAX));
             let (x, y, hp, mhp) = match entities.get(&pawn) {
                 Some(e) => {
                     let p = position(ctx, e).unwrap_or_default();
                     let alive = e.get_value::<u64>(&LIFE_STATE).unwrap_or(0) == 0;
                     let hp: i32 = if alive { e.get_value(&HEALTH).unwrap_or(0) } else { 0 };
-                    (p[0].round() as i32, p[1].round() as i32, hp, e.get_value(&MAX_HEALTH).unwrap_or(0))
+                    let max = ctrl_max.unwrap_or_else(|| e.get_value(&MAX_HEALTH).unwrap_or(0));
+                    (p[0].round() as i32, p[1].round() as i32, hp, max.max(hp))
                 }
                 None => (0, 0, 0, 0),
             };
@@ -341,6 +378,72 @@ impl V {
             tr.pos.push(y);
             tr.hp.push(hp);
             tr.max_hp.push(mhp);
+        }
+    }
+
+    /// diff the ActiveModifiers string table against the last scan
+    fn scan_modifiers(&mut self, ctx: &Context, t: f32) {
+        let Some(table) = ctx.string_tables().and_then(|st| st.find_table("ActiveModifiers")) else {
+            return;
+        };
+        let mut seen = std::collections::HashSet::new();
+        for (idx, item) in table.items() {
+            seen.insert(*idx);
+            let Some(ud) = item.get_user_data() else { continue };
+            let h = fxhash::hash_bytes(ud);
+            if self.mod_rows.get(idx).is_some_and(|(ph, _)| *ph == h) {
+                continue;
+            }
+            let prev = self.mod_rows.get(idx).and_then(|(_, o)| *o);
+            let Ok(e) = ModifierEntry::decode(ud) else { continue };
+            let removed = e.entry_type == Some(2);
+            // a row that changed closes the previous modifier stored there
+            if let Some(o) = prev {
+                let row = &mut self.out.modifiers[o];
+                if removed || e.serial_number.is_some() {
+                    row.1 = row.1.min(t);
+                }
+                if !removed {
+                    row.6 = row.6.max(e.stack_count.unwrap_or(0));
+                }
+            }
+            let mut slot = None;
+            if !removed {
+                let parent = e.parent.filter(|h| is_ehandle_valid(*h)).map(ehandle_to_index).unwrap_or(-1);
+                let noisy = self.noisy.contains(&e.ability_subclass.unwrap_or(0));
+                if self.is_hero_pawn(parent) && !noisy {
+                    let same = prev.is_some_and(|o| {
+                        let r = &self.out.modifiers[o];
+                        r.2 == parent && r.4 == e.modifier_subclass.unwrap_or(0)
+                    });
+                    if same {
+                        // refresh / stack change of the same modifier: keep the row open
+                        let o = prev.unwrap();
+                        let dur = e.duration.unwrap_or(-1.0);
+                        self.out.modifiers[o].1 = if dur > 0.0 { t + dur } else { f32::MAX };
+                        slot = Some(o);
+                    } else {
+                        let caster = e.caster.filter(|h| is_ehandle_valid(*h)).map(ehandle_to_index).unwrap_or(-1);
+                        let dur = e.duration.unwrap_or(-1.0);
+                        let end = if dur > 0.0 { t + dur } else { f32::MAX };
+                        self.out.modifiers.push((
+                            t, end, parent, if self.is_hero_pawn(caster) { caster } else { -1 },
+                            e.modifier_subclass.unwrap_or(0), e.ability_subclass.unwrap_or(0),
+                            e.stack_count.unwrap_or(0),
+                        ));
+                        slot = Some(self.out.modifiers.len() - 1);
+                    }
+                }
+            }
+            self.mod_rows.insert(*idx, (h, slot));
+        }
+        // rows that vanished from the table
+        let gone: Vec<i32> = self.mod_rows.keys().filter(|k| !seen.contains(k)).copied().collect();
+        for k in gone {
+            if let Some((_, Some(o))) = self.mod_rows.remove(&k) {
+                let row = &mut self.out.modifiers[o];
+                row.1 = row.1.min(t);
+            }
         }
     }
 
@@ -523,6 +626,10 @@ impl Visitor for V {
             self.sample(ctx, st);
             self.next_sample += SAMPLE_DT;
         }
+        if t >= self.next_mod_scan {
+            self.next_mod_scan = t + MODIFIER_SCAN_DT;
+            self.scan_modifiers(ctx, t);
+        }
         while t >= self.next_stat {
             let st = self.next_stat;
             self.sample_stats(ctx, st);
@@ -558,6 +665,9 @@ fn sanity_check(o: &Output, has_start: bool) -> Vec<String> {
     }
     if o.shots.is_empty() {
         w.push("no weapon shots (m_nShotNumber)".into());
+    }
+    if o.modifiers.is_empty() {
+        w.push("no modifiers (ActiveModifiers string table)".into());
     }
     if o.kills.is_empty() {
         w.push("no hero kills".into());
@@ -612,6 +722,12 @@ fn main() -> anyhow::Result<()> {
     v.out.version = FORMAT_VERSION;
     v.out.map_radius = max_coord.unwrap_or(0.0);
     v.out.uses.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let end = v.out.duration_s;
+    for m in &mut v.out.modifiers {
+        if m.1 > end {
+            m.1 = end;
+        }
+    }
     v.out.warnings = sanity_check(&v.out, v.game_start.is_some());
     for w in &v.out.warnings {
         eprintln!("warning: {w}");
@@ -619,13 +735,14 @@ fn main() -> anyhow::Result<()> {
 
     serde_json::to_writer(BufWriter::new(File::create(&args[2])?), &v.out)?;
     eprintln!(
-        "ok: {} players, {} casts, {} uses, {} items, {} damage, {} shots, {} kills, {} samples, {:.0}s",
+        "ok: {} players, {} casts, {} uses, {} items, {} damage, {} shots, {} modifiers, {} kills, {} samples, {:.0}s",
         v.out.players.len(),
         v.out.casts.len(),
         v.out.uses.len(),
         v.out.items.len(),
         v.out.damage.len(),
         v.out.shots.iter().map(|s| s.3 as i64).sum::<i64>(),
+        v.out.modifiers.len(),
         v.out.kills.len(),
         v.out.samples.tracks.first().map_or(0, |t| t.hp.len()),
         v.out.duration_s

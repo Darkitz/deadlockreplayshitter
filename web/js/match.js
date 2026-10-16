@@ -1,7 +1,9 @@
 // Match detail: scoreboard, ability picker, minimap + timeline replay, incoming skillshots.
 
-import { loadMatch, loadMeta, statsAt, TEAM_NAMES } from "./data.js";
-import { digestMeta, renderReport } from "./report.js";
+import {
+  loadMatch, loadMeta, prepare, statsAt, hpAt, itemsAt, abilityLevelsAt, modifiersAt, TEAM_NAMES,
+} from "./data.js";
+import { digestMeta, renderReport, matchFromMeta } from "./report.js";
 import {
   analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt,
 } from "./analysis.js";
@@ -20,8 +22,15 @@ export async function viewMatch(id, params) {
   try {
     m = await loadMatch(id);
   } catch (err) {
-    renderNoDemo(app, id, e);
-    return;
+    // no demo: replay from Valve's 1 Hz match paths if the metadata has them
+    try {
+      const pseudo = matchFromMeta(await loadMeta(id), id);
+      if (pseudo) m = prepare(pseudo);
+    } catch { /* no metadata either */ }
+    if (!m) {
+      renderNoDemo(app, id, e);
+      return;
+    }
   }
   const me = m.player(S.index.account_id);
   const pawn = Number(params.get("pawn")) || me?.pawn || m.players[0].pawn;
@@ -87,7 +96,7 @@ export async function viewMatch(id, params) {
             return `<div class="sb-row ${p.pawn === pawn ? "on" : ""}" data-pawn="${p.pawn}" role="button" tabindex="0" title="analyze ${esc(p.name)}">
               <img class="sb-hero" src="${esc(S.assets.hero(p.hero_id).icon)}" alt="">
               ${prof?.avatar ? `<img class="sb-av" src="${esc(prof.avatar)}" alt="">` : `<span class="sb-av"></span>`}
-              <a class="sb-name" href="#/player/${p.account_id}" title="${esc(prof?.name || p.name)}: all matches">${esc(prof?.name || p.name)}</a>
+              <a class="sb-name" href="#/player/${p.account_id}" title="${esc(prof?.name || p.name || "")}: all matches">${esc(prof?.name || p.name || S.assets.hero(p.hero_id).name)}</a>
               <span class="sb-kda">${p.kills}/${p.deaths}/${p.assists}</span>
               ${(() => { const a = skillAcc.get(p.pawn); const v = a.thrown ? a.scored / a.thrown : 0;
                 return `<span class="sb-acc ${a.thrown >= 5 && v === bestAcc ? "best" : ""}" title="signature abilities: ${a.scored}/${a.thrown} hit heroes">${a.thrown ? pct(v) : "–"}</span>`; })()}
@@ -96,23 +105,27 @@ export async function viewMatch(id, params) {
           }).join("")}
         </div>`).join("")}
     </section>
-    <section class="toolbar">
+    ${m.fromMeta ? `<p class="note">No demo for this match (${esc(e?.status || "not downloaded")}). This replay uses Valve's match paths:
+      positions and health once per second, deaths and objectives. Casts, shots and hits need the demo
+      (Deadlock: <b>Download Replay</b>).</p>` : ""}
+    <section class="toolbar" ${m.fromMeta ? "hidden" : ""}>
       <div class="abilities">${abilityButtons([gunAbility, ...table.filter((r) => !r.kind).map((r) => r.ability)], ability.class_name, abStat)}</div>
       <div class="controls">${controlsHTML()}</div>
     </section>
-    ${table.some((r) => r.kind === "extra") ? `<section class="items-row"><span class="muted small">other abilities</span>
+    ${!m.fromMeta && table.some((r) => r.kind === "extra") ? `<section class="items-row"><span class="muted small">other abilities</span>
       <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.kind === "extra").map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}
-    ${table.some((r) => r.item) ? `<section class="items-row"><span class="muted small">active items</span>
+    ${!m.fromMeta && table.some((r) => r.item) ? `<section class="items-row"><span class="muted small">active items</span>
       <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.item).map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}
-    ${analysis.source === "cooldown" ? `<p class="note">No cast events for ${esc(ability.name)} in this demo; casts are taken from the ability going on cooldown, so there is no aim direction or aim error.</p>` : ""}
+    ${!m.fromMeta && analysis.source === "cooldown" ? `<p class="note">No cast events for ${esc(ability.name)} in this demo; casts are taken from the ability going on cooldown, so there is no aim direction or aim error.</p>` : ""}
     ${e?.warnings?.length ? `<p class="note warn">Parser warnings for this demo: ${e.warnings.map(esc).join(" · ")}</p>` : ""}
-    ${analysis.source === "none" ? `<p class="note">No casts of ${esc(ability.name)} found for this player.</p>` : ""}
+    ${!m.fromMeta && analysis.source === "none" ? `<p class="note">No casts of ${esc(ability.name)} found for this player.</p>` : ""}
     <section class="stage">
       <div class="map-wrap"><canvas class="minimap"></canvas>
         <div class="map-legend small muted">
           <label class="check"><input type="checkbox" class="show-all" ${settings.showAll ? "checked" : ""}> all casts</label>
           <span>click a hero to analyze them · rays = aim at cast</span>
-        </div></div>
+        </div>
+        <div class="state" id="state"></div></div>
       <div class="stage-right">
         <svg class="timeline"></svg>
         <div class="player-row">
@@ -140,8 +153,8 @@ export async function viewMatch(id, params) {
           <b>shift+drag</b> on the timeline (or <b>[</b> at the playhead) selects a span, Esc clears</p>
       </div>
     </section>
-    <section class="chart-card tracker" id="tracker"></section>
-    <section class="chart-card incoming" id="incoming"></section>
+    <section class="chart-card tracker" id="tracker" ${m.fromMeta ? "hidden" : ""}></section>
+    <section class="chart-card incoming" id="incoming" ${m.fromMeta ? "hidden" : ""}></section>
     <section class="report" id="report"><p class="muted">loading Valve match report…</p></section>`;
   showReport($("#report", app), id, subject.account_id);
 
@@ -169,6 +182,61 @@ export async function viewMatch(id, params) {
     skill.sort((a, b) => a.t - b.t);
     return { p, skill, gun: gunStats(m, p.pawn, S.assets) };
   });
+  // ---- player state at the playhead: health, souls, ability tiers, items, buffs
+  const HIDDEN_MODS = /tracker|watcher|hero_upgrade_bonuses|combat_status|_aura_target|modifier_citadel_base/;
+  function modName(x) {
+    const raw = S.assets.modifiers[x[4]];
+    const ab = S.assets.item(x[5]);
+    if (raw && HIDDEN_MODS.test(raw)) return null;
+    if (ab) return ab.name;
+    if (raw) return raw.replace(/^modifier_(citadel_)?/, "").replace(/_/g, " ");
+    return null; // unnamed internal modifier
+  }
+  function renderState(t) {
+    const hp = hpAt(m, pawn, t);
+    const st = statsAt(m, pawn, t);
+    const heroName = S.assets.hero(subject.hero_id).name;
+    const lv = abilityLevelsAt(m, pawn, t);
+    const abil = S.assets.signatures(subject.hero_id).map((ab) => {
+      const n = lv.get(ab.id) ?? 0;
+      const tier = Math.max(0, n - 1);
+      return `<span class="st-ab ${n ? "" : "locked"}" title="${esc(ab.name)}${n ? ` · upgrades ${tier}/3` : " · not unlocked"}">
+        ${ab.image ? `<img src="${esc(ab.image)}" alt="">` : ""}<span class="pips">${[1, 2, 3].map((i) => `<i class="${i <= tier ? "on" : ""}"></i>`).join("")}</span></span>`;
+    }).join("");
+    const slotOrder = { weapon: 0, vitality: 1, spirit: 2 };
+    const items = itemsAt(m, pawn, t).map((id) => ({ id, ...S.assets.item(id) }))
+      .filter((it) => it.type === "upgrade")
+      .sort((a, b) => (slotOrder[a.slot] ?? 3) - (slotOrder[b.slot] ?? 3) || (a.tier || 0) - (b.tier || 0));
+    const mods = [];
+    const seen = new Map();
+    for (const x of modifiersAt(m, pawn, t)) {
+      const name = modName(x);
+      if (!name) continue;
+      const key = `${name}|${x[3]}`;
+      const enemy = x[3] >= 0 && m.byPawn.get(x[3])?.team !== subject.team;
+      const left = x[1] - t;
+      const prev = seen.get(key);
+      if (prev) { prev.n++; prev.left = Math.max(prev.left, left); continue; }
+      const row = { name, enemy, left, n: 1, stacks: x[6], icon: S.assets.itemIcon(x[5]) };
+      seen.set(key, row);
+      mods.push(row);
+    }
+    mods.sort((a, b) => b.enemy - a.enemy || a.left - b.left);
+    const f = hp && hp.max ? hp.hp / hp.max : 0;
+    $("#state", app).innerHTML = `
+      <div class="st-head">
+        <img src="${esc(S.assets.hero(subject.hero_id).icon)}" alt="">
+        <div class="st-hp"><div class="st-bar"><span style="width:${f * 100}%;background:${f > 0.5 ? "var(--hit)" : f > 0.25 ? "var(--accent)" : "var(--miss)"}"></span></div>
+          <small>${hp ? (hp.hp > 0 ? `${hp.hp} / ${hp.max} HP` : "dead") : "–"}${m.fromMeta ? " (%)" : ""}</small></div>
+        <div class="st-num"><b>${st ? k1(st[0]) : "–"}</b><small>souls</small></div>
+        <div class="st-num"><b>${st ? st[1] : "–"}</b><small>level</small></div>
+      </div>
+      ${m.fromMeta ? "" : `<div class="st-abs">${abil}</div>`}
+      <div class="st-items">${items.map((it) => `<img class="slot-${esc(it.slot || "x")}" src="${esc(S.assets.itemIcon(it.id))}" title="${esc(it.name)}${it.tier ? ` · tier ${it.tier}` : ""}" alt="">`).join("") || `<span class="muted small">no items yet</span>`}</div>
+      ${m.fromMeta ? "" : `<div class="st-mods">${mods.map((x) => `<span class="mod ${x.enemy ? "debuff" : ""}" title="${esc(x.name)}${x.enemy ? " (from enemy)" : ""}${x.left < 9999 ? ` · ${x.left.toFixed(1)} s left` : ""}">
+        ${x.icon ? `<img src="${esc(x.icon)}" alt="">` : ""}<span>${esc(x.name)}</span>${x.stacks > 1 ? `<b>×${x.stacks}</b>` : x.n > 1 ? `<b>×${x.n}</b>` : ""}${x.left < 600 ? `<small>${x.left.toFixed(0)}s</small>` : ""}</span>`).join("") || `<span class="muted small">no buffs or debuffs</span>`}</div>`}`;
+  }
+
   /** [souls, level, k, d, a, lh] at t, or gained inside the span (level stays absolute) */
   function spanStats() {
     const end = statsAt(m, pawn, t);
@@ -273,7 +341,7 @@ export async function viewMatch(id, params) {
 
   const timeline = createTimeline($(".timeline", app), {
     end: m.end, casts, heroesOnly: settings.heroesOnly, hp, lead, deaths, kills, items,
-    gun: gunMode ? gun : null,
+    gun: gunMode ? gun : null, noChart: !!m.fromMeta,
   }, (t) => seek(t), (a, b) => setSpan(a, b));
   const minimap = createMinimap($(".minimap", app), {
     match: m, assets: S.assets, onPick: (p) => setParams({ pawn: p.pawn, ability: null }),
@@ -346,6 +414,7 @@ export async function viewMatch(id, params) {
     minimap.update({ t, subject: pawn, casts, showAll: settings.showAll });
     renderReadout(t);
     renderTracker(t);
+    renderState(t);
   }
 
   function renderGunReadout(t) {
@@ -385,10 +454,16 @@ export async function viewMatch(id, params) {
 
   function renderReadout(t) {
     if (gunMode) { renderGunReadout(t); return; }
+    if (m.fromMeta) {
+      const st = spanStats();
+      $(".tiles", app).innerHTML = tile("K / D / A", st ? `${st[2]}/${st[3]}/${st[4]}` : "–") +
+        tile("Souls", st ? k1(st[0]) : "–") + tile("Level", st ? st[1] : "–") +
+        tile("Last hits", st ? st[5] : "–");
+    }
     const past = casts.filter((c) => inSpan(c.t));
     const c = counts(past, settings.heroesOnly);
     const st = spanStats();
-    $(".tiles", app).innerHTML =
+    if (!m.fromMeta) $(".tiles", app).innerHTML =
       tile("Thrown", c.thrown) +
       tile(settings.heroesOnly ? "Hit heroes" : "Hit", c.scored, "good") +
       tile("Accuracy", c.thrown ? pct(c.acc) : "–", "accent") +

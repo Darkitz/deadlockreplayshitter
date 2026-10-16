@@ -63,6 +63,7 @@ export class Assets {
     this.map = raw.map;
     this.ranks = raw.ranks || {};
     this.accolades = raw.accolades || {};
+    this.modifiers = raw.modifiers || {};
     this.byClass = new Map();
     for (const [id, it] of Object.entries(raw.items)) this.byClass.set(it.class_name, { id: Number(id), ...it });
   }
@@ -145,3 +146,30 @@ export function statsAt(m, pawn, t) {
 }
 
 export const TEAM_NAMES = { 2: "Amber", 3: "Sapphire" };
+
+/** items a pawn owns at time t (demo item events: +1 bought, -1 sold/consumed) */
+export function itemsAt(m, pawn, t) {
+  const owned = new Map(); // item id -> count
+  for (const it of m.items) {
+    if (it[1] !== pawn || it[0] > t) continue;
+    owned.set(it[2], (owned.get(it[2]) || 0) + it[3]);
+  }
+  return [...owned].filter(([, n]) => n > 0).map(([id]) => id);
+}
+
+/** upgrade bits (m_nUpgradeInfo) per ability at time t; tier = popcount(bits >> 16) */
+export function abilityLevelsAt(m, pawn, t) {
+  const lv = new Map();
+  for (const u of m.upgrades || []) {
+    if (u[1] !== pawn || u[0] > t) continue;
+    let bits = Number(BigInt(u[3]) >> 16n), n = 0;
+    while (bits) { n += bits & 1; bits >>= 1; }
+    lv.set(u[2], n);
+  }
+  return lv;
+}
+
+/** modifiers active on a pawn at time t: [start, end, parent, caster, modifier, ability, stacks] */
+export function modifiersAt(m, pawn, t) {
+  return (m.modifiers || []).filter((x) => x[2] === pawn && x[0] <= t && x[1] > t);
+}
