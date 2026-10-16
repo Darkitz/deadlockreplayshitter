@@ -24,6 +24,7 @@ export class Assets {
     this.heroes = raw.heroes;
     this.items = raw.items;
     this.map = raw.map;
+    this.ranks = raw.ranks || {};
     this.byClass = new Map();
     for (const [id, it] of Object.entries(raw.items)) this.byClass.set(it.class_name, { id: Number(id), ...it });
   }

@@ -164,7 +164,28 @@ def read_match(match_id):
 
 # ---------------------------------------------------------------- assets + profiles
 
-def sync_assets(heroes, used_heroes, used_items):
+def sync_ranks(badges):
+    """rank names + a small image per badge (badge = tier * 10 + subrank)."""
+    try:
+        ranks = get_json(f"{API}/v1/assets/ranks")
+    except (urllib.error.URLError, OSError) as e:
+        log(f"ranks fetch failed: {e}")
+        return {}
+    by_tier = {r["tier"]: r for r in ranks}
+    out = {}
+    for b in sorted({b for b in badges if b}):
+        tier, sub = divmod(b, 10)
+        r = by_tier.get(tier)
+        if not r:
+            continue
+        imgs = r.get("images") or {}
+        url = imgs.get(f"small_subrank{sub}_webp") or imgs.get(f"small_subrank{sub}") or imgs.get("large_webp")
+        out[b] = {"name": f"{r['name']} {sub}" if sub else r["name"],
+                  "image": mirror(url, "ranks", f"{b}.webp")}
+    return out
+
+
+def sync_assets(heroes, used_heroes, used_items, badges=()):
     items = get_json(f"{API}/v1/assets/items")
     out_heroes = {}
     for h in heroes:
@@ -223,7 +244,7 @@ def sync_assets(heroes, used_heroes, used_items):
         game_map = None
 
     (DATA / "assets.json").write_text(json.dumps(
-        {"heroes": out_heroes, "items": out_items, "map": game_map}))
+        {"heroes": out_heroes, "items": out_items, "map": game_map, "ranks": sync_ranks(badges)}))
     log(f"assets: {len(out_heroes)} heroes, {len(out_items)} items")
 
 
@@ -433,7 +454,7 @@ def main():
         used_heroes |= selected
 
     DATA.mkdir(parents=True, exist_ok=True)
-    sync_assets(heroes, used_heroes, used_items)
+    sync_assets(heroes, used_heroes, used_items, [m.get("ranked_display_badge") for m in history])
     profiles = sync_profiles(accounts)
     sync_career(account)
 
@@ -453,6 +474,8 @@ def main():
             "level": m["hero_level"],
             "won": m["match_result"] == m["player_team"],
             "mode": m["match_mode"],
+            "badge": m.get("ranked_display_badge"),
+            "rank_delta": m.get("ranked_delta"),
             "parsed": (MATCHES / f"{mid}.json.gz").exists(),
             "status": status.get(mid, "not tried (hero not selected)"),
         })

@@ -76,6 +76,10 @@ function renderHeader() {
   $("#steam-link").href = prof.url || `https://steamcommunity.com/profiles/${BigInt(acc) + 76561197960265728n}/`;
   $("#steam-link").textContent = "steam profile ↗";
   const parsed = S.index.matches.filter((m) => m.parsed).length;
+  const lastRanked = S.index.matches.filter((m) => m.badge).sort((a, b) => b.start_time - a.start_time)[0];
+  const rank = lastRanked && S.assets.ranks[lastRanked.badge];
+  $("#rank").innerHTML = rank ? `<img src="${esc(rank.image)}" alt=""><span>${esc(rank.name)}</span>` : "";
+  $("#rank").title = rank ? `latest ranked badge (${fmtDay(new Date(lastRanked.start_time * 1000))})` : "";
   $("#subtitle").textContent =
     `${S.index.matches.length} matches · ${parsed} with demo · synced ${fmtDate(new Date(S.index.generated * 1000))} (${TZ})`;
 }
@@ -83,6 +87,13 @@ function renderHeader() {
 const entry = (id) => S.index.matches.find((m) => m.match_id === id);
 
 // ------------------------------------------------------------------ shared widgets
+
+function rankChip(e) {
+  const r = e?.badge && S.assets.ranks[e.badge];
+  if (!r) return "";
+  const d = e.rank_delta ? ` <span class="${e.rank_delta > 0 ? "up" : "down"}">${e.rank_delta > 0 ? "+" : ""}${e.rank_delta}</span>` : "";
+  return `<span class="rank-chip" title="${esc(r.name)}"><img src="${esc(r.image)}" alt="">${d}</span>`;
+}
 
 function tile(k, v, cls = "") {
   return `<div class="tile ${cls}"><div class="k">${k}</div><div class="v">${v}</div></div>`;
@@ -221,7 +232,7 @@ async function viewOverview(heroId, params) {
     tile("Aim error on misses", agg.aimMiss.length ? `${median(agg.aimMiss).toFixed(1)}<small>° median</small>` : "–") +
     tile("Damage", k1(dmg)) +
     tile("Hits → kills", hits ? `${pct(kills / hits)}<small> ${kills}/${hits}</small>` : "–") +
-    tile("Avg ready-idle", idleN ? `${(idleSum / idleN).toFixed(1)}<small> s before recast</small>` : "–") +
+    tile("Ready → recast", idleN ? `${(idleSum / idleN).toFixed(1)}<small> s</small>` : "–") +
     `<div class="tile" id="bench"><div class="k" title="same hero, other players, any of your parsed demos">Other ${esc(hero.name)}s</div><div class="v muted">…</div></div>`;
   benchmark(heroId, ability, list.length);
 
@@ -237,6 +248,7 @@ async function viewOverview(heroId, params) {
         <span class="result ${x.entry.won ? "win" : "loss"}">${x.entry.won ? "WIN" : "LOSS"}</span>
         <span class="muted" title="${esc(d.toString())}">${fmtDate(d)} · ${ago(d)}</span>
         <span class="muted">${fmtClock(x.entry.duration_s)}</span>
+        ${rankChip(x.entry)}
       </div>
       ${sparkline(x.casts, x.match.end, settings.heroesOnly)}
       <div class="card-stats">
@@ -312,9 +324,10 @@ async function benchmark(heroId, ability) {
   }
   if (!el.isConnected) return;
   el.querySelector(".v").innerHTML = thrown
-    ? `${pct(scored / thrown)}<small> ${scored}/${thrown} · ${players.size} player${players.size === 1 ? "" : "s"}</small>`
+    ? `${pct(scored / thrown)}<small> ${scored}/${thrown}</small>`
     : `<small>none found</small>`;
   el.querySelector(".v").classList.remove("muted");
+  el.title = `${players.size} other player${players.size === 1 ? "" : "s"} on this hero across your parsed demos`;
 }
 
 function histogram(values, bins, width, unit) {
@@ -468,6 +481,7 @@ async function viewMatch(id, params) {
         <h2>#${id}</h2>
         ${d ? `<span class="muted" title="${esc(d.toString())}">${fmtDate(d)} · ${ago(d)}</span>` : ""}
         <span class="muted">${fmtClock(m.end)}</span>
+        ${rankChip(e)}
         <a class="muted small" target="_blank" rel="noopener" href="https://statlocker.gg/match/${id}">statlocker ↗</a>
       </div>
     </div>
@@ -641,7 +655,7 @@ async function viewMatch(id, params) {
       tile("Level", st ? st[1] : "–") +
       tile("Hit non-hero", c.other) +
       tile("Hits → kills", c.hit ? `${c.kills}<small> / ${c.hit}</small>` : "–") +
-      tile("Avg ready-idle", c.idle != null ? `${c.idle.toFixed(1)}<small> s</small>` : "–");
+      tile("Ready → recast", c.idle != null ? `${c.idle.toFixed(1)}<small> s</small>` : "–");
 
     const events = [];
     for (const k of past.slice(-40)) events.push({ t: k.t, kind: "cast", k });
