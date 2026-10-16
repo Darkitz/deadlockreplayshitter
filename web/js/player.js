@@ -47,15 +47,20 @@ export async function viewPlayer(acc, params) {
     <section id="p-matches"></section>`;
   wireControls(app, () => viewPlayer(acc, params));
 
+  // load in parallel (4 at a time: each file is a few MB once unzipped)
   const rows = [];
-  for (const mm of matches) {
-    let m;
-    try { m = await loadMatch(mm.match_id); } catch { continue; }
-    const me = m.player(acc);
-    if (!me) continue;
-    rows.push({ mm, me, won: mm.winner === me.team, s: playerMatchSummary(m, me.pawn, S.assets, opts()) });
-    if (S.view !== "player") return;
-  }
+  let next = 0;
+  const worker = async () => {
+    while (next < matches.length) {
+      const mm = matches[next++];
+      let m;
+      try { m = await loadMatch(mm.match_id); } catch { continue; }
+      const me = m.player(acc);
+      if (me) rows.push({ mm, me, won: mm.winner === me.team, s: playerMatchSummary(m, me.pawn, S.assets, opts()) });
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  if (S.view !== "player") return;
   render(acc, rows);
 }
 

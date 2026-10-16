@@ -409,3 +409,8 @@ body.solo #app > *:not(.solo-target) { display: none; }
 img.slot-weapon { background: #7a4a12 !important; }
 img.slot-vitality { background: #2f6b2c !important; }
 img.slot-spirit { background: #5a3a8c !important; }
+.crumb { display: inline-flex; gap: 10px; align-items: center; color: var(--text); font-size: 15px; }
+.crumb img { width: 32px; height: 32px; border-radius: 8px; }
+.crumb:hover { text-decoration: none; color: var(--accent); }
+.recap { border: 1px solid var(--miss); border-radius: 8px; padding: 8px; background: rgba(229,100,90,.06); }
+.recap b img, .recap .lbl img { width: 18px; height: 18px; border-radius: 4px; vertical-align: middle; }

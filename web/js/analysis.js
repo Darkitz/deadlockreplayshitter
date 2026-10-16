@@ -368,3 +368,19 @@ export function playerMatchSummary(m, pawn, assets, opts) {
     aimedAt: inc.aimed, gotHit: inc.hit,
   };
 }
+
+/** hero damage a pawn took in the `window` seconds before time t, grouped by attacker + ability */
+export function damageTaken(m, pawn, t, window = 10) {
+  const by = new Map();
+  let total = 0;
+  for (const d of m.damage) {
+    if (d[3] !== pawn || d[0] > t || d[0] < t - window) continue;
+    const key = `${d[1]}|${d[4]}`;
+    const row = by.get(key) || { attacker: d[1], ability: d[4], dmg: 0, hits: 0, first: d[0] };
+    row.dmg += d[5];
+    row.hits++;
+    by.set(key, row);
+    total += d[5];
+  }
+  return { total, rows: [...by.values()].sort((a, b) => b.dmg - a.dmg) };
+}

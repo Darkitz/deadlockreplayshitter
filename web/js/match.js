@@ -5,7 +5,7 @@ import {
 } from "./data.js";
 import { digestMeta, renderReport, matchFromMeta } from "./report.js";
 import {
-  analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt,
+  analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt, damageTaken,
 } from "./analysis.js";
 import { createTimeline, fmtClock } from "./timeline.js";
 import { createMinimap } from "./minimap.js";
@@ -223,7 +223,22 @@ export async function viewMatch(id, params) {
     }
     mods.sort((a, b) => b.enemy - a.enemy || a.left - b.left);
     const f = hp && hp.max ? hp.hp / hp.max : 0;
-    $("#state", app).innerHTML = `
+    // dead at the playhead: recap of the last death
+    let recap = "";
+    const death = [...m.kills].reverse().find((k) => k[1] === pawn && k[0] <= t);
+    if (death && hp && hp.hp <= 0 && t - death[0] < 120 && !m.fromMeta) {
+      const dt = damageTaken(m, pawn, death[0]);
+      const killer = m.byPawn.get(death[2]);
+      recap = `<div class="recap"><b>Killed ${killer ? `by <img src="${esc(S.assets.hero(killer.hero_id).icon)}" alt=""> ${esc(S.profiles[killer.account_id]?.name || killer.name)}` : ""}</b>
+        <span class="muted small"> at ${fmtClock(death[0])} · ${k1(dt.total)} hero damage in the last 10 s</span>
+        ${dt.rows.slice(0, 8).map((r) => {
+          const a = m.byPawn.get(r.attacker);
+          const ab = S.assets.item(r.ability);
+          return `<div class="hbar"><span class="lbl">${a ? `<img src="${esc(S.assets.hero(a.hero_id).icon)}" alt="">` : ""}${ab?.image ? `<img src="${esc(ab.image)}" alt="">` : ""}${esc(ab?.name || "?")}</span>
+            <span class="track"><span style="width:${(r.dmg / Math.max(1, dt.total)) * 100}%;background:var(--miss)"></span></span><span class="val">${r.dmg} <small>×${r.hits}</small></span></div>`;
+        }).join("")}</div>`;
+    }
+    $("#state", app).innerHTML = recap + `
       <div class="st-head">
         <img src="${esc(S.assets.hero(subject.hero_id).icon)}" alt="">
         <div class="st-hp"><div class="st-bar"><span style="width:${f * 100}%;background:${f > 0.5 ? "var(--hit)" : f > 0.25 ? "var(--accent)" : "var(--miss)"}"></span></div>

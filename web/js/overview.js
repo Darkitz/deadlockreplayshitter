@@ -27,7 +27,11 @@ export async function viewOverview(heroId, params) {
 
   const allEntries = S.index.matches.filter((m) => m.hero_id === heroId).sort((a, b) => b.start_time - a.start_time);
   const entries = applyFilters(allEntries);
+  const prof = S.profiles[S.index.account_id] || {};
   app.innerHTML = `
+    <a class="crumb" href="#/player/${S.index.account_id}">
+      ${prof.avatar ? `<img src="${esc(prof.avatar)}" alt="">` : ""}<b>${esc(prof.name || S.index.profile?.name || `account ${S.index.account_id}`)}</b>
+      <span class="muted">← all matches</span> <span class="muted">/ ${esc(hero.name)}</span></a>
     <nav class="hero-tabs">
       ${heroes.map(([hid, c]) => `
         <a class="hero-tab ${hid === heroId ? "on" : ""} ${c.parsed ? "" : "dim"}" href="#/player/${S.index.account_id}/hero/${hid}" title="${esc(S.assets.hero(hid).name)}: ${c.n} matches, ${c.parsed} with demo">
