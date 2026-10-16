@@ -9,3 +9,4 @@ web/assets/
 
 __pycache__/
 *.pyc
+tools/.vrf/

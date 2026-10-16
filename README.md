@@ -11,6 +11,7 @@ It works for any hero, ability and player. The default is Drifter's Stalker's Ma
 
 ```bash
 tools/get-protoc.sh                       # once: protoc for the parser build
+tools/get-vrf.sh                          # once: Source2Viewer-CLI to read game files
 (cd parser && cargo build --release)      # once: demo parser
 python3 tools/sync.py                     # pull history, find/download demos, parse
 python3 tools/serve.py                    # http://127.0.0.1:8765 (sync button + auto-sync)
@@ -95,6 +96,21 @@ Matches without a demo still open, showing Valve's end-of-match stats.
   watcher. It binds to localhost only.
 - `web/`: static site with no build step (ES modules: `data`, `analysis`, `timeline`, `minimap`,
   `app`).
+
+## Where the data comes from
+
+| data | source |
+| --- | --- |
+| demos | your replays folder / `data/demos/`, or Valve's replay servers (needs the replay salt) |
+| match IDs, history, rank badges | deadlock-api `/v1/players/<id>/match-history` |
+| replay + metadata salts | deadlock-api `/v1/matches/<id>/salts` (cached in `data/salts.json`) |
+| match metadata | Valve's replay servers (`.meta` file via the metadata salt), decoded locally by `dlmeta` |
+| heroes, abilities, items, modifiers, accolades, ranks, icons, minimap | your Deadlock install: `pak01_dir.vpk` via Source2Viewer-CLI (`tools/get-vrf.sh`) + localization files (`tools/game_assets.py`) |
+| player names + avatars | steamcommunity.com public profile XML, cached 1 h |
+
+Ability/item/modifier ids are Valve string tokens: MurmurHash2 of the lowercase class name, seed
+`0x31415926`. If the game isn't installed, sync falls back to deadlock-api's asset endpoints.
+Set `DEADLOCK_GAME` to your `game/citadel` folder if it isn't at the default path.
 
 ## Where demos come from (in order)
 

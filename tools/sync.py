@@ -230,6 +230,7 @@ def sync_ranks(badges):
 
 
 def sync_assets(heroes, items, used_heroes, used_items, badges=()):
+    """fallback when the game isn't installed locally: assets from deadlock-api"""
     out_heroes = {}
     for h in heroes:
         img = h.get("images", {})
@@ -589,11 +590,25 @@ class Ctx:
     def __init__(self, args):
         self.args = args
         self.pver = parser_version()
-        self.heroes = get_json(f"{API}/v1/assets/heroes")
-        self.items = get_json(f"{API}/v1/assets/items")
-        self.ignore_ids = [it["id"] for it in self.items if it.get("class_name") in NOISY_CLASSES]
-        if len(self.ignore_ids) != len(NOISY_CLASSES):
-            log(f"note: only {len(self.ignore_ids)}/{len(NOISY_CLASSES)} movement abilities found in assets")
+        sys.path.insert(0, str(ROOT / "tools"))
+        import game_assets
+        self.game_assets = None
+        if game_assets.VPK.exists():
+            try:
+                prev = json.loads((DATA / "assets.json").read_text())
+            except (OSError, ValueError):
+                prev = None
+            self.game_assets = game_assets.build_assets(prev)
+            self.heroes = [{"id": hid, "name": h["name"], "class_name": h["class_name"]}
+                           for hid, h in self.game_assets["heroes"].items()]
+            self.items = None
+            log(f"assets from game files: {len(self.heroes)} heroes, {len(self.game_assets['items'])} items")
+        else:  # no local install: fall back to deadlock-api's asset endpoints
+            log(f"game files not found at {game_assets.GAME}, using deadlock-api assets")
+            self.heroes = get_json(f"{API}/v1/assets/heroes")
+            self.items = get_json(f"{API}/v1/assets/items")
+        # ability ids are string tokens of their class names
+        self.ignore_ids = [game_assets.token_id(c) for c in NOISY_CLASSES]
         self.selected = resolve_heroes(self.heroes, args.hero)
         self.demos = local_demos()
         self.manifest = load_manifest()
@@ -799,7 +814,10 @@ def main():
                                           else {"v": ctx.pver, "error": msg})
         MANIFEST.write_text(json.dumps(ctx.manifest))
 
-    sync_assets(ctx.heroes, ctx.items, ctx.used_heroes, ctx.used_items, ctx.badges)
+    if ctx.game_assets:
+        (DATA / "assets.json").write_text(json.dumps(ctx.game_assets))
+    else:
+        sync_assets(ctx.heroes, ctx.items, ctx.used_heroes, ctx.used_items, ctx.badges)
     if not args.no_meta:
         parsed_ids = {int(p.name.split(".")[0]) for p in MATCHES.glob("*.json.gz")}
         wanted = ctx.meta_ids | parsed_ids
