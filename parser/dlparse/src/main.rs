@@ -12,6 +12,7 @@ use std::io::{BufReader, BufWriter};
 
 use haste::demofile::DemoFile;
 use haste::entities::{DeltaHeader, Entity, ehandle_to_index, fkey_from_path, is_ehandle_valid};
+use haste::fieldvalue::FieldValue;
 use haste::fxhash;
 use haste::parser::{Context, Parser, Visitor};
 use haste::valveprotos::common::{CnetMsgTick, NetMessages};
@@ -22,7 +23,7 @@ use haste::valveprotos::deadlock::{
 use prost::Message;
 use serde::Serialize;
 
-const FORMAT_VERSION: u32 = 6;
+const FORMAT_VERSION: u32 = 7;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`.
 /// sync.py passes the current ids (resolved by class name) via `--ignore-ids`; this list is only
 /// the fallback.
@@ -80,6 +81,8 @@ const OWNER: u64 = fkey_from_path(&["m_hOwnerEntity"]);
 const SUBCLASS: u64 = fkey_from_path(&["m_nSubclassID"]);
 const UPGRADE_INFO: u64 = fkey_from_path(&["m_nUpgradeInfo"]);
 const CHARGES: u64 = fkey_from_path(&["m_iRemainingCharges"]);
+// weapons
+const SHOT_NUMBER: u64 = fkey_from_path(&["m_nShotNumber"]);
 
 const STEAM_ID64_BASE: u64 = 76561197960265728;
 
@@ -155,8 +158,12 @@ struct Output {
     items: Vec<(f32, i32, u32, i32)>,
     /// [t, pawn, ability_id, upgrade_bits]
     upgrades: Vec<(f32, i32, u32, u64)>,
-    /// [t, attacker_pawn, victim_entindex, victim_pawn_or_-1, ability_id, damage, victim_class, x, y]
-    damage: Vec<(f32, i32, i32, i32, u32, i32, u32, i32, i32)>,
+    /// [t, attacker_pawn, victim_entindex, victim_pawn_or_-1, ability_id, damage, victim_class, x, y,
+    ///  hitgroup, crit]
+    damage: Vec<(f32, i32, i32, i32, u32, i32, u32, i32, i32, i32, u8)>,
+    /// weapon shots fired (trigger pulls; multiply by the weapon's pellets for bullets):
+    /// [t, pawn, weapon_id, shots] (one row per tick with shots)
+    shots: Vec<(f32, i32, u32, i32)>,
     /// [t, attacker_pawn, victim_pawn, ability_id, status_impact]
     notify: Vec<(f32, i32, i32, u32, u32)>,
     /// [t, victim_pawn, attacker_pawn, killer_ability_id, [assister pawns]]
@@ -169,6 +176,7 @@ struct Output {
 
 #[derive(Default)]
 struct AbilityState {
+    shot_number: Option<i64>,
     owner_pawn: i32,
     id: u32,
     cooldown_start: f32,
@@ -265,6 +273,20 @@ impl V {
             self.out.items.push((t, owner, id, 1));
             return;
         }
+        if let Some(sn) = e.get_field_value(&SHOT_NUMBER).and_then(|v| match v {
+            FieldValue::I64(x) => Some(*x),
+            FieldValue::U64(x) => Some(*x as i64),
+            _ => None,
+        }) {
+            let prev = a.shot_number.replace(sn);
+            if let Some(prev) = prev {
+                if sn > prev && t > 0.0 {
+                    let (owner, id) = (a.owner_pawn, a.id);
+                    self.out.shots.push((t, owner, id, (sn - prev) as i32));
+                }
+            }
+        }
+        let a = self.abilities.get_mut(&idx).unwrap();
         let cd_start: f32 = e.get_value(&COOLDOWN_START).unwrap_or(0.0);
         if cd_start > 0.0 && (cd_start - a.cooldown_start).abs() > 1e-3 && !self.noisy.contains(&a.id) {
             a.cooldown_start = cd_start;
@@ -397,6 +419,7 @@ impl Visitor for V {
                 }
             }
         } else if e.get_field_value(&COOLDOWN_START).is_some()
+            || e.get_field_value(&SHOT_NUMBER).is_some()
             || self.abilities.contains_key(&e.index())
         {
             self.handle_ability_entity(ctx, dh, e);
@@ -438,6 +461,7 @@ impl Visitor for V {
                 let t = self.time(ctx);
                 self.out.damage.push((
                     t, att, vic, vic_pawn, m.ability_id(), m.damage(), m.victim_class(), x, y,
+                    m.hitgroup_id(), u8::from(m.crit_damage() > 0.0),
                 ));
             }
             IMPORTANT => {
@@ -528,6 +552,9 @@ fn sanity_check(o: &Output, has_start: bool) -> Vec<String> {
     if o.damage.is_empty() {
         w.push("no hero damage events".into());
     }
+    if o.shots.is_empty() {
+        w.push("no weapon shots (m_nShotNumber)".into());
+    }
     if o.kills.is_empty() {
         w.push("no hero kills".into());
     }
@@ -588,12 +615,13 @@ fn main() -> anyhow::Result<()> {
 
     serde_json::to_writer(BufWriter::new(File::create(&args[2])?), &v.out)?;
     eprintln!(
-        "ok: {} players, {} casts, {} uses, {} items, {} damage, {} kills, {} samples, {:.0}s",
+        "ok: {} players, {} casts, {} uses, {} items, {} damage, {} shots, {} kills, {} samples, {:.0}s",
         v.out.players.len(),
         v.out.casts.len(),
         v.out.uses.len(),
         v.out.items.len(),
         v.out.damage.len(),
+        v.out.shots.iter().map(|s| s.3 as i64).sum::<i64>(),
         v.out.kills.len(),
         v.out.samples.tracks.first().map_or(0, |t| t.hp.len()),
         v.out.duration_s

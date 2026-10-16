@@ -47,8 +47,8 @@ export function createMinimap(canvas, { match, assets, onPick }) {
 
     // ground + building silhouettes (the minimap png is dark buildings on transparent)
     const grd = ctx.createRadialGradient(S / 2, S / 2, S * 0.1, S / 2, S / 2, S * 0.6);
-    grd.addColorStop(0, "#3b3127");
-    grd.addColorStop(1, "#231d17");
+    grd.addColorStop(0, "#2a2e35");
+    grd.addColorStop(1, "#15171b");
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, S, S);
     const bg = img(assets.map?.image, redraw);

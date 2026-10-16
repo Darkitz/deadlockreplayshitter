@@ -1,16 +1,16 @@
 :root {
-  --bg: #15120f;
-  --panel: #1f1a15;
-  --panel-2: #2a231c;
-  --panel-3: #342b22;
-  --line: #3a3027;
-  --text: #ede3d2;
-  --muted: #9b8d7a;
+  --bg: #0a0b0d;
+  --panel: #121418;
+  --panel-2: #191c21;
+  --panel-3: #22262d;
+  --line: #262a31;
+  --text: #e9ebef;
+  --muted: #8b919c;
   --accent: #e0b25a;
-  --hit: #6fd08c;
+  --hit: #5fd38d;
   --other: #e0b25a;
-  --miss: #d9644f;
-  --thrown: #c9bba5;
+  --miss: #e5645a;
+  --thrown: #b9bec8;
   --death: #ff6b5a;
   --kill: #a98bff;
   --amber: #e8a33d;
@@ -150,8 +150,8 @@ footer { padding: 16px 24px 28px; }
 .spark .l-thrown { fill: none; stroke: var(--thrown); stroke-width: 1.5; }
 .spark .l-hit { fill: none; stroke: var(--hit); stroke-width: 1.5; }
 .result { font-weight: 700; font-size: 11px; padding: 1px 6px; border-radius: 4px; }
-.result.win { background: #234a30; color: var(--hit); }
-.result.loss { background: #4a2620; color: var(--miss); }
+.result.win { background: #163a26; color: var(--hit); }
+.result.loss { background: #3d1a18; color: var(--miss); }
 details.unparsed { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; }
 details.unparsed summary { cursor: pointer; color: var(--muted); }
 table.plain { border-collapse: collapse; width: 100%; font-size: 12px; }
@@ -189,7 +189,7 @@ table.plain td { padding: 4px 8px; border-top: 1px solid var(--line); }
 
 .stage { display: grid; grid-template-columns: minmax(280px, 440px) minmax(0, 1fr); gap: 14px; align-items: start; }
 .map-wrap { position: sticky; top: 92px; }
-.minimap { width: 100%; aspect-ratio: 1; display: block; border-radius: var(--radius); border: 1px solid var(--line); background: #1a1511; }
+.minimap { width: 100%; aspect-ratio: 1; display: block; border-radius: var(--radius); border: 1px solid var(--line); background: #111317; }
 .map-legend { margin-top: 6px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .map-legend .check { display: flex; gap: 5px; align-items: center; color: var(--text); }
 .stage-right { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -287,3 +287,5 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
 .charts.charts-3 { grid-template-columns: 1fr 1fr minmax(260px, 380px); align-items: start; }
 .castmap { width: 100%; aspect-ratio: 1; display: block; border-radius: 8px; }
 @media (max-width: 1100px) { .charts.charts-3 { grid-template-columns: 1fr; } }
+.timeline .l-hs { fill: none; stroke: var(--accent); stroke-width: 2; }
+.m-hs { fill: var(--accent); }

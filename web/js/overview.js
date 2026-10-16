@@ -373,7 +373,7 @@ function drawCastMap(canvas, list) {
   const W = canvas.width;
   const w2p = (x, y) => [((x + R) / (2 * R)) * W, ((R - y) / (2 * R)) * W];
   const draw = (bg) => {
-    ctx.fillStyle = "#2c241d";
+    ctx.fillStyle = "#1f2228";
     ctx.fillRect(0, 0, W, W);
     if (bg) ctx.drawImage(bg, 0, 0, W, W);
     const col = { hit: "#6fd08c", other: "#e0b25a", miss: "#d9644f" };

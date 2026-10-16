@@ -231,6 +231,10 @@ def sync_assets(heroes, items, used_heroes, used_items, badges=()):
                              ("item_tier", "tier"), ("cost", "cost")):
             if it.get(k_src):
                 entry[k_dst] = it[k_src]
+        wi = it.get("weapon_info") or {}
+        if it.get("type") == "weapon" and wi:
+            entry["pellets"] = wi.get("bullets") or 1
+            entry["bullet_damage"] = wi.get("bullet_damage")
         wanted = (it.get("type") == "ability" and it.get("hero") in used_heroes) \
             or it["id"] in used_items
         if wanted:
@@ -307,6 +311,44 @@ CAREER_CUSTOM = {
     "Enemy Hero Accuracy - Incoming##Hits": "in_hits",
     "Parry Miss": "parry_miss",
 }
+
+
+VALVE_STATS = DATA / "valve-stats.json"
+VALVE_FIELDS = ["shots_hit", "shots_missed", "hero_bullets_hit", "hero_bullets_hit_crit",
+                "player_damage", "player_damage_taken", "player_healing", "net_worth", "kills",
+                "deaths", "assists", "headshot_kills", "bullet_kills", "ability_kills", "melee_kills"]
+
+
+def sync_valve_stats(match_ids):
+    """Valve's end-of-match stats for every player of every parsed match (cached forever)."""
+    try:
+        cache = json.loads(VALVE_STATS.read_text())
+    except (OSError, ValueError):
+        cache = {}
+    todo = [m for m in match_ids if str(m) not in cache]
+    for i in range(0, len(todo), 50):
+        chunk = todo[i:i + 50]
+        url = (f"{API}/v1/matches/metadata?match_ids={','.join(map(str, chunk))}"
+               f"&include_player_info=true&include_player_final_stats=true&limit={len(chunk)}")
+        try:
+            rows = get_json(url, timeout=180)
+        except (urllib.error.URLError, OSError) as e:
+            log(f"valve stats fetch failed: {e}")
+            break
+        for m in rows:
+            per = {}
+            for p in m.get("players", []):
+                fs = p.get("final_stats") or {}
+                cs = fs.get("custom_user_stats") or {}
+                rec = {k: fs.get(k) for k in VALVE_FIELDS}
+                for k, short in CAREER_CUSTOM.items():
+                    rec[short] = cs.get(k)
+                per[p["account_id"]] = rec
+            cache[str(m["match_id"])] = per
+        for mid in chunk:  # matches deadlock-api has no metadata for: don't ask every sync
+            cache.setdefault(str(mid), {})
+    VALVE_STATS.write_text(json.dumps(cache))
+    log(f"valve stats: {sum(1 for v in cache.values() if v)} matches")
 
 
 def sync_career(account):
@@ -574,6 +616,7 @@ def main():
         indexes.append(idx)
 
     sync_assets(ctx.heroes, ctx.items, ctx.used_heroes, ctx.used_items, ctx.badges)
+    sync_valve_stats(sorted({int(p.name.split(".")[0]) for p in MATCHES.glob("*.json.gz")}))
     profiles = sync_profiles(ctx.accounts)
     for idx in indexes:
         idx["profile"] = profiles.get(idx["account_id"])

@@ -278,3 +278,69 @@ export function incoming(m, pawn, assets, opts) {
   const hit = rows.reduce((a, r) => a + r.hit, 0);
   return { rows: rows.sort((a, b) => b.aimed - a.aimed), aimed, hit, dodged: aimed - hit };
 }
+
+/** pseudo-ability used by the UI for the hero's gun */
+export const GUN = { class_name: "__gun", name: "Gun", id: null };
+
+/**
+ * Gun stats for a pawn, straight from the demo:
+ *   shots    = trigger pulls (weapon m_nShotNumber), bullets = shots × pellets per shot
+ *   heroHits = weapon damage events on enemy heroes (one per shot that connected; for
+ *              multi-pellet guns several pellets fold into one event)
+ *   headshots = hero hits on hitgroup 1 / with crit damage
+ * Returns totals plus time-ordered events for timelines: {t, kind: "shot"|"hit"|"hs"|"npc", n}
+ */
+export function gunStats(m, pawn, assets) {
+  m._gun ??= new Map();
+  if (m._gun.has(pawn)) return m._gun.get(pawn);
+  const me = m.byPawn.get(pawn);
+  const weapons = new Set();
+  const events = [];
+  let shots = 0, bullets = 0;
+  for (const s of m.shots || []) {
+    if (s[1] !== pawn) continue;
+    weapons.add(s[2]);
+    const pellets = assets?.item(s[2])?.pellets || 1;
+    shots += s[3];
+    bullets += s[3] * pellets;
+    events.push({ t: s[0], kind: "shot", n: s[3] });
+  }
+  let heroHits = 0, headshots = 0, npcHits = 0, dmg = 0, heroDmg = 0;
+  const byVictim = new Map();
+  for (const d of m.damage) {
+    if (d[1] !== pawn || !weapons.has(d[4])) continue;
+    dmg += d[5];
+    const vic = d[3] >= 0 ? m.byPawn.get(d[3]) : null;
+    if (vic && vic.team === me.team) continue;
+    if (vic) {
+      heroHits++;
+      heroDmg += d[5];
+      const hs = d[9] === 1 || d[10] === 1;
+      if (hs) headshots++;
+      byVictim.set(vic.hero_id, (byVictim.get(vic.hero_id) || 0) + 1);
+      events.push({ t: d[0], kind: hs ? "hs" : "hit", n: 1, victim: d[3] });
+    } else {
+      npcHits++;
+      events.push({ t: d[0], kind: "npc", n: 1 });
+    }
+  }
+  events.sort((a, b) => a.t - b.t);
+  const res = {
+    weapons: [...weapons], shots, bullets, heroHits, headshots, npcHits, dmg, heroDmg, events,
+    byVictim: [...byVictim].sort((a, b) => b[1] - a[1]),
+  };
+  m._gun.set(pawn, res);
+  return res;
+}
+
+/** gun totals up to time t */
+export function gunAt(g, t) {
+  let shots = 0, hits = 0, hs = 0, npc = 0;
+  for (const e of g.events) {
+    if (e.t > t) break;
+    if (e.kind === "shot") shots += e.n;
+    else if (e.kind === "npc") npc++;
+    else { hits++; if (e.kind === "hs") hs++; }
+  }
+  return { shots, hits, hs, npc };
+}

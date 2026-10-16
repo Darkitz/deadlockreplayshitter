@@ -123,3 +123,24 @@ test("kill conversion and ready-idle time", () => {
   assert.equal(c.kills, 1);
   assert.ok(Math.abs(c.idle - 10) < 1e-9);
 });
+
+test("gun stats: shots, pellets, hero hits, headshots", async () => {
+  const { gunStats, gunAt } = await import("../web/js/analysis.js");
+  const m = fixture({
+    damage: [
+      [10.1, 1, 2, 2, 900, 20, 1, 0, 0, 3, 0], // body hit on enemy
+      [10.6, 1, 2, 2, 900, 40, 1, 0, 0, 1, 1], // headshot
+      [11.0, 1, 50, -1, 900, 10, 4, 0, 0, 0, 0], // trooper
+      [11.2, 1, 3, 3, 900, 10, 1, 0, 0, 0, 0], // ally: ignored
+    ],
+  });
+  m.shots = [[10, 1, 900, 2], [10.5, 1, 900, 1], [11, 1, 900, 3]];
+  const assets = { item: (id) => (id === 900 ? { pellets: 3 } : null) };
+  const g = gunStats(m, 1, assets);
+  assert.equal(g.shots, 6);
+  assert.equal(g.bullets, 18);
+  assert.equal(g.heroHits, 2);
+  assert.equal(g.headshots, 1);
+  assert.equal(g.npcHits, 1);
+  assert.deepEqual(gunAt(g, 10.55), { shots: 3, hits: 1, hs: 0, npc: 0 });
+});

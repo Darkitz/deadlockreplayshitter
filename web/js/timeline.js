@@ -58,9 +58,31 @@ export function createTimeline(svg, model, onSeek) {
     let outside = "";
     g += `<g clip-path="url(#plot-clip)">`;
 
-    // lane: cumulative thrown vs hit
+    // lane: cumulative thrown vs hit (or gun: shots vs hero hits vs headshots)
     const { casts } = model;
     const c = L.chart;
+    if (model.gun) {
+      const ev = model.gun.events;
+      const total = (kinds) => ev.reduce((a, e) => a + (kinds.includes(e.kind) ? e.n : 0), 0);
+      const maxG = Math.max(total(["shot"]), 1);
+      const gy = (n) => c.y + c.h - (n / maxG) * (c.h - 4);
+      const series = (kinds) => {
+        let n = 0, d = `M${x(0)},${gy(0)}`;
+        for (const e of ev) {
+          if (!kinds.includes(e.kind)) continue;
+          n += e.n;
+          d += ` H${x(e.t)} V${gy(n)}`;
+        }
+        return { d: d + ` H${x(dur)}`, n };
+      };
+      const sh = series(["shot"]), hi = series(["hit", "hs"]), hs = series(["hs"]);
+      g += `<path class="area-hit" d="${hi.d} V${gy(0)} H${x(0)} Z"/>`;
+      g += `<path class="l-thrown" d="${sh.d}"/><path class="l-hit" d="${hi.d}"/><path class="l-hs" d="${hs.d}"/>`;
+      for (const n of [0, maxG]) {
+        outside += `<text class="axis" x="${padL - 6}" y="${gy(n) + 3}" text-anchor="end">${n}</text>`;
+      }
+      g += `<text class="lane-label" x="${padL + 4}" y="${c.y + 10}">shots ${sh.n} · hero hits ${hi.n} · headshots ${hs.n}</text>`;
+    }
     const maxY = Math.max(casts.length, 1);
     const cy = (n) => c.y + c.h - (n / maxY) * (c.h - 4);
     const scored = (k) => k.result === "hit" || (!model.heroesOnly && k.result === "other");
@@ -72,13 +94,15 @@ export function createTimeline(svg, model, onSeek) {
       }
       return { d: d + ` H${x(dur)}`, n };
     };
-    const thrown = stepPath(() => true), hit = stepPath(scored);
-    g += `<path class="area-hit" d="${hit.d} V${cy(0)} H${x(0)} Z"/>`;
-    g += `<path class="l-thrown" d="${thrown.d}"/><path class="l-hit" d="${hit.d}"/>`;
-    for (const n of [0, maxY]) {
-      outside += `<text class="axis" x="${padL - 6}" y="${cy(n) + 3}" text-anchor="end">${n}</text>`;
+    if (!model.gun) {
+      const thrown = stepPath(() => true), hit = stepPath(scored);
+      g += `<path class="area-hit" d="${hit.d} V${cy(0)} H${x(0)} Z"/>`;
+      g += `<path class="l-thrown" d="${thrown.d}"/><path class="l-hit" d="${hit.d}"/>`;
+      for (const n of [0, maxY]) {
+        outside += `<text class="axis" x="${padL - 6}" y="${cy(n) + 3}" text-anchor="end">${n}</text>`;
+      }
+      g += `<text class="lane-label" x="${padL + 4}" y="${c.y + 10}">thrown ${casts.length} · hit ${hit.n}</text>`;
     }
-    g += `<text class="lane-label" x="${padL + 4}" y="${c.y + 10}">thrown ${casts.length} · hit ${hit.n}</text>`;
 
     // lane: cast markers, deaths, kills
     const mk = L.marks, my = mk.y + mk.h / 2;
@@ -88,6 +112,10 @@ export function createTimeline(svg, model, onSeek) {
     }
     for (const k of model.deaths || []) {
       g += `<path class="m-death" data-t="${k}" d="M${x(k) - 4},${my + 4} l8,8 m0,-8 l-8,8"><title>${fmtClock(k)} died</title></path>`;
+    }
+    for (const e of model.gun?.events || []) {
+      if (e.kind !== "hit" && e.kind !== "hs") continue;
+      g += `<rect data-t="${e.t}" class="m-${e.kind === "hs" ? "hs" : "hit"}" x="${x(e.t) - 1}" y="${my - (e.kind === "hs" ? 7 : 4)}" width="2" height="${e.kind === "hs" ? 14 : 8}"/>`;
     }
     casts.forEach((k, i) => {
       g += `<circle data-i="${i}" data-t="${k.t}" class="m-${k.result}" cx="${x(k.t)}" cy="${my}" r="4.5"><title>${fmtClock(k.t)} ${k.result}${k.dmg ? ` · ${k.dmg} dmg` : ""}</title></circle>`;

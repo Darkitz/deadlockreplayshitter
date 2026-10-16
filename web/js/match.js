@@ -1,7 +1,9 @@
 // Match detail: scoreboard, ability picker, minimap + timeline replay, incoming skillshots.
 
 import { loadMatch, statsAt, TEAM_NAMES } from "./data.js";
-import { analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG } from "./analysis.js";
+import {
+  analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt,
+} from "./analysis.js";
 import { createTimeline, fmtClock } from "./timeline.js";
 import { createMinimap } from "./minimap.js";
 import {
@@ -29,13 +31,21 @@ export async function viewMatch(id, params) {
   const row = table.find((r) => r.ability.class_name === wanted)
     || table.find((r) => r.ability.class_name === "drifter_shadow_mark")
     || table.find((r) => r.thrown) || table[0];
-  const ability = row?.ability || sigs[0];
-  const analysis = analyzeAbility(m, pawn, ability, opts());
+  const gunMode = wanted === GUN.class_name;
+  const gun = gunStats(m, pawn, S.assets);
+  const weaponItem = S.assets.itemByClass(S.assets.hero(subject.hero_id).weapon);
+  const gunAbility = { ...GUN, image: weaponItem?.image };
+  const ability = gunMode ? gunAbility : row?.ability || sigs[0];
+  const analysis = gunMode ? { source: "gun", casts: [] } : analyzeAbility(m, pawn, ability, opts());
   const casts = analysis.casts;
+  const valve = (S.valveStats?.[id] || {})[subject.account_id];
   const won = e ? e.won : null;
   const d = e ? new Date(e.start_time * 1000) : null;
 
   function abStat(ab) {
+    if (ab.class_name === GUN.class_name) {
+      return gun.shots ? `<span class="ab-stat">${gun.heroHits}/${gun.shots}</span>` : `<span class="ab-stat muted">–</span>`;
+    }
     const r = table.find((x) => x.ability.class_name === ab.class_name);
     return r && r.thrown ? `<span class="ab-stat">${r.scored}/${r.thrown}</span>` : `<span class="ab-stat muted">–</span>`;
   }
@@ -86,7 +96,7 @@ export async function viewMatch(id, params) {
         </div>`).join("")}
     </section>
     <section class="toolbar">
-      <div class="abilities">${abilityButtons(table.filter((r) => !r.kind).map((r) => r.ability), ability.class_name, abStat)}</div>
+      <div class="abilities">${abilityButtons([gunAbility, ...table.filter((r) => !r.kind).map((r) => r.ability)], ability.class_name, abStat)}</div>
       <div class="controls">${controlsHTML()}</div>
     </section>
     ${table.some((r) => r.kind === "extra") ? `<section class="items-row"><span class="muted small">other abilities</span>
@@ -112,7 +122,7 @@ export async function viewMatch(id, params) {
           <input type="range" class="scrub" min="0" max="${Math.ceil(m.end)}" step="0.5">
           <span class="clock">0:00</span>
           <button class="btn csv" title="download casts as CSV">CSV</button>
-          <button class="btn demo-cmd" title="copy a Deadlock console command that jumps the real replay to this moment">⧉ in-game</button>
+          <button class="btn demo-cmd" title="copy a Deadlock console command that jumps the real replay to this moment">in-game ↗</button>
         </div>
         <div class="readout">
           <div class="tiles"></div>
@@ -189,6 +199,7 @@ export async function viewMatch(id, params) {
 
   const timeline = createTimeline($(".timeline", app), {
     end: m.end, casts, heroesOnly: settings.heroesOnly, hp, lead, deaths, kills, items,
+    gun: gunMode ? gun : null,
   }, (t) => seek(t));
   const minimap = createMinimap($(".minimap", app), {
     match: m, assets: S.assets, onPick: (p) => setParams({ pawn: p.pawn, ability: null }),
@@ -207,8 +218,11 @@ export async function viewMatch(id, params) {
   });
   $(".csv", app).addEventListener("click", () => {
     const name = (p) => m.byPawn.get(p)?.name ?? "";
-    const rows = [["time_s", "clock", "result", "damage", "delay_s", "range_m", "victims", "x", "y", "yaw"]];
-    for (const c of casts) {
+    const rows = gunMode
+      ? [["time_s", "clock", "event", "count", "victim"]].concat(gun.events.map((ev) =>
+        [ev.t.toFixed(2), fmtClock(ev.t), ev.kind, ev.n, ev.victim != null ? name(ev.victim) : ""]))
+      : [["time_s", "clock", "result", "damage", "delay_s", "range_m", "victims", "x", "y", "yaw"]];
+    for (const c of gunMode ? [] : casts) {
       rows.push([c.t.toFixed(2), fmtClock(c.t), c.result, c.dmg, c.delay?.toFixed(3) ?? "",
         c.dist != null ? Math.round(c.dist) : "", c.victims.map(name).join("|"), c.x, c.y, c.yaw?.toFixed(1) ?? ""]);
     }
@@ -237,7 +251,42 @@ export async function viewMatch(id, params) {
     renderReadout(t);
   }
 
+  function renderGunReadout(t) {
+    const g = gunAt(gun, t);
+    const pellets = gun.shots ? gun.bullets / gun.shots : 1;
+    const st = statsAt(m, pawn, t);
+    const vAcc = valve?.hero_shots ? valve.hero_hits / valve.hero_shots : null;
+    $(".tiles", app).innerHTML =
+      tile("Shots fired", g.shots) +
+      tile("Bullets", Math.round(g.shots * pellets) + (pellets > 1 ? `<small> ×${pellets.toFixed(0)}</small>` : "")) +
+      tile("Shots hit heroes", g.hits, "good") +
+      tile("Hit rate", g.shots ? pct(g.hits / g.shots) : "–", "accent") +
+      tile("Headshots", g.hs) +
+      tile("Headshot %", g.hits ? pct(g.hs / g.hits) : "–") +
+      tile("Trooper/NPC hits", g.npc) +
+      tile("K / D / A", st ? `${st[2]}/${st[3]}/${st[4]}` : "–") +
+      tile("Souls", st ? k1(st[0]) : "–") +
+      (valve ? tile("Valve: hero accuracy", vAcc != null ? `${pct(vAcc)}<small> ${valve.hero_hits}/${valve.hero_shots}</small>` : "–") +
+        tile("Valve: headshots", valve.hero_headshots ?? "–") +
+        tile("Valve: bullets hit", valve.shots_hit != null ? `${valve.shots_hit}<small> / ${valve.shots_hit + valve.shots_missed}</small>` : "–") : "");
+    const f = settings.feed || "all";
+    const evs = [];
+    for (const ev of gun.events) {
+      if (ev.t > t) break;
+      if (ev.kind === "hit" || ev.kind === "hs") {
+        if (f === "miss" || f === "kills") continue;
+        evs.push(ev);
+      }
+    }
+    $(".feed", app).innerHTML = evs.slice(-40).reverse().map((ev) => {
+      const p = m.byPawn.get(ev.victim);
+      return `<li data-t="${ev.t}"><span class="dot ${ev.kind === "hs" ? "other" : "hit"}"></span><span class="t">${fmtClock(ev.t)}</span>
+        ${p ? `<img src="${esc(S.assets.hero(p.hero_id).icon)}" title="${esc(p.name)}">` : ""}<span>${ev.kind === "hs" ? "<b>headshot</b>" : "hit"}</span></li>`;
+    }).join("") || `<li class="muted">no hero hits yet</li>`;
+  }
+
   function renderReadout(t) {
+    if (gunMode) { renderGunReadout(t); return; }
     const past = casts.filter((c) => c.t <= t);
     const c = counts(past, settings.heroesOnly);
     const st = statsAt(m, pawn, t);

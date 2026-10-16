@@ -20,6 +20,7 @@ async function loadAll() {
     loadJSON(acc ? `data/career-${acc}.json` : "data/career.json").catch(() => []),
   ]);
   S.career = career;
+  S.valveStats = await loadJSON("data/valve-stats.json").catch(() => ({}));
   S.index = index;
   S.assets = new Assets(assets);
   S.profiles = profiles;
