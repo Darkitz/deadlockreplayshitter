@@ -8,6 +8,7 @@
 //   #/player/<account>                   a player's performance across parsed matches
 //   #/player/<account>/hero/<id>?ability= per-hero ability analysis (tracked accounts)
 //   #/hero/<id>                          legacy: hero page of the current player
+//   #/about                              how every number is derived
 
 import { loadJSON, Assets, clearCache, setDataVersion } from "./data.js";
 import { $, esc, S, fmtDate, TZ, settings, saveSettings } from "./ui.js";
@@ -18,6 +19,7 @@ import { viewPlayer } from "./player.js";
 import { viewPlayers } from "./players.js";
 import { viewHeroes, viewHero } from "./heroes.js";
 import { viewCompare } from "./compare.js";
+import { viewAbout, explain } from "./explain.js";
 
 async function loadAll() {
   S.accounts = await loadJSON("data/accounts.json").catch(() => []);
@@ -119,6 +121,9 @@ async function route() {
       S.view = "heroes";
       viewHeroes();
     }
+  } else if (parts[0] === "about") {
+    S.view = "about";
+    viewAbout($("#app"));
   } else if (parts[0] === "players") {
     S.view = "players";
     viewPlayers();
@@ -186,6 +191,55 @@ async function initSync() {
   });
 }
 
+// ------------------------------------------------------------------ hover help
+// Tile labels, table headers and anything with data-help get an explanation on hover. Labels
+// are looked up in explain.js, so new tiles with a known label get help for free.
+const HELP_SEL = "[data-help], .tile .k, th";
+
+function helpFor(el) {
+  if (el.dataset.help) return el.dataset.help;
+  return explain(el.textContent);
+}
+
+function initHelp() {
+  const tip = document.createElement("div");
+  tip.className = "help-tip";
+  tip.hidden = true;
+  document.body.append(tip);
+  // mark explained labels (dotted underline) whenever a view renders
+  const mark = () => {
+    for (const el of document.querySelectorAll(HELP_SEL)) {
+      if (el.classList.contains("has-help") || el.dataset.helpChecked) continue;
+      el.dataset.helpChecked = "1";
+      if (helpFor(el)) el.classList.add("has-help");
+    }
+  };
+  let queued = false;
+  new MutationObserver(() => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => { queued = false; mark(); });
+  }).observe(document.body, { childList: true, subtree: true });
+  let cur = null;
+  document.addEventListener("mouseover", (ev) => {
+    const el = ev.target.closest?.(".has-help, [data-help]");
+    if (el === cur) return;
+    cur = el;
+    const text = el && helpFor(el);
+    if (!text) { tip.hidden = true; return; }
+    tip.textContent = text;
+    tip.hidden = false;
+    const r = el.getBoundingClientRect();
+    const w = Math.min(340, window.innerWidth - 16);
+    tip.style.maxWidth = `${w}px`;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+    tip.style.left = `${left + window.scrollX}px`;
+    const below = r.bottom + 6 + tip.offsetHeight < window.innerHeight;
+    tip.style.top = `${(below ? r.bottom + 6 : r.top - 6 - tip.offsetHeight) + window.scrollY}px`;
+  });
+  window.addEventListener("scroll", () => { tip.hidden = true; cur = null; }, { passive: true });
+}
+
 async function main() {
   try {
     await loadAll();
@@ -194,6 +248,7 @@ async function main() {
     return;
   }
   window.addEventListener("hashchange", route);
+  initHelp();
   route();
   initSync();
 }

@@ -91,6 +91,51 @@ export function createMinimap(canvas, { match, assets, profiles, onPick }) {
       ctx.globalAlpha = 1;
     }
 
+    // heat: where the subject spent time inside [from, t] (whole match up to t in point mode)
+    const from = state.from ?? 0;
+    if (state.heat && subject != null) {
+      const tr = match.tracks.get(subject);
+      if (tr) {
+        const N = 48, grid = new Float32Array(N * N);
+        let max = 0;
+        for (let i = 0; i < tr.hp.length; i++) {
+          const tt = match.samples.t0 + i * match.samples.dt;
+          if (tt < from || tt > t || tr.hp[i] <= 0) continue;
+          const x = tr.pos[i * 2], y = tr.pos[i * 2 + 1];
+          if (!x && !y) continue;
+          const gx = Math.floor(((x + R) / (2 * R)) * N), gy = Math.floor(((R - y) / (2 * R)) * N);
+          if (gx < 0 || gy < 0 || gx >= N || gy >= N) continue;
+          max = Math.max(max, ++grid[gy * N + gx]);
+        }
+        const cell = (2 * R) / N;
+        for (let gy = 0; gy < N; gy++) {
+          for (let gx = 0; gx < N; gx++) {
+            const v = grid[gy * N + gx];
+            if (!v) continue;
+            const [px, py] = w2p(-R + gx * cell, R - gy * cell);
+            const [qx, qy] = w2p(-R + (gx + 1) * cell, R - (gy + 1) * cell);
+            ctx.fillStyle = `rgba(224, 178, 90, ${0.15 + 0.7 * Math.sqrt(v / max)})`;
+            ctx.fillRect(px, py, qx - px, qy - py);
+          }
+        }
+      }
+    }
+    // deaths of everyone inside [from, t]
+    if (state.deaths) {
+      for (const k of match.kills) {
+        if (k[0] < from || k[0] > t) continue;
+        const p = posAt(match, k[1], k[0] - 0.5);
+        const v = match.byPawn.get(k[1]);
+        if (!p || !v) continue;
+        const [px, py] = w2p(p[0], p[1]);
+        const sz = 5 * dpr;
+        ctx.strokeStyle = TEAM_COLOR[v.team];
+        ctx.lineWidth = (k[1] === subject ? 3.5 : 2) * dpr;
+        ctx.beginPath(); ctx.moveTo(px - sz, py - sz); ctx.lineTo(px + sz, py + sz);
+        ctx.moveTo(px + sz, py - sz); ctx.lineTo(px - sz, py + sz); ctx.stroke();
+      }
+    }
+
     // subject trail
     if (subject != null) {
       ctx.beginPath();

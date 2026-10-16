@@ -403,6 +403,12 @@ export function playerMatchSummary(m, pawn, assets, opts, win = null) {
     meleeLightHit: ml.filter((x) => x.kind === "light" && x.result === "hit").length,
     meleeHeavy: ml.filter((x) => x.kind === "heavy").length,
     meleeHeavyHit: ml.filter((x) => x.kind === "heavy" && x.result === "hit").length,
+    // swings with an enemy hero in reach, and how many of those an enemy parried
+    meleeLightNear: ml.filter((x) => x.kind === "light" && x.near).length,
+    meleeHeavyNear: ml.filter((x) => x.kind === "heavy" && x.near).length,
+    meleeParried: ml.filter((x) => x.result === "parried").length,
+    meleeMove: ml.filter((x) => x.intent === "move").length,
+    meleeNpc: ml.filter((x) => x.intent === "npc").length,
     deaths: dc.length, isolatedDeaths: dc.filter((d) => d.isolated).length,
     thrown, hit, skillAcc: thrown ? hit / thrown : null, skillDmg: dmg, abilities,
     shots: g.shots, bullets: g.bullets, gunHits: g.heroHits, headshots: g.headshots,
@@ -479,13 +485,54 @@ export function deathContexts(m, pawn) {
   });
 }
 
-/** pseudo-ability for melee in the UI */
+/** pseudo-abilities for melee in the UI: light and heavy are tracked as separate abilities */
 export const MELEE = { class_name: "__melee", name: "Melee", id: null };
+export const MELEE_LIGHT = { class_name: "__melee_light", name: "Light melee", id: null, melee: "light" };
+export const MELEE_HEAVY = { class_name: "__melee_heavy", name: "Heavy melee", id: null, melee: "heavy" };
 export const MELEE_KIND = { 1: "light", 2: "heavy", 3: "heavy" };
+/**
+ * What a swing was for, from what was around it: an enemy hero within MELEE_REACH_M = "hero"
+ * melee, else an NPC / crate / soul orb / objective within reach = "npc" (farming, pushing),
+ * else "move" (melee used to move). Swings that connected or got parried count by what they hit.
+ */
+export const MELEE_REACH_M = 10;
+export const MELEE_INTENT = { hero: "at heroes", npc: "at NPCs", move: "movement" };
+/** a successful parry catches the enemy swing that started up to 0.6 s before (or 0.2 s after) it */
+const PARRY_PAIR = [-0.6, 0.2], PARRY_DIST_M = 8;
+
+/**
+ * Successful parries of the whole match paired with the enemy swing they caught:
+ * [{t, parrier, attacker, swingT, kind}]. Unpaired parries (troopers, missing data) have attacker null.
+ */
+export function parryLog(m) {
+  if (m._parryLog) return m._parryLog;
+  const out = [];
+  const swings = m.melee || [];
+  for (const [t, parrier, ok] of m.parries || []) {
+    if (ok !== 1) continue;
+    const me = m.byPawn.get(parrier);
+    const p = posAt(m, parrier, t);
+    let best = null;
+    for (const s of swings) {
+      const dt = s[0] - t;
+      if (dt < PARRY_PAIR[0] || dt > PARRY_PAIR[1]) continue;
+      const a = m.byPawn.get(s[1]);
+      if (!a || !me || a.team === me.team) continue;
+      const q = posAt(m, s[1], s[0]);
+      if ((p[0] || p[1]) && (q[0] || q[1]) && Math.hypot(q[0] - p[0], q[1] - p[1]) * UNIT_M > PARRY_DIST_M) continue;
+      if (!best || Math.abs(dt) < Math.abs(best[0] - t)) best = s;
+    }
+    out.push({ t, parrier, attacker: best ? best[1] : null, swingT: best ? best[0] : null, kind: best ? MELEE_KIND[best[3]] || "light" : null });
+  }
+  m._parryLog = out;
+  return out;
+}
 
 /**
  * Melee swings (from the melee ability entity) paired with the melee damage that followed
- * within 0.6 s. Returns totals per light/heavy plus parries and timeline events
+ * within 0.6 s. Each swing: {t, kind, result: hit|other|miss|parried, dmg, victims, near, parriedBy}
+ * where near = an enemy hero was within MELEE_REACH_M ("hero melee"). Totals per light/heavy,
+ * parries this player made (with the swing they caught) and timeline events
  * ({t, kind: "shot"|"hit"|"hs"|"npc"}, "hs" = heavy that hit a hero).
  */
 export function meleeStats(m, pawn) {
@@ -495,7 +542,11 @@ export function meleeStats(m, pawn) {
   const swings = (m.melee || []).filter((x) => x[1] === pawn);
   const ids = new Set(swings.map((x) => x[2]));
   const dmg = m.damage.filter((d) => d[1] === pawn && ids.has(d[4]));
-  const out = { light: { n: 0, hero: 0, npc: 0, dmg: 0 }, heavy: { n: 0, hero: 0, npc: 0, dmg: 0 }, events: [], swings: [] };
+  const plog = parryLog(m);
+  const parriedAt = new Map(plog.filter((x) => x.attacker === pawn).map((x) => [x.swingT, x.parrier]));
+  const enemies = m.players.filter((p) => p.team !== me.team);
+  const blank = () => ({ n: 0, hero: 0, npc: 0, dmg: 0, near: 0, parried: 0, atNpc: 0, move: 0 });
+  const out = { light: blank(), heavy: blank(), events: [], swings: [] };
   let j = 0;
   for (let i = 0; i < swings.length; i++) {
     const [t, , , type] = swings[i];
@@ -510,22 +561,52 @@ export function meleeStats(m, pawn) {
       if (v) { hero = true; victims.add(dmg[k][3]); } else npc = true;
       total += dmg[k][5];
     }
+    const parriedBy = parriedAt.get(t) ?? null;
+    // parser (v12+) measured the nearest enemy hero / NPC at swing time in decimeters
+    const heroD = swings[i][4] != null && swings[i][4] >= 0 ? swings[i][4] / 10 : null;
+    const npcD = swings[i][5] != null && swings[i][5] >= 0 ? swings[i][5] / 10 : null;
+    let near = hero || parriedBy != null || (heroD != null && heroD <= MELEE_REACH_M), target = parriedBy;
+    if (!near || target == null) {
+      const p = posAt(m, pawn, t);
+      let bd = Infinity;
+      if (p[0] || p[1]) {
+        for (const e of enemies) {
+          if (hpAt(m, e.pawn, t) <= 0) continue;
+          const q = posAt(m, e.pawn, t);
+          if (!q[0] && !q[1]) continue;
+          const d = Math.hypot(q[0] - p[0], q[1] - p[1]) * UNIT_M;
+          if (d <= MELEE_REACH_M + 2 && d < bd) { bd = d; target = e.pawn; if (heroD == null && d <= MELEE_REACH_M) near = true; }
+        }
+      }
+    }
     const s = out[kind];
     s.n++;
+    if (near) s.near++;
+    if (parriedBy != null) s.parried++;
     if (hero) s.hero++; else if (npc) s.npc++;
     s.dmg += total;
-    const result = hero ? "hit" : npc ? "other" : "miss";
-    out.swings.push({ t, kind, result, dmg: total, victims: [...victims] });
-    out.events.push({ t, kind: "shot", n: 1 });
-    if (hero) out.events.push({ t, kind: kind === "heavy" ? "hs" : "hit", n: 1, victim: [...victims][0] });
-    else if (npc) out.events.push({ t, kind: "npc", n: 1 });
+    const result = parriedBy != null && !hero ? "parried" : hero ? "hit" : npc ? "other" : "miss";
+    const intent = near ? "hero" : npc || (npcD != null && npcD <= MELEE_REACH_M) ? "npc" : "move";
+    if (intent === "npc") s.atNpc++;
+    if (intent === "move") s.move++;
+    out.swings.push({ t, kind, result, intent, dmg: total, victims: [...victims], near, heroD, npcD,
+      target: hero ? [...victims][0] : near ? target : null, parriedBy });
+    out.events.push({ t, kind: "shot", n: 1, melee: kind });
+    if (hero) out.events.push({ t, kind: kind === "heavy" ? "hs" : "hit", n: 1, victim: [...victims][0], melee: kind });
+    else if (npc) out.events.push({ t, kind: "npc", n: 1, melee: kind });
   }
   const parries = (m.parries || []).filter((x) => x[1] === pawn);
   out.parryAttempts = parries.filter((x) => x[2] === 0).length;
   out.parrySuccess = parries.filter((x) => x[2] === 1).length;
   out.parries = parries;
+  out.parried = plog.filter((x) => x.parrier === pawn);
   m._melee.set(pawn, out);
   return out;
+}
+
+/** melee swings of one kind ("light" / "heavy" / null = both) as a timeline gun model */
+export function meleeModel(ms, kind) {
+  return kind ? { ...ms, events: ms.events.filter((e) => e.melee === kind), swings: ms.swings.filter((x) => x.kind === kind) } : ms;
 }
 
 /** gun totals restricted to a game-time window ([from, to] or null) */

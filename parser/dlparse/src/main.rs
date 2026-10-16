@@ -23,7 +23,7 @@ use haste::valveprotos::deadlock::{
 use prost::Message;
 use serde::Serialize;
 
-const FORMAT_VERSION: u32 = 11;
+const FORMAT_VERSION: u32 = 12;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`.
 /// sync.py passes the current ids (resolved by class name) via `--ignore-ids`; this list is only
 /// the fallback.
@@ -46,6 +46,29 @@ const STATS_DT: f32 = 10.0;
 const GAME_RULES: u64 = fxhash::hash_bytes(b"CCitadelGameRulesProxy");
 const CONTROLLER: u64 = fxhash::hash_bytes(b"CCitadelPlayerController");
 const PAWN: u64 = fxhash::hash_bytes(b"CCitadelPlayerPawn");
+/// things worth hitting with a melee that are not heroes: troopers, neutrals, objectives, crates,
+/// soul orbs (class names from server.dll, checked against the damage victims of real demos)
+const MELEE_TARGET_CLASSES: [u64; 15] = [
+    fxhash::hash_bytes(b"CNPC_Trooper"),
+    fxhash::hash_bytes(b"CNPC_TrooperNeutral"),
+    fxhash::hash_bytes(b"CNPC_TrooperBoss"),
+    fxhash::hash_bytes(b"CNPC_Boss_Tier2"),
+    fxhash::hash_bytes(b"CNPC_Boss_Tier3"),
+    fxhash::hash_bytes(b"CNPC_BarrackBoss"),
+    fxhash::hash_bytes(b"CNPC_MidBoss"),
+    fxhash::hash_bytes(b"CNPC_BaseDefenseSentry"),
+    fxhash::hash_bytes(b"CNPC_ShieldedSentry"),
+    fxhash::hash_bytes(b"CNPC_Neutral_SinnersSacrifice"),
+    fxhash::hash_bytes(b"CNPC_Neutral_SinnersSacrifice_Hideout"),
+    fxhash::hash_bytes(b"CCitadel_BreakableProp"),
+    fxhash::hash_bytes(b"CCitadel_Destroyable_Building"),
+    fxhash::hash_bytes(b"CNPC_ChessPiece"),
+    fxhash::hash_bytes(b"CItemXP"),
+];
+/// soul orbs carry a team but either side can hit them (secure / deny)
+const SOUL_ORB: u64 = fxhash::hash_bytes(b"CItemXP");
+/// surroundings of a melee swing are looked up this far (world units, 30 m)
+const MELEE_LOOK: f32 = 30.0 / 0.0254;
 
 const GAME_START_TIME: u64 = fkey_from_path(&["m_pGameRules", "m_flGameStartTime"]);
 const PAUSED_TICKS: u64 = fkey_from_path(&["m_pGameRules", "m_nTotalPausedTicks"]);
@@ -194,8 +217,10 @@ struct Output {
     /// [t, attacker_pawn, victim_entindex, victim_pawn_or_-1, ability_id, damage, victim_class, x, y,
     ///  hitgroup, crit]
     damage: Vec<(f32, i32, i32, i32, u32, i32, u32, i32, i32, i32, u8)>,
-    /// melee swings: [t, pawn, melee_ability_id, attack_type (1 light, 2 heavy, 3 heavy variant)]
-    melee: Vec<(f32, i32, u32, u8)>,
+    /// melee swings: [t, pawn, melee_ability_id, attack_type (1 light, 2 heavy, 3 heavy variant),
+    /// distance to the nearest living enemy hero, to the nearest enemy/neutral NPC, crate or
+    /// objective (decimeters, -1 = none within 30 m)]
+    melee: Vec<(f32, i32, u32, u8, i32, i32)>,
     /// parries: [t, pawn, 0 = attempt / 1 = successful parry]
     parries: Vec<(f32, i32, u8)>,
     /// weapon shots fired (trigger pulls; multiply by the weapon's pellets for bullets):
@@ -289,6 +314,37 @@ impl V {
         (p[0] as i32, p[1] as i32, p[2] as i32, ang[1], ang[0])
     }
 
+    fn pawn_team(&self, pawn: i32) -> u32 {
+        self.pawn_ctrl.get(&pawn).and_then(|c| self.controllers.get(c)).map(|p| p.team).unwrap_or(0)
+    }
+
+    /// (nearest living enemy hero, nearest non-allied NPC / crate / objective) around a pawn, in
+    /// decimeters; -1 when nothing is within MELEE_LOOK
+    fn melee_surroundings(&self, ctx: &Context, pawn: i32) -> (i32, i32) {
+        let Some(entities) = ctx.entities() else { return (-1, -1) };
+        let Some(me) = entities.get(&pawn).and_then(|e| position(ctx, e)) else { return (-1, -1) };
+        let team = self.pawn_team(pawn);
+        let (mut hero, mut npc) = (f32::MAX, f32::MAX);
+        for (&idx, e) in entities.iter() {
+            let is_hero = self.is_hero_pawn(idx);
+            if !is_hero && !MELEE_TARGET_CLASSES.iter().any(|&c| e.serializer_name_heq(c)) {
+                continue;
+            }
+            if idx == pawn || e.get_value::<u64>(&LIFE_STATE).unwrap_or(0) != 0 {
+                continue;
+            }
+            let other = if is_hero { self.pawn_team(idx) } else { e.get_value::<u32>(&TEAM).unwrap_or(0) };
+            if (other == team && !e.serializer_name_heq(SOUL_ORB)) || (is_hero && e.get_value::<i32>(&HEALTH).unwrap_or(1) <= 0) {
+                continue;
+            }
+            let Some(p) = position(ctx, e) else { continue };
+            let d = ((p[0] - me[0]).powi(2) + (p[1] - me[1]).powi(2) + (p[2] - me[2]).powi(2)).sqrt();
+            if is_hero { hero = hero.min(d) } else { npc = npc.min(d) }
+        }
+        let dm = |d: f32| if d <= MELEE_LOOK { (d * 0.254).round() as i32 } else { -1 };
+        (dm(hero), dm(npc))
+    }
+
     fn handle_ability_entity(&mut self, ctx: &Context, dh: DeltaHeader, e: &Entity) {
         let idx = e.index();
         let t = self.time(ctx);
@@ -337,8 +393,13 @@ impl V {
         if let Some(trig) = e.get_value::<f32>(&MELEE_TRIGGERED) {
             if trig > 0.0 && (trig - a.melee_triggered).abs() > 1e-3 && t > 0.0 {
                 let kind = e.get_value::<u64>(&MELEE_ATTACK_TYPE).unwrap_or(0) as u8;
-                self.out.melee.push((t, a.owner_pawn, a.id, kind));
+                let (owner, id) = (a.owner_pawn, a.id);
+                let (hero_d, npc_d) = self.melee_surroundings(ctx, owner);
+                self.out.melee.push((t, owner, id, kind, hero_d, npc_d));
             }
+        }
+        let a = self.abilities.get_mut(&idx).unwrap();
+        if let Some(trig) = e.get_value::<f32>(&MELEE_TRIGGERED) {
             a.melee_triggered = trig;
         }
         if let Some(ps) = e.get_value::<f32>(&PARRY_START) {

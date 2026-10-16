@@ -7,7 +7,7 @@ import { analyzeAbility, counts, aimError, median } from "../web/js/analysis.js"
 const AB = { class_name: "test_skillshot", id: 42 };
 
 /** me at x=2, enemy at x=1000, ally at x=-500, for 100 s (0,0 = unknown position) */
-function fixture({ casts = [], damage = [], notify = [], uses = [] } = {}) {
+function fixture({ casts = [], damage = [], notify = [], uses = [], enemyX = 1000 } = {}) {
   const n = 200;
   const track = (pawn, x) => ({
     pawn,
@@ -23,7 +23,7 @@ function fixture({ casts = [], damage = [], notify = [], uses = [] } = {}) {
       { pawn: 3, controller: 13, account_id: 9, name: "ally", hero_id: 2, team: 2 },
     ],
     casts, uses, damage, notify, kills: [], items: [], upgrades: [],
-    samples: { t0: 0, dt: 0.5, tracks: [track(1, 2), track(2, 1000), track(3, -500)] },
+    samples: { t0: 0, dt: 0.5, tracks: [track(1, 2), track(2, enemyX), track(3, -500)] },
     stats: { t0: 0, dt: 10, tracks: [] },
   });
 }
@@ -171,4 +171,26 @@ test("melee: light/heavy swings paired with following damage", async () => {
   assert.deepEqual([s.heavy.n, s.heavy.hero, s.heavy.npc], [2, 0, 1]);
   assert.equal(s.parryAttempts, 2);
   assert.equal(s.parrySuccess, 1);
+});
+
+test("melee: hero melees (enemy in reach) and parried swings both ways", async () => {
+  const { meleeStats, parryLog } = await import("../web/js/analysis.js");
+  const m = fixture({ enemyX: 100 }); // 2.5 m apart
+  m.melee = [[10, 1, 555, 1], [20, 1, 555, 2], [30, 2, 556, 2]];
+  // enemy parries my heavy at 20; I parry the enemy's heavy at 30
+  m.parries = [[19.9, 2, 0], [20.05, 2, 1], [29.8, 1, 0], [30.1, 1, 1]];
+  const log = parryLog(m);
+  assert.deepEqual(log.map((x) => [x.parrier, x.attacker, x.kind]), [[2, 1, "heavy"], [1, 2, "heavy"]]);
+  const s = meleeStats(m, 1);
+  assert.deepEqual(s.swings.map((x) => x.result), ["miss", "parried"]);
+  assert.deepEqual([s.light.near, s.heavy.near, s.heavy.parried], [1, 1, 1]);
+  assert.equal(s.swings[1].parriedBy, 2);
+  assert.equal(s.parried.length, 1);
+  assert.equal(s.parried[0].attacker, 2);
+
+  const far = fixture(); // 25 m apart: nothing in reach, parry can't pair
+  far.melee = [[10, 1, 555, 1]];
+  far.parries = [[10.05, 2, 1]];
+  assert.equal(meleeStats(far, 1).swings[0].near, false);
+  assert.equal(parryLog(far)[0].attacker, null);
 });

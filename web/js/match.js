@@ -5,7 +5,7 @@ import {
 } from "./data.js";
 import { digestMeta, renderReport, matchFromMeta } from "./report.js";
 import {
-  analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt, damageTaken, detectFights, surroundings, MELEE, meleeStats,
+  analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt, damageTaken, detectFights, surroundings, MELEE, MELEE_LIGHT, MELEE_HEAVY, MELEE_REACH_M, meleeStats, meleeModel,
 } from "./analysis.js";
 import { createTimeline, fmtClock } from "./timeline.js";
 import { createMinimap } from "./minimap.js";
@@ -36,19 +36,27 @@ export async function viewMatch(id, params) {
   const pawn = Number(params.get("pawn")) || me?.pawn || m.players[0].pawn;
   const subject = m.byPawn.get(pawn);
   const sigs = S.assets.signatures(subject.hero_id);
-  const table = abilityTable(m, pawn, S.assets, opts());
+  // the hero's own melee ability rows are replaced by the light / heavy melee pseudo-abilities
+  const isMeleeAb = (c) => /ability_melee_(?!parry)|hold_melee/.test(c || "");
+  const fullTable = abilityTable(m, pawn, S.assets, opts());
+  const table = fullTable.filter((r) => !isMeleeAb(r.ability.class_name));
   const wanted = params.get("ability");
   const row = table.find((r) => r.ability.class_name === wanted)
     || table.find((r) => r.ability.class_name === "drifter_shadow_mark")
     || table.find((r) => r.thrown) || table[0];
   const gunMode = wanted === GUN.class_name;
-  const meleeMode = wanted === MELEE.class_name;
-  const melee = meleeStats(m, pawn);
-  const meleeItem = S.assets.itemByClass(S.assets.hero(subject.hero_id).weapon?.replace("citadel_weapon_", "ability_melee_").replace(/_set\d*$/, ""));
+  const MELEES = [MELEE_LIGHT, MELEE_HEAVY];
+  const meleeMode = wanted === MELEE.class_name || MELEES.some((x) => x.class_name === wanted);
+  const meleeKind = MELEES.find((x) => x.class_name === wanted)?.melee ?? null;
+  const meleeAll = meleeStats(m, pawn);
+  const melee = meleeModel(meleeAll, meleeKind);
+  const meleeItem = fullTable.find((r) => isMeleeAb(r.ability.class_name) && r.ability.image)?.ability
+    || S.assets.itemByClass(S.assets.hero(subject.hero_id).weapon?.replace("citadel_weapon_", "ability_melee_").replace(/_set\d*$/, ""));
   const gun = gunStats(m, pawn, S.assets);
   const weaponItem = S.assets.itemByClass(S.assets.hero(subject.hero_id).weapon);
   const gunAbility = { ...GUN, image: weaponItem?.image };
-  const meleeAbility = { ...MELEE, image: meleeItem?.image };
+  const meleeAbilities = MELEES.map((x) => ({ ...x, image: meleeItem?.image }));
+  const meleeAbility = meleeAbilities.find((x) => x.melee === meleeKind) || { ...MELEE, image: meleeItem?.image };
   const ability = gunMode ? gunAbility : meleeMode ? meleeAbility : row?.ability || sigs[0];
   const analysis = gunMode || meleeMode ? { source: gunMode ? "gun" : "melee", casts: [] } : analyzeAbility(m, pawn, ability, opts());
   const casts = analysis.casts;
@@ -57,9 +65,10 @@ export async function viewMatch(id, params) {
   const d = e ? new Date(e.start_time * 1000) : null;
 
   function abStat(ab) {
-    if (ab.class_name === MELEE.class_name) {
-      const n = melee.light.n + melee.heavy.n, h = melee.light.hero + melee.heavy.hero;
-      return n ? `<span class="ab-stat">${h}/${n}</span>` : `<span class="ab-stat muted">–</span>`;
+    if (ab.melee) {
+      const k = meleeAll[ab.melee];
+      return k.n ? `<span class="ab-stat" title="hero hits / hero melees (enemy hero within ${MELEE_REACH_M} m) · ${k.n} swings">${k.hero}/${k.near}</span>`
+        : `<span class="ab-stat muted">–</span>`;
     }
     if (ab.class_name === GUN.class_name) {
       return gun.shots ? `<span class="ab-stat">${gun.heroHits}/${gun.shots}</span>` : `<span class="ab-stat muted">–</span>`;
@@ -117,7 +126,7 @@ export async function viewMatch(id, params) {
       positions and health once per second, deaths and objectives. Casts, shots and hits need the demo
       (Deadlock: <b>Download Replay</b>).</p>` : ""}
     <section class="toolbar" ${m.fromMeta ? "hidden" : ""}>
-      <div class="abilities">${abilityButtons([gunAbility, meleeAbility, ...table.filter((r) => !r.kind).map((r) => r.ability)], ability.class_name, abStat)}</div>
+      <div class="abilities">${abilityButtons([gunAbility, ...meleeAbilities, ...table.filter((r) => !r.kind).map((r) => r.ability)], ability.class_name, abStat)}</div>
       <div class="controls">${controlsHTML(false)}</div>
     </section>
     ${!m.fromMeta && table.some((r) => r.kind === "extra") ? `<section class="items-row"><span class="muted small">other abilities</span>
@@ -131,6 +140,8 @@ export async function viewMatch(id, params) {
       <div class="map-wrap"><canvas class="minimap"></canvas>
         <div class="map-legend small muted">
           <label class="check"><input type="checkbox" class="show-all" ${settings.showAll ? "checked" : ""}> all casts</label>
+          <label class="check"><input type="checkbox" class="show-heat" ${settings.showHeat ? "checked" : ""}> heat</label>
+          <label class="check"><input type="checkbox" class="show-deaths" ${settings.showDeaths ? "checked" : ""}> deaths</label>
           <span class="zoom-btns">${[1, 2, 3].map((z) => `<button class="chip ${(settings.mapZoom || 1) === z ? "on" : ""}" data-zoom="${z}">${z === 1 ? "full map" : `follow ×${z}`}</button>`).join("")}</span>
           <span>click a hero to analyze them · rays = aim at cast</span>
         </div>
@@ -327,10 +338,12 @@ export async function viewMatch(id, params) {
           if (shots >= 20 && shots - npc > 0) pts.push([e.t, hits / (shots - npc)]);
         }
       } else if (meleeMode) {
+        // hero hits / hero melees (swings with an enemy hero in reach)
         let n = 0, h = 0;
-        for (const x of meleeStats(m, p.pawn).swings) {
+        for (const x of meleeModel(meleeStats(m, p.pawn), meleeKind).swings) {
+          if (!x.near) continue;
           n++; if (x.result === "hit") h++;
-          if (n >= 5) pts.push([x.t, h / n]);
+          if (n >= 3) pts.push([x.t, h / n]);
         }
       } else {
         let thrown = 0, hit = 0;
@@ -356,10 +369,10 @@ export async function viewMatch(id, params) {
     const span = t0 != null ? `<rect class="acc-span" x="${cx(t0)}" y="4" width="${cx(t) - cx(t0)}" height="${CH - 18}"/>` : "";
     $("#tracker", app).innerHTML = `
       <svg class="acc-chart" viewBox="0 0 ${CW} ${CH}">${grid}${span}${accLines}<line class="cursor" x1="${cx(t)}" x2="${cx(t)}" y1="4" y2="${CH - 14}"/></svg>
-      <div class="small muted">chart: ${gunMode ? "gun hero accuracy (excl. trooper shots)" : meleeMode ? "melee hit % (hero)" : "skill accuracy"} over the match</div>
+      <div class="small muted">chart: ${gunMode ? "gun hero accuracy (excl. trooper shots)" : meleeMode ? `${meleeKind || "melee"} hero hits / hero melees (enemy within ${MELEE_REACH_M} m)` : "skill accuracy"} over the match</div>
       <h3>Accuracy tracker · ${t0 != null ? `${fmtClock(t0)}–${fmtClock(t)}` : `at ${fmtClock(t)}`} <span class="muted">· signature skills that connect + gun, every player</span></h3>
       <table class="report-table tracker-table">
-        <tr><th></th><th>player</th><th>HP</th><th>souls</th><th>skills thrown</th><th>skill hit %</th><th>shots</th><th title="hero hits / (shots - shots that hit only troopers/neutrals)">hero accuracy</th><th>hero HS %</th><th>melee → hero <small class="muted">light · heavy</small></th><th>items</th></tr>
+        <tr><th></th><th>player</th><th>HP</th><th>souls</th><th>skills thrown</th><th>skill hit %</th><th>shots</th><th title="hero hits / (shots - shots that hit only troopers/neutrals)">hero accuracy</th><th>hero HS %</th><th title="hero hits / hero melees (swings with an enemy hero within ${MELEE_REACH_M} m); parried">melee → hero <small class="muted">light · heavy · parried</small></th><th>items</th></tr>
         ${teams.map((tm) => rows.filter((r) => r.p.team === tm).map((r) => `
           <tr class="team-row-${tm} ${r.p.pawn === pawn ? "on" : ""}" data-pawn="${r.p.pawn}">
             <td><img src="${esc(S.assets.hero(r.p.hero_id).icon)}" alt=""></td>
@@ -381,8 +394,8 @@ export async function viewMatch(id, params) {
               const ms = meleeStats(m, r.p.pawn);
               const sw = ms.swings.filter((x) => inSpan(x.t));
               const l = sw.filter((x) => x.kind === "light"), h = sw.filter((x) => x.kind === "heavy");
-              const fr = (xs) => `${xs.filter((x) => x.result === "hit").length}/${xs.length}`;
-              return `<small>${fr(l)} · ${fr(h)}</small>`;
+              const fr = (xs) => `${xs.filter((x) => x.result === "hit").length}/${xs.filter((x) => x.near).length}`;
+              return `<small>${fr(l)} · ${fr(h)} · ${sw.filter((x) => x.result === "parried").length}</small>`;
             })()}</td>
             <td class="tr-items">${itemsAt(m, r.p.pawn, t).filter((id) => S.assets.item(id)?.type === "upgrade")
               .map((id) => `<img class="slot-${esc(S.assets.item(id)?.slot || "x")}" src="${esc(S.assets.itemIcon(id))}" title="${esc(S.assets.item(id)?.name)}" alt="">`).join("")}</td>
@@ -477,13 +490,18 @@ export async function viewMatch(id, params) {
   const timeline = createTimeline($(".timeline", app), {
     end: m.end, casts, heroesOnly: settings.heroesOnly, lead, deaths, kills,
     gun: gunMode ? gun : meleeMode ? melee : null, noChart: !!m.fromMeta,
-    gunLabels: meleeMode ? ["swings", "hero hits", "heavy hero hits"] : null,
+    gunLabels: meleeMode ? ["swings", "hero hits", meleeKind ? null : "heavy hero hits"] : null,
   }, (t) => seek(t), (a, b) => setSpan(a, b));
   const minimap = createMinimap($(".minimap", app), {
     match: m, assets: S.assets, profiles: S.profiles, onPick: (p) => setParams({ pawn: p.pawn, ability: null }),
   });
 
   if (params.has("zoom")) settings.mapZoom = Number(params.get("zoom")) || 1;
+  if (params.has("heat")) settings.showHeat = params.get("heat") === "1";
+  if (params.has("deaths")) settings.showDeaths = params.get("deaths") === "1";
+  // URL params win over the stored settings the checkboxes were rendered with
+  $(".show-heat", app).checked = !!settings.showHeat;
+  $(".show-deaths", app).checked = !!settings.showDeaths;
   let t = Number(params.get("t")) || m.end;
   // optional span start: stats then cover [t0, t] instead of [start, t]
   let t0 = params.has("from") ? Number(params.get("from")) : null;
@@ -536,6 +554,9 @@ export async function viewMatch(id, params) {
       for (const o of app.querySelectorAll("[data-zoom]")) o.classList.toggle("on", o === b);
       seek(t);
     });
+  }
+  for (const [cls, key] of [[".show-heat", "showHeat"], [".show-deaths", "showDeaths"]]) {
+    $(cls, app).addEventListener("change", (ev) => { settings[key] = ev.target.checked; saveSettings(); seek(t); });
   }
   $(".show-all", app).addEventListener("change", (ev) => {
     settings.showAll = ev.target.checked;
@@ -601,7 +622,8 @@ export async function viewMatch(id, params) {
     $(".span-info", app).innerHTML = t0 != null
       ? `span ${fmtClock(t0)}–${fmtClock(t)} <button class="chip span-clear" title="clear span (Esc)">×</button>` : "";
     syncUrl();
-    minimap.update({ t, subject: pawn, casts, showAll: settings.showAll, zoom: settings.mapZoom || 1 });
+    minimap.update({ t, from: t0 ?? 0, subject: pawn, casts, showAll: settings.showAll, zoom: settings.mapZoom || 1,
+      heat: settings.showHeat, deaths: settings.showDeaths });
     renderReadout(t);
     renderTracker(t);
     renderState(t);
@@ -645,30 +667,67 @@ export async function viewMatch(id, params) {
 
   function renderMeleeReadout(t) {
     const sw = melee.swings.filter((x) => inSpan(x.t));
-    const part = (kind) => {
-      const xs = sw.filter((x) => x.kind === kind);
-      return { n: xs.length, hero: xs.filter((x) => x.result === "hit").length, npc: xs.filter((x) => x.result === "other").length };
-    };
-    const L = part("light"), H = part("heavy");
-    const pr = melee.parries.filter((x) => inSpan(x[0]));
-    const pa = pr.filter((x) => x[2] === 0).length, ps = pr.filter((x) => x[2] === 1).length;
+    const name = (pw) => esc(S.profiles[m.byPawn.get(pw)?.account_id]?.name || m.byPawn.get(pw)?.name || "");
+    const icon = (pw) => { const p = m.byPawn.get(pw); return p ? `<img src="${esc(S.assets.hero(p.hero_id).icon)}" title="${name(pw)}">` : ""; };
+    const n = sw.length, near = sw.filter((x) => x.near).length;
+    const hero = sw.filter((x) => x.result === "hit").length;
+    const parried = sw.filter((x) => x.result === "parried").length;
+    // parries this player made: which enemy swing they caught
+    const caught = meleeAll.parried.filter((x) => inSpan(x.t) && (!meleeKind || x.kind === meleeKind));
+    const pr = meleeAll.parries.filter((x) => inSpan(x[0]));
+    const pa = pr.filter((x) => x[2] === 0).length;
     const rate = (a, b) => (b ? pct(a / b) : "–");
+    const label = meleeKind ? `${meleeKind[0].toUpperCase()}${meleeKind.slice(1)}` : "Melee";
+    // breakdown: what each swing was for (intent) x what came of it
+    const row = (name, xs) => {
+      const at = (i) => xs.filter((x) => x.intent === i);
+      const H = at("hero"), N = at("npc"), M = at("move");
+      const hh = H.filter((x) => x.result === "hit").length, hp = H.filter((x) => x.result === "parried").length;
+      const nh = N.filter((x) => x.result === "other").length;
+      const cell = (v, d) => `<td>${v}${d ? `<small class="muted"> ${pct(v / d)}</small>` : ""}</td>`;
+      return `<tr><th>${name}</th><td>${xs.length}</td>
+        ${cell(H.length, xs.length)}<td class="good">${hh}</td><td class="accent">${rate(hh, H.length)}</td><td class="${hp ? "bad" : ""}">${hp}</td><td>${H.length - hh - hp}</td>
+        ${cell(N.length, xs.length)}<td>${nh}</td>
+        ${cell(M.length, xs.length)}
+        <td>${k1(xs.reduce((a, x) => a + x.dmg, 0))}</td></tr>`;
+    };
+    const kinds = meleeKind ? [[label, sw]] : [["Light", sw.filter((x) => x.kind === "light")], ["Heavy", sw.filter((x) => x.kind === "heavy")], ["All", sw]];
     $(".tiles", app).innerHTML =
-      tile("Light swings", L.n) + tile("Light → hero", `${rate(L.hero, L.n)}<small> ${L.hero}</small>`, "good") +
-      tile("Light → NPC", L.npc) +
-      tile("Heavy swings", H.n) + tile("Heavy → hero", `${rate(H.hero, H.n)}<small> ${H.hero}</small>`, "good") +
-      tile("Heavy → NPC", H.npc) +
-      tile("Parries", `${ps}<small> / ${pa} tried</small>`, "accent") +
-      tile("Melee damage", k1(sw.reduce((a, x) => a + x.dmg, 0))) +
-      tile("Light : heavy", L.n + H.n ? `${Math.round((L.n / (L.n + H.n)) * 100)} : ${Math.round((H.n / (L.n + H.n)) * 100)}` : "–");
+      tile(`${label} swings`, n) +
+      tile("Hero melees", `${near}<small> enemy ≤ ${MELEE_REACH_M} m</small>`) +
+      tile("Hit heroes", hero, "good") +
+      tile("Hero melee accuracy", `${rate(hero, near)}<small> ${hero}/${near}</small>`, "accent") +
+      tile("Got parried", parried ? `<span class="bad">${parried}</span><small> ${rate(parried, near)} of hero melees</small>` : "0") +
+      tile("Parries", `${caught.length}<small> / ${pa} tried${meleeKind ? ` · vs ${meleeKind}` : ""}</small>`) +
+      `<div class="tile wide melee-break"><table class="mini">
+        <tr><th></th><th>swings</th><th title="enemy hero within ${MELEE_REACH_M} m (or hit / parried)">at heroes</th><th>hit</th><th>acc</th><th>parried</th><th>whiff</th>
+          <th title="no hero, but a trooper, neutral, crate, soul orb or objective within ${MELEE_REACH_M} m">at NPCs</th><th>hit</th>
+          <th title="nothing to hit within ${MELEE_REACH_M} m: melee used to move">movement</th><th>dmg</th></tr>
+        ${kinds.map(([nm, xs]) => row(nm, xs)).join("")}
+      </table></div>`;
     const f = settings.feed || "all";
-    const evs = sw.filter((x) => (f === "miss" ? x.result === "miss" : f === "hit" ? x.result === "hit" : f !== "kills" && f !== "all kills"));
-    $(".feed", app).innerHTML = evs.slice(-40).reverse().map((x) => {
-      const v = m.byPawn.get(x.victims[0]);
-      return `<li data-t="${x.t}"><span class="dot ${x.result}"></span><span class="t">${fmtClock(x.t)}</span>
+    const evs = [];
+    if (f !== "kills" && f !== "all kills") {
+      for (const x of sw) {
+        if (f === "hit" ? x.result !== "hit" : f === "miss" ? x.result === "hit" || x.result === "other" : false) continue;
+        evs.push({ t: x.t, swing: x });
+      }
+      if (f !== "miss") for (const x of caught) evs.push({ t: x.t, caught: x });
+    }
+    evs.sort((a, b) => b.t - a.t);
+    $(".feed", app).innerHTML = evs.slice(0, 60).map(({ swing: x, caught: c }) => {
+      if (c) {
+        return `<li data-t="${c.t}" class="ev-kill"><span class="dot hit"></span><span class="t">${fmtClock(c.t)}</span>
+          <span><b>parried</b></span>${c.attacker != null ? `${icon(c.attacker)}<span class="chip-s ${c.kind === "heavy" ? "" : "muted-chip"}">${c.kind}</span>` : `<span class="muted">(no hero swing found)</span>`}</li>`;
+      }
+      const other = x.target;
+      const what = x.result === "hit" ? `hit · ${x.dmg} dmg` : x.result === "other" ? `hit NPC · ${x.dmg} dmg`
+        : x.result === "parried" ? `<b class="bad">parried by</b>`
+        : x.intent === "hero" ? `whiff · hero ${x.heroD != null ? `${x.heroD.toFixed(0)} m` : "in reach"}`
+        : x.intent === "npc" ? `whiff · NPC ${x.npcD != null ? `${x.npcD.toFixed(0)} m` : "near"}` : `<span class="muted">movement</span>`;
+      return `<li data-t="${x.t}"><span class="dot ${x.result === "parried" ? "miss" : x.result}"></span><span class="t">${fmtClock(x.t)}</span>
         <span class="chip-s ${x.kind === "heavy" ? "" : "muted-chip"}">${x.kind}</span>
-        ${v ? `<img src="${esc(S.assets.hero(v.hero_id).icon)}" title="${esc(v.name)}">` : ""}
-        <span>${x.result === "hit" ? `hit · ${x.dmg} dmg` : x.result === "other" ? `hit NPC · ${x.dmg} dmg` : "miss"}</span></li>`;
+        <span>${what}</span>${x.intent === "hero" ? icon(other) : ""}</li>`;
     }).join("") || `<li class="muted">no swings yet</li>`;
   }
 

@@ -36,8 +36,9 @@ export function totals(rows) {
     gun: shots - npc > 0 ? gh / (shots - npc) : null, shots,
     hs: gh ? sum("headshots") / gh : null,
     dodge: sum("aimedAt") ? (sum("aimedAt") - sum("gotHit")) / sum("aimedAt") : null,
-    light: sum("meleeLight") ? sum("meleeLightHit") / sum("meleeLight") : null,
-    heavy: sum("meleeHeavy") ? sum("meleeHeavyHit") / sum("meleeHeavy") : null,
+    // melee accuracy against heroes: hits / swings with an enemy hero in reach
+    light: sum("meleeLightNear") ? sum("meleeLightHit") / sum("meleeLightNear") : null,
+    heavy: sum("meleeHeavyNear") ? sum("meleeHeavyHit") / sum("meleeHeavyNear") : null,
     isolated: sum("deaths") ? sum("isolatedDeaths") / sum("deaths") : null,
     skillDmg: sum("skillDmg"),
   };
@@ -107,9 +108,19 @@ function render(acc, rows) {
     tile("Hero headshot %", gunHits ? pct(hs / gunHits) : "–"),
     tile("Dodge rate", aimed ? `${pct((aimed - got) / aimed)}<small> of ${aimed}</small>` : "–"),
     tile("Skill damage", k1(sum("skillDmg"))),
-    tile("Melee → hero", (() => {
-      const l = sum("meleeLight"), lh = sum("meleeLightHit"), h = sum("meleeHeavy"), hh = sum("meleeHeavyHit");
-      return l + h ? `<small>light</small> ${l ? pct(lh / l) : "–"} <small>heavy</small> ${h ? pct(hh / h) : "–"}` : "–";
+    tile("Hero melee accuracy", (() => {
+      const l = sum("meleeLightNear"), lh = sum("meleeLightHit"), h = sum("meleeHeavyNear"), hh = sum("meleeHeavyHit");
+      const r = (a, b) => (b ? Math.round((a / b) * 100) : "–");
+      return l + h ? `${r(lh, l)}<small>% light · </small>${r(hh, h)}<small>% heavy</small>` : "–";
+    })()),
+    tile("Melee use % <small>heroes · NPCs · move</small>", (() => {
+      const n = sum("meleeLight") + sum("meleeHeavy"), hero = sum("meleeLightNear") + sum("meleeHeavyNear");
+      const r = (v) => Math.round((v / n) * 100);
+      return n ? `${r(hero)}<small> · </small>${r(sum("meleeNpc"))}<small> · </small>${r(sum("meleeMove"))}<small> of ${n}</small>` : "–";
+    })()),
+    tile("Got parried", (() => {
+      const hero = sum("meleeLightNear") + sum("meleeHeavyNear");
+      return hero ? `${sum("meleeParried")}<small> ${pct(sum("meleeParried") / hero)}</small>` : "–";
     })()),
     tile("Isolated deaths", sum("deaths") ? `${pct(sum("isolatedDeaths") / sum("deaths"))}<small> ${sum("isolatedDeaths")}/${sum("deaths")}</small>` : "–"),
   ].join("") : `<div class="empty">No parsed demos with this player.</div>`;
