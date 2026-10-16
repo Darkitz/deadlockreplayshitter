@@ -1,65 +1,73 @@
 // Skill Hitter: data loading, header, router, sync button.
-//   #/                       overview for the default hero
-//   #/hero/<id>              overview for a hero
-//   #/match/<id>?pawn=&ability=   match detail (minimap + timeline)
+//
+// Matches are the main entity; players lead to matches.
+//   #/                                   all parsed matches
+//   #/match/<id>?pawn=&ability=&from=&t=  match detail (minimap + timeline + tracker)
+//   #/player/<account>                   a player's performance across parsed matches
+//   #/player/<account>/hero/<id>?ability= per-hero ability analysis (tracked accounts)
+//   #/hero/<id>                          legacy: hero page of the current player
 
 import { loadJSON, Assets, clearCache, setDataVersion } from "./data.js";
-import { $, esc, S, fmtDate, fmtDay, TZ, settings, saveSettings } from "./ui.js";
+import { $, esc, S, fmtDate, TZ, settings, saveSettings } from "./ui.js";
 import { viewOverview } from "./overview.js";
 import { viewMatch } from "./match.js";
+import { viewHome } from "./home.js";
+import { viewPlayer } from "./player.js";
 
 async function loadAll() {
   S.accounts = await loadJSON("data/accounts.json").catch(() => []);
-  const fromUrl = Number(new URLSearchParams(location.search).get("account"));
-  const ids = S.accounts.map((a) => a.account_id);
-  const acc = [fromUrl, settings.account].find((a) => a && ids.includes(a)) ?? ids[0];
-  const [index, assets, profiles, career] = await Promise.all([
-    acc ? loadJSON(`data/index-${acc}.json`) : loadJSON("data/index.json"),
+  const [assets, profiles, valveStats, matchList, ...indexes] = await Promise.all([
     loadJSON("data/assets.json"),
     loadJSON("data/profiles.json").catch(() => ({})),
-    loadJSON(acc ? `data/career-${acc}.json` : "data/career.json").catch(() => []),
+    loadJSON("data/valve-stats.json").catch(() => ({})),
+    loadJSON("data/matches.json").catch(() => []),
+    ...S.accounts.map((a) => loadJSON(`data/index-${a.account_id}.json`).catch(() => null)),
   ]);
-  S.career = career;
-  setDataVersion(index.parser_version);
-  S.valveStats = await loadJSON("data/valve-stats.json").catch(() => ({}));
-  S.index = index;
   S.assets = new Assets(assets);
   S.profiles = profiles;
+  S.valveStats = valveStats;
+  S.matchList = matchList;
+  S.indexes = {};
+  for (const idx of indexes) if (idx) S.indexes[idx.account_id] = idx;
+  S.careers = {};
+  const first = S.indexes[settings.account] || Object.values(S.indexes)[0];
+  setDataVersion(Math.max(0, ...Object.values(S.indexes).map((i) => i.parser_version || 0)));
+  await useAccount(first?.account_id);
   renderHeader();
 }
 
-function renderHeader() {
-  const prof = S.index.profile || {};
-  const acc = S.index.account_id;
-  $("#avatar").src = prof.avatar || "";
-  $("#avatar").hidden = !prof.avatar;
-  $("#player-name").textContent = prof.name || `account ${acc}`;
-  $("#steam-link").href = prof.url || `https://steamcommunity.com/profiles/${BigInt(acc) + 76561197960265728n}/`;
-  $("#steam-link").textContent = "steam profile ↗";
-  const sw = $("#account-switch");
-  sw.hidden = (S.accounts || []).length < 2;
-  sw.innerHTML = (S.accounts || []).map((a) =>
-    `<option value="${a.account_id}" ${a.account_id === acc ? "selected" : ""}>${esc(a.name)} · ${a.parsed} demos</option>`).join("");
-  sw.onchange = async () => {
-    settings.account = Number(sw.value);
+/** make `acc` the current tracked player (S.index / S.career) */
+async function useAccount(acc) {
+  if (!acc || !S.indexes[acc]) return false;
+  S.index = S.indexes[acc];
+  if (!S.careers[acc]) S.careers[acc] = await loadJSON(`data/career-${acc}.json`).catch(() => []);
+  S.career = S.careers[acc];
+  if (settings.account !== acc) {
+    settings.account = acc;
     saveSettings();
-    await loadAll();
-    location.hash = "#/";
-    route();
+  }
+  return true;
+}
+
+function renderHeader() {
+  const sw = $("#account-switch");
+  sw.hidden = !S.accounts.length;
+  sw.innerHTML = `<option value="">players…</option>` + S.accounts.map((a) =>
+    `<option value="${a.account_id}">${esc(a.name)} · ${a.parsed} demos</option>`).join("");
+  sw.onchange = () => {
+    if (sw.value) location.hash = `#/player/${sw.value}`;
+    sw.value = "";
   };
-  const parsed = S.index.matches.filter((m) => m.parsed).length;
-  const lastRanked = S.index.matches.filter((m) => m.badge).sort((a, b) => b.start_time - a.start_time)[0];
-  const rank = lastRanked && S.assets.ranks[lastRanked.badge];
-  $("#rank").innerHTML = rank ? `<img src="${esc(rank.image)}" alt=""><span>${esc(rank.name)}</span>` : "";
-  $("#rank").title = rank ? `latest ranked badge (${fmtDay(new Date(lastRanked.start_time * 1000))})` : "";
-  const h = S.index.health;
-  $("#health").innerHTML = h
-    ? `parser v${S.index.parser_version} · ${h.parsed} demos parsed` +
-      (h.failed.length ? ` · <b class="bad">${h.failed.length} failed to parse</b> (a game patch may need <code>tools/update-parser.sh</code>)` : "") +
-      (h.warned.length ? ` · ${h.warned.length} with warnings` : "")
-    : "";
-  $("#subtitle").textContent =
-    `${S.index.matches.length} matches · ${parsed} with demo · synced ${fmtDate(new Date(S.index.generated * 1000))} (${TZ})`;
+  const parsed = S.matchList.length;
+  const failed = Object.values(S.indexes).flatMap((i) => i.health?.failed || []);
+  const warned = new Set(Object.values(S.indexes).flatMap((i) => i.health?.warned || []));
+  const version = Math.max(0, ...Object.values(S.indexes).map((i) => i.parser_version || 0)) || null;
+  $("#health").innerHTML = `parser v${version ?? "?"} · ${parsed} demos parsed` +
+    (failed.length ? ` · <b class="bad">${failed.length} failed to parse</b> (a game patch may need <code>tools/update-parser.sh</code>)` : "") +
+    (warned.size ? ` · ${warned.size} with warnings` : "");
+  const synced = Math.max(0, ...Object.values(S.indexes).map((i) => i.generated || 0));
+  $("#subtitle").textContent = `${parsed} parsed matches · ${S.accounts.length} tracked player${S.accounts.length === 1 ? "" : "s"}` +
+    (synced ? ` · synced ${fmtDate(new Date(synced * 1000))} (${TZ})` : "");
 }
 
 // ------------------------------------------------------------------ router
@@ -71,12 +79,33 @@ async function route() {
   const params = new URLSearchParams(q || "");
   const parts = (path || "/").split("/").filter(Boolean);
   window.scrollTo({ top: 0 });
+  for (const a of document.querySelectorAll("[data-nav]")) a.classList.toggle("on", a.dataset.nav === (parts[0] || "matches"));
+
   if (parts[0] === "match" && parts[1]) {
+    const id = Number(parts[1]);
+    // analyze from the point of view of a tracked player in this match, if any
+    const inMatch = S.matchList.find((m) => m.match_id === id)?.players.map((p) => p.account_id) || [];
+    if (!inMatch.includes(S.index?.account_id)) {
+      const tracked = inMatch.find((a) => S.indexes[a]);
+      if (tracked) await useAccount(tracked);
+    }
     S.view = "match";
-    await viewMatch(Number(parts[1]), params);
+    await viewMatch(id, params);
+  } else if (parts[0] === "player" && parts[1]) {
+    const acc = Number(parts[1]);
+    const tracked = await useAccount(acc);
+    if (parts[2] === "hero" && parts[3] && tracked) {
+      S.view = "overview";
+      await viewOverview(Number(parts[3]), params);
+    } else {
+      S.view = "player";
+      await viewPlayer(acc, params);
+    }
+  } else if (parts[0] === "hero" && parts[1] && S.index) {
+    location.replace(`#/player/${S.index.account_id}/hero/${parts[1]}${q ? `?${q}` : ""}`);
   } else {
-    S.view = "overview";
-    await viewOverview(parts[0] === "hero" ? Number(parts[1]) : undefined, params);
+    S.view = "home";
+    await viewHome(params);
   }
 }
 
@@ -122,13 +151,7 @@ async function main() {
   try {
     await loadAll();
   } catch (err) {
-    const h = S.index.health;
-  $("#health").innerHTML = h
-    ? `parser v${S.index.parser_version} · ${h.parsed} demos parsed` +
-      (h.failed.length ? ` · <b class="bad">${h.failed.length} failed to parse</b> (a game patch may need <code>tools/update-parser.sh</code>)` : "") +
-      (h.warned.length ? ` · ${h.warned.length} with warnings` : "")
-    : "";
-  $("#subtitle").textContent = `failed to load data: ${err.message}. Run tools/sync.py first.`;
+    $("#subtitle").textContent = `failed to load data: ${err.message}. Run tools/sync.py first.`;
     return;
   }
   window.addEventListener("hashchange", route);

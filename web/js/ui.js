@@ -46,7 +46,9 @@ export const k1 = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
 export const S = { index: null, assets: null, profiles: {}, career: [], view: null };
 
-export const entry = (id) => S.index.matches.find((m) => m.match_id === id);
+/** history entry of a match for the current tracked player, else any tracked player */
+export const entry = (id) => S.index?.matches.find((m) => m.match_id === id)
+  || Object.values(S.indexes || {}).map((i) => i.matches.find((m) => m.match_id === id)).find(Boolean);
 
 // ------------------------------------------------------------------ shared widgets
 

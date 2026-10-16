@@ -10,16 +10,17 @@
 <body>
 <header class="top">
   <a class="brand" href="#/">
-    <img id="avatar" class="avatar" alt="" hidden>
+    <span class="logo" aria-hidden="true"></span>
     <div>
-      <h1><span id="player-name">Skill Hitter</span></h1>
+      <h1>Skill Hitter</h1>
       <p id="subtitle" class="muted">loading…</p>
     </div>
   </a>
+  <nav class="top-nav">
+    <a href="#/" data-nav="matches">Matches</a>
+    <select id="account-switch" title="tracked players" hidden></select>
+  </nav>
   <div class="top-right">
-    <select id="account-switch" title="switch player" hidden></select>
-    <span id="rank" class="rank"></span>
-    <a id="steam-link" class="muted small" target="_blank" rel="noopener"></a>
     <button id="sync" class="btn" hidden>sync</button>
   </div>
   <pre id="sync-log" class="sync-log" hidden></pre>

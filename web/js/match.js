@@ -66,7 +66,7 @@ export async function viewMatch(id, params) {
 
   app.innerHTML = `
     <div class="match-header">
-      <a href="#/hero/${e?.hero_id ?? subject.hero_id}" class="back">← overview</a>
+      <a href="#/" class="back">← matches</a>
       <div class="mh-title">
         ${won != null ? `<span class="result ${won ? "win" : "loss"}">${won ? "WIN" : "LOSS"}</span>` : ""}
         <h2>#${id}</h2>
@@ -83,15 +83,15 @@ export async function viewMatch(id, params) {
           <div class="team-head"><span></span><span></span><span>player</span><span style="text-align:right">k/d/a</span><span style="text-align:right">skill%</span><span style="text-align:right">souls</span></div>
           ${teamOf(t).map((p) => {
             const prof = S.profiles[p.account_id];
-            return `<button class="sb-row ${p.pawn === pawn ? "on" : ""}" data-pawn="${p.pawn}" title="analyze ${esc(p.name)}">
+            return `<div class="sb-row ${p.pawn === pawn ? "on" : ""}" data-pawn="${p.pawn}" role="button" tabindex="0" title="analyze ${esc(p.name)}">
               <img class="sb-hero" src="${esc(S.assets.hero(p.hero_id).icon)}" alt="">
               ${prof?.avatar ? `<img class="sb-av" src="${esc(prof.avatar)}" alt="">` : `<span class="sb-av"></span>`}
-              <span class="sb-name">${esc(prof?.name || p.name)}</span>
+              <a class="sb-name" href="#/player/${p.account_id}" title="${esc(prof?.name || p.name)}: all matches">${esc(prof?.name || p.name)}</a>
               <span class="sb-kda">${p.kills}/${p.deaths}/${p.assists}</span>
               ${(() => { const a = skillAcc.get(p.pawn); const v = a.thrown ? a.scored / a.thrown : 0;
                 return `<span class="sb-acc ${a.thrown >= 5 && v === bestAcc ? "best" : ""}" title="signature abilities: ${a.scored}/${a.thrown} hit heroes">${a.thrown ? pct(v) : "–"}</span>`; })()}
               <span class="sb-nw">${k1(p.net_worth)}</span>
-            </button>`;
+            </div>`;
           }).join("")}
         </div>`).join("")}
     </section>
@@ -144,7 +144,11 @@ export async function viewMatch(id, params) {
 
   // wiring
   for (const b of app.querySelectorAll(".sb-row")) {
-    b.addEventListener("click", () => setParams({ pawn: b.dataset.pawn, ability: null }));
+    b.addEventListener("click", (ev) => {
+      if (ev.target.closest("a")) return; // name links to the player page
+      setParams({ pawn: b.dataset.pawn, ability: null });
+    });
+    b.addEventListener("keydown", (ev) => { if (ev.key === "Enter") b.click(); });
   }
   for (const b of app.querySelectorAll(".abilities .ab")) {
     b.addEventListener("click", () => setParams({ ability: b.dataset.ability }));
@@ -200,7 +204,7 @@ export async function viewMatch(id, params) {
         ${teams.map((tm) => rows.filter((r) => r.p.team === tm).map((r) => `
           <tr class="team-row-${tm} ${r.p.pawn === pawn ? "on" : ""}" data-pawn="${r.p.pawn}">
             <td><img src="${esc(S.assets.hero(r.p.hero_id).icon)}" alt=""></td>
-            <td>${esc(S.profiles[r.p.account_id]?.name || r.p.name)}</td>
+            <td><a href="#/player/${r.p.account_id}">${esc(S.profiles[r.p.account_id]?.name || r.p.name)}</a></td>
             <td>${r.thrown}</td>
             ${cell(r.sAcc, r.hit, r.thrown, r.thrown >= 5 && r.sAcc === bS)}
             <td>${r.shots}</td>
@@ -495,7 +499,7 @@ function renderNoDemo(app, id, e) {
   const mins = (c?.duration_s || e?.duration_s || 60) / 60;
   app.innerHTML = `
     <div class="match-header">
-      <a href="#/hero/${e?.hero_id ?? c?.hero_id ?? ""}" class="back">← overview</a>
+      <a href="#/" class="back">← matches</a>
       <div class="mh-title">
         ${e ? `<span class="result ${e.won ? "win" : "loss"}">${e.won ? "WIN" : "LOSS"}</span>` : ""}
         <img class="mh-hero" src="${esc(hero.icon)}" alt=""><h2>#${id}</h2>

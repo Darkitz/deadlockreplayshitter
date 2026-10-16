@@ -344,3 +344,27 @@ export function gunAt(g, t) {
   }
   return { shots, hits, hs, npc };
 }
+
+/**
+ * One player's numbers in one match: signature skills that connect (thrown / hit),
+ * gun shots / hero hits / headshots, incoming skillshots dodged.
+ */
+export function playerMatchSummary(m, pawn, assets, opts) {
+  let thrown = 0, hit = 0, dmg = 0;
+  const abilities = [];
+  for (const ab of assets.signatures(m.byPawn.get(pawn).hero_id)) {
+    const cs = analyzeAbility(m, pawn, ab, opts).casts;
+    const c = counts(cs, opts.heroesOnly);
+    abilities.push({ ability: ab, ...c });
+    if (c.scored + c.other === 0) continue;
+    thrown += c.thrown; hit += c.scored; dmg += c.dmg;
+  }
+  const g = gunStats(m, pawn, assets);
+  const inc = incoming(m, pawn, assets, opts);
+  return {
+    thrown, hit, skillAcc: thrown ? hit / thrown : null, skillDmg: dmg, abilities,
+    shots: g.shots, bullets: g.bullets, gunHits: g.heroHits, headshots: g.headshots,
+    gunAcc: g.shots ? g.heroHits / g.shots : null,
+    aimedAt: inc.aimed, gotHit: inc.hit,
+  };
+}

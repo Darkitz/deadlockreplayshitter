@@ -30,7 +30,7 @@ export async function viewOverview(heroId, params) {
   app.innerHTML = `
     <nav class="hero-tabs">
       ${heroes.map(([hid, c]) => `
-        <a class="hero-tab ${hid === heroId ? "on" : ""} ${c.parsed ? "" : "dim"}" href="#/hero/${hid}" title="${esc(S.assets.hero(hid).name)}: ${c.n} matches, ${c.parsed} with demo">
+        <a class="hero-tab ${hid === heroId ? "on" : ""} ${c.parsed ? "" : "dim"}" href="#/player/${S.index.account_id}/hero/${hid}" title="${esc(S.assets.hero(hid).name)}: ${c.n} matches, ${c.parsed} with demo">
           <img src="${esc(S.assets.hero(hid).icon)}" alt=""><span>${c.parsed}<small>/${c.n}</small></span>
         </a>`).join("")}
     </nav>
@@ -51,7 +51,7 @@ export async function viewOverview(heroId, params) {
     <details class="unparsed" id="unparsed"></details>`;
 
   for (const b of app.querySelectorAll(".abilities .ab")) {
-    b.addEventListener("click", () => go(`#/hero/${heroId}?ability=${b.dataset.ability}`));
+    b.addEventListener("click", () => go(`#/player/${S.index.account_id}/hero/${heroId}?ability=${b.dataset.ability}`));
   }
   wireControls(app, () => viewOverview(heroId, params));
   for (const el of app.querySelectorAll("[data-filter]")) {
@@ -310,7 +310,7 @@ function renderAbilityReport(list, heroId, selected) {
         <td>${k1(r.dmg)}</td></tr>`).join("")}
     </table></div>`;
   for (const tr of $("#report").querySelectorAll("tr[data-ability]")) {
-    tr.addEventListener("click", () => go(`#/hero/${heroId}?ability=${tr.dataset.ability}`));
+    tr.addEventListener("click", () => go(`#/player/${S.index.account_id}/hero/${heroId}?ability=${tr.dataset.ability}`));
   }
 }
 
@@ -346,7 +346,7 @@ async function renderByHero(current) {
     <p class="small muted">Only signature abilities that hit something at least once in a match are counted (skips buffs and passives).</p></div>`;
   for (const tr of el.querySelectorAll("tr[data-hero]")) {
     tr.style.cursor = "pointer";
-    tr.addEventListener("click", () => go(`#/hero/${tr.dataset.hero}`));
+    tr.addEventListener("click", () => go(`#/player/${S.index.account_id}/hero/${tr.dataset.hero}`));
   }
 }
 
