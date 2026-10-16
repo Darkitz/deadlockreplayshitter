@@ -40,13 +40,6 @@ export function aimError(m, me, c) {
   return best;
 }
 
-export const PHASES = [
-  { key: "lane", label: "0–10 min", from: -Infinity, to: 600 },
-  { key: "mid", label: "10–20 min", from: 600, to: 1200 },
-  { key: "late", label: "20–30 min", from: 1200, to: 1800 },
-  { key: "ot", label: "30+ min", from: 1800, to: Infinity },
-];
-
 const cacheKey = (pawn, cls, o) => `${pawn}|${cls}|${o.window}`;
 
 /**
@@ -193,52 +186,6 @@ export function abilityTable(m, pawn, assets, opts) {
   return rows;
 }
 
-/** aggregates over many analyzed matches for the overview charts */
-export function aggregate(list, heroesOnly) {
-  const phases = PHASES.map((ph) => ({ ...ph, thrown: 0, scored: 0 }));
-  const victims = new Map(); // hero_id -> hits
-  const delays = [];
-  const dists = [];
-  const byTarget = new Map(); // enemy hero_id -> {thrown, scored}
-  const RANGES = [
-    { label: "< 15 m", to: 15 }, { label: "15–30 m", to: 30 },
-    { label: "30–50 m", to: 50 }, { label: "50 m +", to: Infinity },
-  ];
-  const byRange = RANGES.map((r) => ({ ...r, thrown: 0, scored: 0 }));
-  const aimMiss = [];
-  const aimHit = [];
-  for (const { match, casts } of list) {
-    for (const c of casts) {
-      const ph = phases.find((x) => c.t >= x.from && c.t < x.to);
-      ph.thrown++;
-      const ok = c.result === "hit" || (!heroesOnly && c.result === "other");
-      if (ok) ph.scored++;
-      if (c.delay != null && ok) delays.push(c.delay);
-      if (c.dist != null && ok) dists.push(c.dist);
-      // who was the cast aimed at (within the aimed-at cone), and from how far
-      if (c.aimPawn != null && c.aimErr <= AIMED_AT_DEG) {
-        const hid = match.byPawn.get(c.aimPawn)?.hero_id;
-        const row = byTarget.get(hid) || { thrown: 0, scored: 0 };
-        row.thrown++;
-        if (c.result === "hit" && c.victims.includes(c.aimPawn)) row.scored++;
-        byTarget.set(hid, row);
-        const br = byRange.find((r) => c.aimDist < r.to);
-        br.thrown++;
-        if (ok) br.scored++;
-      }
-      if (c.aimErr != null) (c.result === "miss" ? aimMiss : ok ? aimHit : []).push(c.aimErr);
-      for (const v of c.victims) {
-        const hid = match.byPawn.get(v)?.hero_id;
-        victims.set(hid, (victims.get(hid) || 0) + 1);
-      }
-    }
-  }
-  return {
-    phases, victims: [...victims].sort((a, b) => b[1] - a[1]), delays, dists, aimMiss, aimHit,
-    byTarget: [...byTarget].sort((a, b) => b[1].thrown - a[1].thrown), byRange,
-  };
-}
-
 export const median = (xs) => {
   if (!xs.length) return null;
   const s = [...xs].sort((a, b) => a - b);
@@ -368,57 +315,6 @@ export function gunAt(g, t) {
   return { shots, hits, hs, npc };
 }
 
-/**
- * One player's numbers in one match: signature skills that connect (thrown / hit),
- * gun shots / hero hits / headshots, incoming skillshots dodged.
- */
-export function playerMatchSummary(m, pawn, assets, opts, win = null) {
-  const inW = (t) => !win || (t >= win[0] && t < win[1]);
-  let thrown = 0, hit = 0, dmg = 0;
-  const abilities = [];
-  for (const ab of assets.signatures(m.byPawn.get(pawn).hero_id)) {
-    const cs = analyzeAbility(m, pawn, ab, opts).casts.filter((c) => inW(c.t));
-    const c = counts(cs, opts.heroesOnly);
-    abilities.push({ ability: ab, ...c });
-    if (c.scored + c.other === 0) continue;
-    thrown += c.thrown; hit += c.scored; dmg += c.dmg;
-  }
-  const g0 = gunStats(m, pawn, assets);
-  // gun numbers inside the window, from the per-shot events
-  const g = { shots: 0, heroHits: 0, headshots: 0, npcHits: 0, bullets: 0 };
-  const pellets = g0.shots ? g0.bullets / g0.shots : 1;
-  for (const e of g0.events) {
-    if (!inW(e.t)) continue;
-    if (e.kind === "shot") g.shots += e.n;
-    else if (e.kind === "npc") g.npcHits++;
-    else { g.heroHits++; if (e.kind === "hs") g.headshots++; }
-  }
-  g.bullets = Math.round(g.shots * pellets);
-  g.heroAcc = g.shots - g.npcHits > 0 ? g.heroHits / (g.shots - g.npcHits) : null;
-  const inc = incoming(m, pawn, assets, opts);
-  const dc = deathContexts(m, pawn).filter((d) => inW(d.t));
-  const ml = meleeStats(m, pawn).swings.filter((x) => inW(x.t));
-  return {
-    meleeLight: ml.filter((x) => x.kind === "light").length,
-    meleeLightHit: ml.filter((x) => x.kind === "light" && x.result === "hit").length,
-    meleeHeavy: ml.filter((x) => x.kind === "heavy").length,
-    meleeHeavyHit: ml.filter((x) => x.kind === "heavy" && x.result === "hit").length,
-    // swings with an enemy hero in reach, and how many of those an enemy parried
-    meleeLightNear: ml.filter((x) => x.kind === "light" && x.near).length,
-    meleeHeavyNear: ml.filter((x) => x.kind === "heavy" && x.near).length,
-    meleeParried: ml.filter((x) => x.result === "parried").length,
-    meleeMove: ml.filter((x) => x.intent === "move").length,
-    meleeNpc: ml.filter((x) => x.intent === "npc").length,
-    deaths: dc.length, isolatedDeaths: dc.filter((d) => d.isolated).length,
-    thrown, hit, skillAcc: thrown ? hit / thrown : null, skillDmg: dmg, abilities,
-    shots: g.shots, bullets: g.bullets, gunHits: g.heroHits, headshots: g.headshots,
-    // hero hits / (shots - shots that only hit troopers/neutrals): ~ Valve's hero accuracy
-    gunAcc: g.heroAcc,
-    gunRaw: g.shots ? g.heroHits / g.shots : null, npcShots: g.npcHits,
-    aimedAt: inc.aimed, gotHit: inc.hit,
-  };
-}
-
 /** hero damage a pawn took in the `window` seconds before time t, grouped by attacker + ability */
 export function damageTaken(m, pawn, t, window = 10) {
   const by = new Map();
@@ -477,14 +373,6 @@ export function surroundings(m, pawn, t, radius = 30) {
   return { ally: Number.isFinite(ally) ? ally : null, enemies };
 }
 
-/** deaths of a pawn with their surroundings a moment before (isolated = no ally within 30 m) */
-export function deathContexts(m, pawn) {
-  return m.kills.filter((k) => k[1] === pawn).map((k) => {
-    const s = surroundings(m, pawn, k[0] - 1.5);
-    return { t: k[0], killer: k[2], ...(s || {}), isolated: s ? s.ally == null || s.ally > 30 : null };
-  });
-}
-
 /** pseudo-abilities for melee in the UI: light and heavy are tracked as separate abilities */
 export const MELEE = { class_name: "__melee", name: "Melee", id: null };
 export const MELEE_LIGHT = { class_name: "__melee_light", name: "Light melee", id: null, melee: "light" };
@@ -496,7 +384,6 @@ export const MELEE_KIND = { 1: "light", 2: "heavy", 3: "heavy" };
  * else "move" (melee used to move). Swings that connected or got parried count by what they hit.
  */
 export const MELEE_REACH_M = 10;
-export const MELEE_INTENT = { hero: "at heroes", npc: "at NPCs", move: "movement" };
 /** a successful parry catches the enemy swing that started up to 0.6 s before (or 0.2 s after) it */
 const PARRY_PAIR = [-0.6, 0.2], PARRY_DIST_M = 8;
 
@@ -613,17 +500,3 @@ export function meleeModel(ms, kind) {
   return kind ? { ...ms, events: ms.events.filter((e) => e.melee === kind), swings: ms.swings.filter((x) => x.kind === kind) } : ms;
 }
 
-/** gun totals restricted to a game-time window ([from, to] or null) */
-export function gunWindow(g, win) {
-  if (!win) return g;
-  const r = { shots: 0, heroHits: 0, headshots: 0, npcHits: 0, heroDmg: g.heroDmg, byVictim: g.byVictim };
-  for (const e of g.events) {
-    if (e.t < win[0] || e.t >= win[1]) continue;
-    if (e.kind === "shot") r.shots += e.n;
-    else if (e.kind === "npc") r.npcHits++;
-    else { r.heroHits++; if (e.kind === "hs") r.headshots++; }
-  }
-  r.bullets = g.shots ? Math.round(r.shots * (g.bullets / g.shots)) : 0;
-  r.heroAcc = r.shots - r.npcHits > 0 ? r.heroHits / (r.shots - r.npcHits) : null;
-  return r;
-}

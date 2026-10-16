@@ -1,11 +1,11 @@
 // Demos dropped onto the page: parsed in the browser (parse-worker.js + WebAssembly), kept in
-// IndexedDB so their #/match/<id> links keep working, and listed on the Matches page.
+// IndexedDB so their #/match/<id> links keep working, and listed on the home page.
 // Nothing is uploaded anywhere.
 
 import { $, esc, S } from "./ui.js";
+import { forgetMatch } from "./data.js";
 import { fmtClock } from "./timeline.js";
 
-// its own database: the 1 h match cache ("skillhitter") is wiped on sync, these must stay
 const DB = "skillhitter-local";
 
 function db() {
@@ -59,13 +59,11 @@ export function matchIdFromFile(file) {
   return 900000000000 + (h % 1000000000);
 }
 
-/** same shape as the server's matches.json rows, so the Matches page can show both */
+/** what the home page lists */
 function summarize(m, file) {
   return {
     match_id: m.match_id, local: true, file: file.name, size: file.size, parsed_at: Date.now(),
     parser_version: m.version, duration_s: m.game_over_s ?? m.duration_s, winner: m.winning_team ?? null,
-    // demos don't carry the match date; sort dropped demos by when they were dropped
-    start_time: Math.round(Date.now() / 1000), dropped: true,
     warnings: m.warnings || [],
     players: m.players.map((p) => ({
       account_id: p.account_id, name: p.name, hero_id: p.hero_id, team: p.team,
@@ -87,7 +85,7 @@ export function parseFile(file, matchId, onProgress) {
       }
     };
     w.onerror = (ev) => { w.terminate(); reject(new Error(ev.message || "worker failed")); };
-    w.postMessage({ file, matchId, version: S.wasmVersion || "" });
+    w.postMessage({ file, matchId });
   });
 }
 
@@ -105,6 +103,7 @@ export async function openDemoFiles(files) {
   let lastId = null;
   for (const [i, file] of list.entries()) {
     const id = matchIdFromFile(file);
+    forgetMatch(id);
     const head = `${list.length > 1 ? `${i + 1}/${list.length} · ` : ""}<b>${esc(file.name)}</b> <span class="muted">${(file.size / 1048576).toFixed(0)} MB</span>`;
     ov.show(`${head}<div class="drop-bar"><i style="width:2%"></i></div><p class="muted drop-stage">reading file…</p>`);
     const t0 = performance.now();
@@ -129,8 +128,11 @@ export async function openDemoFiles(files) {
   ov.hide();
   if (lastId != null) {
     // the match view caches loaded matches by id; a re-dropped file must replace the old parse
-    S.onLocalMatch?.(lastId);
-    location.hash = list.length > 1 ? "#/" : `#/match/${lastId}`;
+    forgetMatch(lastId);
+    const target = list.length > 1 ? "#/" : `#/match/${lastId}`;
+    // already there (re-dropped the open match, or several files from home): re-render
+    if (location.hash === target || (target === "#/" && !location.hash.startsWith("#/match"))) window.dispatchEvent(new HashChangeEvent("hashchange"));
+    else location.hash = target;
   }
 }
 

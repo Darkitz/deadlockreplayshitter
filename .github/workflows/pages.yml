@@ -1,0 +1,35 @@
+# Publishes web/ to GitHub Pages. The site is fully static: the WebAssembly parser
+# (web/parser/dlparse.wasm, built with tools/build-wasm.sh) and the game assets
+# (web/data/assets.json + web/assets/game, from tools/game_assets.py) are committed.
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests
+        run: node --test tests/analysis.test.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

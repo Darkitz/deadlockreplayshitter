@@ -1,141 +1,53 @@
-// Home: every parsed match (the main entity) plus the tracked players that lead to them.
+// Home: a drop field for a demo, and the demos already opened in this browser.
 
-import { $, esc, S, fmtDate, ago, settings, saveSettings } from "./ui.js";
+import { $, esc, S, ago } from "./ui.js";
 import { fmtClock } from "./timeline.js";
 import { TEAM_NAMES, forgetMatch } from "./data.js";
 import { localDelete } from "./local.js";
 
-export async function viewHome(params) {
+export function viewHome() {
   const app = $("#app");
-  const q = params.get("q") ?? settings.homeQuery ?? "";
-  const tracked = new Set(Object.keys(S.indexes).map(Number));
-
+  const list = [...(S.localMatches || [])].sort((a, b) => b.parsed_at - a.parsed_at);
   app.innerHTML = `
-    <section class="players-strip">
-      ${S.accounts.map((a) => {
-        const p = S.profiles[a.account_id] || {};
-        return `<a class="player-chip" href="#/player/${a.account_id}">
-          ${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : `<span class="ph"></span>`}
-          <span><b>${esc(p.name || a.name)}</b><small class="muted">${a.parsed} demos · ${a.matches} matches</small></span>
-        </a>`;
-      }).join("")}
+    <section class="drop-field" role="button" tabindex="0" data-pick>
+      <b>Drop a Deadlock demo here</b>
+      <span>or click to pick a file · <code>.dem</code> from <code>Deadlock/game/citadel/replays</code>
+        (in-game: match history → <i>Download Replay</i>) or <code>.dem.bz2</code></span>
+      <small class="muted">Parsed right here in your browser. Nothing is uploaded.</small>
     </section>
-    <section class="drop-hint">
-      <div><b>Analyze any match:</b> drag a demo onto this page or
-        <button class="btn primary" data-pick-demo>open demo</button>
-        <span class="muted small">.dem from <code>Deadlock/game/citadel/replays</code> or .dem.bz2 · parsed in your browser, nothing is uploaded</span></div>
-    </section>
-    <section class="toolbar">
-      <h2 class="section-title">Matches <span class="muted small" id="match-count"></span></h2>
-      <div class="controls">
-        <label>search
-          <input id="match-search" type="search" placeholder="player, hero or match id" value="${esc(q)}">
-        </label>
-        <label class="check"><input type="checkbox" id="demos-only" ${settings.demosOnly ? "checked" : ""}> with demo only</label>
-      </div>
-    </section>
-    <section class="match-grid" id="match-grid"></section>`;
-
-  // parsed demos plus every history game of tracked players (newest first)
-  // dropped demos the server doesn't have
-  const serverIds = new Set(S.matchList.map((m) => m.match_id));
-  const local = (S.localMatches || []).filter((m) => !serverIds.has(m.match_id));
-  const parsedIds = new Set([...serverIds, ...local.map((m) => m.match_id)]);
-  const fromHistory = new Map();
-  for (const idx of Object.values(S.indexes)) {
-    for (const e of idx.matches) {
-      if (parsedIds.has(e.match_id)) continue;
-      const rec = fromHistory.get(e.match_id) || { match_id: e.match_id, start_time: e.start_time, duration_s: e.duration_s, mode: e.mode, nodemo: true, tracked: [] };
-      rec.tracked.push({ account_id: idx.account_id, ...e });
-      fromHistory.set(e.match_id, rec);
-    }
-  }
-  const all = [...S.matchList, ...local, ...fromHistory.values()].sort((a, b) => (b.start_time || 0) - (a.start_time || 0));
-  let limit = 60;
-
-  const render = () => {
-    const needle = $("#match-search").value.trim().toLowerCase();
-    const demosOnly = $("#demos-only").checked;
-    const list = all.filter((m) => (!demosOnly || !m.nodemo) && (!needle || String(m.match_id).includes(needle)
-      || (m.players || m.tracked).some((p) => (S.profiles[p.account_id]?.name || p.name || "").toLowerCase().includes(needle)
-        || S.assets.hero(p.hero_id).name.toLowerCase().includes(needle))));
-    $("#match-count").textContent = `${list.length} matches · ${S.matchList.length + local.length} with parsed demos` +
-      (local.length ? ` · ${local.length} dropped here` : "");
-    $("#match-grid").innerHTML = list.slice(0, limit).map((m) => (m.nodemo ? noDemoCard(m) : matchCard(m, tracked))).join("") +
-      (list.length > limit ? `<button class="btn more" id="more">show more (${list.length - limit})</button>` : "") ||
-      `<div class="empty">No matches yet. Drop a demo onto the page, or run <code>tools/sync.py</code>.</div>`;
-  };
-  render();
-  $("#match-grid").addEventListener("click", async (ev) => {
-    if (ev.target.id === "more") { limit += 60; render(); }
+    ${list.length ? `
+      <h2 class="section-title">Opened in this browser</h2>
+      <section class="match-grid">${list.map(card).join("")}</section>` : ""}`;
+  const pick = $("[data-pick]", app);
+  pick.addEventListener("click", () => S.pickDemo?.());
+  pick.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); S.pickDemo?.(); } });
+  $(".match-grid", app)?.addEventListener("click", async (ev) => {
     const del = ev.target.closest("[data-forget]");
-    if (del) {
-      ev.preventDefault();
-      const id = Number(del.dataset.forget);
-      await localDelete(id);
-      forgetMatch(id);
-      const i = all.findIndex((m) => m.match_id === id && m.local);
-      if (i >= 0) all.splice(i, 1);
-      local.splice(local.findIndex((m) => m.match_id === id), 1);
-      render();
-    }
-  });
-  app.querySelector("[data-pick-demo]").addEventListener("click", () => S.pickDemo?.());
-  $("#demos-only").addEventListener("change", () => {
-    settings.demosOnly = $("#demos-only").checked;
-    saveSettings();
-    render();
-  });
-  $("#match-search").addEventListener("input", () => {
-    settings.homeQuery = $("#match-search").value;
-    saveSettings();
-    render();
+    if (!del) return;
+    ev.preventDefault();
+    const id = Number(del.dataset.forget);
+    await localDelete(id);
+    forgetMatch(id);
+    viewHome();
   });
 }
 
-function matchCard(m, tracked) {
-  const d = m.start_time ? new Date(m.start_time * 1000) : null;
-  const teams = [2, 3];
-  const trackedHere = m.players.filter((p) => tracked.has(p.account_id));
+function card(m) {
   return `<a class="match-card" href="#/match/${m.match_id}">
     <div class="mc-top">
       <b>#${m.match_id}</b>
-      <span class="muted">${m.local ? `dropped ${ago(new Date(m.parsed_at))}` : d ? `${fmtDate(d)} · ${ago(d)}` : "date unknown"}</span>
-      <span class="muted">${fmtClock(m.duration_s)}</span>
-      ${m.mode === 4 ? `<span class="chip-s">ranked</span>` : ""}
-      ${m.local ? `<span class="chip-s" title="${esc(m.file)} · parsed in this browser">dropped</span>
-        <button class="chip-s forget" data-forget="${m.match_id}" title="remove from this browser">×</button>` : ""}
+      <span class="muted">${fmtClock(m.duration_s || 0)}</span>
+      <span class="muted small" title="${esc(m.file)}">opened ${ago(new Date(m.parsed_at))}</span>
+      <button class="chip-s forget" data-forget="${m.match_id}" title="remove from this browser">×</button>
     </div>
-    ${teams.map((t) => {
+    ${[2, 3].map((t) => {
       const ps = m.players.filter((p) => p.team === t);
-      const kills = ps.reduce((a, p) => a + (p.k || 0), 0);
       return `<div class="mc-team team-${t} ${m.winner === t ? "won" : ""}">
         <span class="mc-team-name">${TEAM_NAMES[t]}${m.winner === t ? " ✓" : ""}</span>
-        <span class="mc-heroes">${ps.map((p) => `<img class="${tracked.has(p.account_id) ? "tracked" : ""}"
-          src="${esc(S.assets.hero(p.hero_id).icon)}" title="${esc(S.profiles[p.account_id]?.name || p.name)} · ${esc(S.assets.hero(p.hero_id).name)} · ${p.k}/${p.d}/${p.a}">`).join("")}</span>
-        <span class="muted small">${kills} kills</span>
+        <span class="mc-heroes">${ps.map((p) => `<img src="${esc(S.assets.hero(p.hero_id).icon)}"
+          title="${esc(p.name)} · ${esc(S.assets.hero(p.hero_id).name)} · ${p.k}/${p.d}/${p.a}">`).join("")}</span>
+        <span class="muted small">${ps.reduce((a, p) => a + (p.k || 0), 0)} kills</span>
       </div>`;
     }).join("")}
-    ${trackedHere.length ? `<div class="mc-tracked small">${trackedHere.map((p) => {
-      const won = m.winner === p.team;
-      return `<span class="${won ? "w" : "l"}">${esc(S.profiles[p.account_id]?.name || p.name)} · ${esc(S.assets.hero(p.hero_id).name)} · ${p.k}/${p.d}/${p.a}</span>`;
-    }).join("")}</div>` : ""}
-  </a>`;
-}
-
-/** a tracked player's game we have no demo for */
-function noDemoCard(m) {
-  const d = m.start_time ? new Date(m.start_time * 1000) : null;
-  return `<a class="match-card nodemo" href="#/match/${m.match_id}">
-    <div class="mc-top">
-      <b>#${m.match_id}</b>
-      <span class="muted">${d ? `${fmtDate(d)} · ${ago(d)}` : ""}</span>
-      <span class="muted">${fmtClock(m.duration_s || 0)}</span>
-      ${m.mode === 4 ? `<span class="chip-s">ranked</span>` : ""}
-      <span class="chip-s muted-chip">no demo</span>
-    </div>
-    <div class="mc-tracked">${m.tracked.map((e) => `<span class="${e.won ? "w" : "l"}">
-      <img class="hi" src="${esc(S.assets.hero(e.hero_id).icon)}" alt="">
-      ${esc(S.profiles[e.account_id]?.name || "")} · ${esc(S.assets.hero(e.hero_id).name)} · ${e.kills}/${e.deaths}/${e.assists} · ${e.won ? "win" : "loss"}</span>`).join("")}</div>
   </a>`;
 }

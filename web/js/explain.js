@@ -8,8 +8,7 @@ export const SECTIONS = [
   {
     title: "Where the data comes from",
     items: [
-      ["demo", "Demo", "The replay file (.dem) from Deadlock's replays folder or Valve's replay servers, parsed locally by dlparse. Casts, damage, shots, melee swings, parries, buffs, items and positions (every 0.5 s) all come from it."],
-      ["metadata", "Valve metadata", "Valve's match summary (.meta), decoded locally. It outlives the demo, so matches without a demo still get a scoreboard, objectives, positions once per second and Valve's own accuracy numbers."],
+      ["demo", "Demo", "The replay file you drop: a .dem from Deadlock's replays folder (in-game: Download Replay) or a .dem.bz2 from Valve's replay servers. It is parsed in your browser by dlparse compiled to WebAssembly; nothing is uploaded. Casts, damage, shots, melee swings, parries, buffs, items and positions (every 0.5 s) all come from it."],
       ["game time", "Game time", "Seconds since the match horn, from the server tick minus pauses. Matches the in-game clock."],
       ["point / span", "Point / span", "Point: every number covers the match start up to the playhead. Span: only events between the two handles count (e.g. 10:00 to 20:00)."],
     ],
@@ -23,12 +22,10 @@ export const SECTIONS = [
       ["hit non-hero", "Hit non-hero", "Casts that damaged something within the window, but no enemy hero."],
       ["missed", "Missed", "Casts that damaged nothing within the hit window."],
       ["accuracy", "Accuracy", "Hit ÷ thrown. With \"heroes only\" (the default) only enemy-hero hits count."],
-      ["skill accuracy", "Skill accuracy", "Signature-ability hits on heroes ÷ casts, over all parsed matches in view. Abilities that never connect with anything (pure buffs, movement) are left out."],
-      ["skill%", "Skill %", "Same as skill accuracy, for this match. The best value (5+ casts) is underlined."],
+      ["skill%", "Skill %", "Signature-ability casts that hit an enemy hero ÷ casts, this match. Abilities that never connect with anything (pure buffs, movement) are left out. The best value (5+ casts) is underlined."],
       ["skill hit %", "Skill hit %", "Signature-ability casts that hit an enemy hero ÷ casts, in the current point or span."],
       ["skills thrown", "Skills thrown", "Signature-ability casts in the current point or span."],
       ["damage", "Damage", "Damage this ability dealt within the hit windows of its casts (all victims except allies)."],
-      ["skill damage", "Skill damage", "Damage dealt by signature abilities within their hit windows."],
       ["hits → kills", "Hits → kills", "Hero hits whose victim died within 10 s of the first hit, out of all hero hits."],
       ["ready → recast", "Ready → recast", "Average time the ability sat off cooldown before the next cast. Lower means it was used as soon as it was ready."],
       ["hit window", "Hit window", "How long after a cast damage still counts for it. Longer for slow projectiles or damage over time."],
@@ -44,15 +41,11 @@ export const SECTIONS = [
       ["bullets", "Bullets", "Shots × pellets per shot from the weapon's game data (shotguns fire several). Matches Valve's bullet totals."],
       ["shots hit heroes", "Shots hit heroes", "Shots paired with bullet damage on an enemy hero. Damage packets from one tick claim the oldest unpaired shot of the last 1.5 s, so projectile travel time is covered."],
       ["shots hit troopers", "Shots hit troopers", "Shots whose bullet damage landed only on troopers, neutrals, objectives or crates."],
-      ["hero accuracy", "Hero accuracy", "Hero hits ÷ (shots − shots that hit only NPCs). Shots spent on troopers aren't attempts at heroes, so they leave the denominator. Close to Valve's hero accuracy."],
-      ["gun hero accuracy", "Gun hero accuracy", "Hero hits ÷ (shots − shots that hit only NPCs), over all parsed matches in view."],
+      ["hero accuracy", "Hero accuracy", "Hero hits ÷ (shots − shots that hit only NPCs). Shots spent on troopers aren't attempts at heroes, so they leave the denominator. Close to Valve's own end-of-match hero accuracy."],
       ["hit rate (all shots)", "Hit rate (all shots)", "Hero hits ÷ all shots, troopers included."],
       ["headshots", "Headshots", "Hero hits whose damage landed on the head hitgroup or carried crit damage (matches Valve's crit count)."],
       ["hero headshot %", "Hero headshot %", "Headshots ÷ hero hits."],
       ["hero hs %", "Hero HS %", "Headshots ÷ hero hits in the current point or span."],
-      ["valve: hero accuracy", "Valve: hero accuracy", "Valve's own end-of-match number (hero bullets hit ÷ hero bullets fired), from the metadata. Whole match only."],
-      ["valve: headshots", "Valve: headshots", "Valve's hero headshot count, whole match."],
-      ["valve: bullets hit", "Valve: bullets hit", "Valve's bullets that hit anything ÷ bullets fired, whole match."],
     ],
   },
   {
@@ -65,7 +58,6 @@ export const SECTIONS = [
       ["hero melees", "Hero melees", `Swings with a living enemy hero within ${MELEE_REACH_M} m, or that hit or got parried by one.`],
       ["at npcs", "At NPCs", `No enemy hero in reach, but a trooper, neutral, objective, crate or soul orb within ${MELEE_REACH_M} m: farming, pushing or securing souls.`],
       ["movement", "Movement", `Nothing to hit within ${MELEE_REACH_M} m: melee used to move (the heavy-melee lunge or the light-melee hop).`],
-      ["melee use %", "Melee use %", "Share of swings at heroes, at NPCs and for movement."],
       ["hero melee accuracy", "Hero melee accuracy", "Hero hits ÷ hero melees. Swings at NPCs and movement swings stay out of the denominator."],
       ["acc", "Acc", "Hero hits ÷ swings at heroes."],
       ["whiff", "Whiff", "Swings at heroes that neither hit nor got parried."],
@@ -80,11 +72,8 @@ export const SECTIONS = [
     title: "Players, fights and positioning",
     items: [
       ["k / d / a", "K / D / A", "Kills, deaths and assists up to the playhead (in a span: during it), from the player's stats every 10 s."],
-      ["kda ratio", "KDA ratio", "(Kills + assists) ÷ deaths."],
       ["souls", "Souls", "Net worth at the playhead."],
       ["level", "Level", "Hero level at the playhead."],
-      ["win rate", "Win rate", "Wins ÷ parsed matches in view."],
-      ["isolated deaths", "Isolated deaths", "Deaths with no living ally within 30 m half a second before."],
       ["fights", "Fights", "Kills grouped together when less than 15 s apart. The score is kills per team."],
       ["team souls lead", "Team souls lead", "Amber's total net worth minus Sapphire's, every 10 s."],
       ["heat", "Heat (map)", "Where the selected player spent time while alive in the current point or span (positions every 0.5 s)."],
@@ -185,7 +174,7 @@ export const DEEP_DIVES = [
         A group with only troopers, neutrals or objectives is an NPC shot.</li>
         <li><b>Hero accuracy</b> = hero hits ÷ (shots − NPC shots). A shot spent on a trooper was not an attempt at a
         hero, so it leaves the denominator. On single-bullet guns this lands within about 2 points of Valve's own
-        hero accuracy from the match metadata.</li>
+        end-of-match hero accuracy.</li>
       </ol>`,
   },
 ];
@@ -194,7 +183,7 @@ export function viewAbout(app, params) {
   app.innerHTML = `
     <section class="about">
       <h2>How the numbers are made</h2>
-      <p class="muted">Hover any underlined label on the site for the same text.</p>
+      <p class="muted">Everything is computed in your browser from the demo alone. Hover any underlined label on the site for the same text.</p>
       <nav class="about-toc">${[...DEEP_DIVES.map((d) => [d.id, d.title]), ...SECTIONS.map((x, i) => [`s${i}`, x.title])]
         .map(([id, t]) => `<a href="#/about?s=${id}" data-jump="${id}">${t}</a>`).join("")}</nav>
       ${DEEP_DIVES.map((d) => `<div class="about-sec deep" id="about-${d.id}"><h3>${d.title}</h3>${d.body}</div>`).join("")}

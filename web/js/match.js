@@ -1,41 +1,32 @@
 // Match detail: scoreboard, ability picker, minimap + timeline replay, incoming skillshots.
 
 import {
-  loadMatch, loadMeta, prepare, statsAt, hpAt, itemsAt, abilityLevelsAt, modifiersAt, TEAM_NAMES,
+  loadMatch, statsAt, hpAt, itemsAt, abilityLevelsAt, modifiersAt, TEAM_NAMES,
 } from "./data.js";
-import { digestMeta, renderReport, matchFromMeta } from "./report.js";
 import {
   analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt, damageTaken, detectFights, surroundings, MELEE, MELEE_LIGHT, MELEE_HEAVY, MELEE_REACH_M, meleeStats, meleeModel,
 } from "./analysis.js";
 import { createTimeline, fmtClock } from "./timeline.js";
 import { createMinimap } from "./minimap.js";
 import {
-  $, esc, S, settings, saveSettings, opts, fmtDate, ago, k1, tile, rankChip, controlsHTML,
-  wireControls, abilityButtons, entry, setParams,
+  $, esc, S, settings, saveSettings, opts, k1, tile, controlsHTML,
+  wireControls, abilityButtons, setParams,
 } from "./ui.js";
 
 export async function viewMatch(id, params) {
   const app = $("#app");
   app.innerHTML = `<div class="muted pad">loading match ${id}…</div>`;
-  const e = entry(id);
-  let m;
-  try {
-    m = await loadMatch(id);
-  } catch (err) {
-    // no demo: replay from Valve's 1 Hz match paths if the metadata has them
-    try {
-      const pseudo = matchFromMeta(await loadMeta(id), id);
-      if (pseudo) m = prepare(pseudo);
-    } catch { /* no metadata either */ }
-    if (!m) {
-      renderNoDemo(app, id, e);
-      return;
-    }
+  const m = await loadMatch(id);
+  if (!m) {
+    app.innerHTML = `<div class="empty"><b>Match ${id} isn't in this browser.</b><br>
+      Demos stay in the browser they were dropped into. Drop the demo again to open it.
+      <p><button class="btn primary" data-pick>open demo</button> <a href="#/">← home</a></p></div>`;
+    $("[data-pick]", app).onclick = () => S.pickDemo?.();
+    return;
   }
-  // point of view: the current tracked player, any tracked player in the match, or (dropped demos)
-  // whoever was analyzed last
-  const me = (S.index && m.player(S.index.account_id))
-    || m.players.find((p) => S.indexes?.[p.account_id]) || m.player(settings.lastAccount);
+  const info = (S.localMatches || []).find((x) => x.match_id === id);
+  // point of view: whoever was analyzed last (usually yourself), else the first player
+  const me = m.player(settings.lastAccount);
   const pawn = Number(params.get("pawn")) || me?.pawn || m.players[0].pawn;
   const subject = m.byPawn.get(pawn);
   if (params.get("pawn") && subject.account_id !== settings.lastAccount) { settings.lastAccount = subject.account_id; saveSettings(); }
@@ -64,9 +55,7 @@ export async function viewMatch(id, params) {
   const ability = gunMode ? gunAbility : meleeMode ? meleeAbility : row?.ability || sigs[0];
   const analysis = gunMode || meleeMode ? { source: gunMode ? "gun" : "melee", casts: [] } : analyzeAbility(m, pawn, ability, opts());
   const casts = analysis.casts;
-  const valve = (S.valveStats?.[id] || {})[subject.account_id];
-  const won = e ? e.won : null;
-  const d = e ? new Date(e.start_time * 1000) : null;
+  const won = m.winning_team ? m.winning_team === subject.team : null;
 
   function abStat(ab) {
     if (ab.melee) {
@@ -97,27 +86,24 @@ export async function viewMatch(id, params) {
 
   app.innerHTML = `
     <div class="match-header">
-      <a href="#/" class="back">← matches</a>
+      <a href="#/" class="back">← home</a>
       <div class="mh-title">
-        ${won != null ? `<span class="result ${won ? "win" : "loss"}">${won ? "WIN" : "LOSS"}</span>` : ""}
+        ${won != null ? `<span class="result ${won ? "win" : "loss"}" title="for ${esc(subject.name)}">${won ? "WIN" : "LOSS"}</span>` : ""}
         <h2>#${id}</h2>
-        ${d ? `<span class="muted" title="${esc(d.toString())}">${fmtDate(d)} · ${ago(d)}</span>` : ""}
         <span class="muted">${fmtClock(m.end)}</span>
-        ${rankChip(e)}
+        ${info ? `<span class="muted small" title="dropped ${esc(new Date(info.parsed_at).toString())}">${esc(info.file)}</span>` : ""}
         ${id < 900000000000 ? `<a class="muted small" target="_blank" rel="noopener" href="https://statlocker.gg/match/${id}">statlocker ↗</a>` : `<span class="chip-s" title="file name has no match id">dropped demo</span>`}
       </div>
     </div>
     <section class="scoreboard">
       ${teams.map((t) => `
         <div class="team team-${t}">
-          <h3>${TEAM_NAMES[t] || `Team ${t}`}${me && me.team === t ? " · " + esc(S.profiles[me.account_id]?.name || me.name) + "'s team" : ""}</h3>
-          <div class="team-head"><span></span><span></span><span>player</span><span style="text-align:right">k/d/a</span><span style="text-align:right">skill%</span><span style="text-align:right">souls</span></div>
+          <h3>${TEAM_NAMES[t] || `Team ${t}`}${subject.team === t ? " · " + esc(subject.name) + "'s team" : ""}</h3>
+          <div class="team-head"><span></span><span>player</span><span style="text-align:right">k/d/a</span><span style="text-align:right">skill%</span><span style="text-align:right">souls</span></div>
           ${teamOf(t).map((p) => {
-            const prof = S.profiles[p.account_id];
             return `<div class="sb-row ${p.pawn === pawn ? "on" : ""}" data-pawn="${p.pawn}" role="button" tabindex="0" title="analyze ${esc(p.name)}">
               <img class="sb-hero" src="${esc(S.assets.hero(p.hero_id).icon)}" alt="">
-              ${prof?.avatar ? `<img class="sb-av" src="${esc(prof.avatar)}" alt="">` : `<span class="sb-av"></span>`}
-              <a class="sb-name" href="#/player/${p.account_id}" title="${esc(prof?.name || p.name || "")}: all matches">${esc(prof?.name || p.name || S.assets.hero(p.hero_id).name)}</a>
+              <span class="sb-name">${esc(p.name || S.assets.hero(p.hero_id).name)}</span>
               <span class="sb-kda">${p.kills}/${p.deaths}/${p.assists}</span>
               ${(() => { const a = skillAcc.get(p.pawn); const v = a.thrown ? a.scored / a.thrown : 0;
                 return `<span class="sb-acc ${a.thrown >= 5 && v === bestAcc ? "best" : ""}" title="signature abilities: ${a.scored}/${a.thrown} hit heroes">${a.thrown ? pct(v) : "–"}</span>`; })()}
@@ -126,20 +112,17 @@ export async function viewMatch(id, params) {
           }).join("")}
         </div>`).join("")}
     </section>
-    ${m.fromMeta ? `<p class="note">No demo for this match (${esc(e?.status || "not downloaded")}). This replay uses Valve's match paths:
-      positions and health once per second, deaths and objectives. Casts, shots and hits need the demo
-      (Deadlock: <b>Download Replay</b>).</p>` : ""}
-    <section class="toolbar" ${m.fromMeta ? "hidden" : ""}>
+    <section class="toolbar">
       <div class="abilities">${abilityButtons([gunAbility, ...meleeAbilities, ...table.filter((r) => !r.kind).map((r) => r.ability)], ability.class_name, abStat)}</div>
       <div class="controls">${controlsHTML(false)}</div>
     </section>
-    ${!m.fromMeta && table.some((r) => r.kind === "extra") ? `<section class="items-row"><span class="muted small">other abilities</span>
+    ${table.some((r) => r.kind === "extra") ? `<section class="items-row"><span class="muted small">other abilities</span>
       <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.kind === "extra").map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}
-    ${!m.fromMeta && table.some((r) => r.item) ? `<section class="items-row"><span class="muted small">active items</span>
+    ${table.some((r) => r.item) ? `<section class="items-row"><span class="muted small">active items</span>
       <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.item).map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}
-    ${!m.fromMeta && analysis.source === "cooldown" ? `<p class="note">No cast events for ${esc(ability.name)} in this demo; casts are taken from the ability going on cooldown, so there is no aim direction or aim error.</p>` : ""}
-    ${e?.warnings?.length ? `<p class="note warn">Parser warnings for this demo: ${e.warnings.map(esc).join(" · ")}</p>` : ""}
-    ${!m.fromMeta && analysis.source === "none" ? `<p class="note">No casts of ${esc(ability.name)} found for this player.</p>` : ""}
+    ${analysis.source === "cooldown" ? `<p class="note">No cast events for ${esc(ability.name)} in this demo; casts are taken from the ability going on cooldown, so there is no aim direction or aim error.</p>` : ""}
+    ${m.warnings?.length ? `<p class="note warn">Parser warnings for this demo: ${m.warnings.map(esc).join(" · ")}</p>` : ""}
+    ${analysis.source === "none" ? `<p class="note">No casts of ${esc(ability.name)} found for this player.</p>` : ""}
     <section class="stage">
       <div class="map-wrap"><canvas class="minimap"></canvas>
         <div class="map-legend small muted">
@@ -191,10 +174,9 @@ export async function viewMatch(id, params) {
       </div>
     </section>
     <section class="chart-card laning" id="laning"></section>
-    <section class="chart-card tracker" id="tracker" ${m.fromMeta ? "hidden" : ""}></section>
-    <section class="chart-card incoming" id="incoming" ${m.fromMeta ? "hidden" : ""}></section>
-    <section class="report" id="report"><p class="muted">loading Valve match report…</p></section>`;
-  showReport($("#report", app), id, subject.account_id);
+    <section class="chart-card tracker" id="tracker"></section>
+    <section class="chart-card incoming" id="incoming"></section>
+`;
 
   // wiring
   for (const b of app.querySelectorAll(".sb-row")) {
@@ -264,10 +246,10 @@ export async function viewMatch(id, params) {
     // dead at the playhead: recap of the last death
     let recap = "";
     const death = [...m.kills].reverse().find((k) => k[1] === pawn && k[0] <= t);
-    if (death && hp && hp.hp <= 0 && t - death[0] < 120 && !m.fromMeta) {
+    if (death && hp && hp.hp <= 0 && t - death[0] < 120) {
       const dt = damageTaken(m, pawn, death[0]);
       const killer = m.byPawn.get(death[2]);
-      recap = `<div class="recap"><b>Killed ${killer ? `by <img src="${esc(S.assets.hero(killer.hero_id).icon)}" alt=""> ${esc(S.profiles[killer.account_id]?.name || killer.name)}` : ""}</b>
+      recap = `<div class="recap"><b>Killed ${killer ? `by <img src="${esc(S.assets.hero(killer.hero_id).icon)}" alt=""> ${esc(killer.name)}` : ""}</b>
         <span class="muted small"> at ${fmtClock(death[0])} · ${k1(dt.total)} hero damage in the last 10 s</span>
         ${(() => {
           const sr = surroundings(m, pawn, death[0] - 1.5);
@@ -286,13 +268,13 @@ export async function viewMatch(id, params) {
       <div class="st-head">
         <img src="${esc(S.assets.hero(subject.hero_id).icon)}" alt="">
         <div class="st-hp"><div class="st-bar"><span style="width:${f * 100}%;background:${f > 0.5 ? "var(--hit)" : f > 0.25 ? "var(--accent)" : "var(--miss)"}"></span></div>
-          <small>${hp ? (hp.hp > 0 ? `${hp.hp} / ${hp.max} HP` : "dead") : "–"}${m.fromMeta ? " (%)" : ""}</small></div>
+          <small>${hp ? (hp.hp > 0 ? `${hp.hp} / ${hp.max} HP` : "dead") : "–"}</small></div>
         <div class="st-num"><b>${st ? k1(st[0]) : "–"}</b><small>souls</small></div>
         <div class="st-num"><b>${st ? st[1] : "–"}</b><small>level</small></div>
       </div>
-      ${m.fromMeta ? "" : `<div class="st-abs">${abil}</div>`}
+      <div class="st-abs">${abil}</div>
       <div class="st-items">${items.map((it) => `<img class="slot-${esc(it.slot || "x")}" src="${esc(S.assets.itemIcon(it.id))}" title="${esc(it.name)}${it.tier ? ` · tier ${it.tier}` : ""}" alt="">`).join("") || `<span class="muted small">no items yet</span>`}</div>
-      ${m.fromMeta ? "" : `<div class="st-mods">${mods.map((x) => `<span class="mod ${x.enemy ? "debuff" : ""}" title="${esc(x.name)}${x.enemy ? " (from enemy)" : ""}${x.left < 9999 ? ` · ${x.left.toFixed(1)} s left` : ""}">
+      ${`<div class="st-mods">${mods.map((x) => `<span class="mod ${x.enemy ? "debuff" : ""}" title="${esc(x.name)}${x.enemy ? " (from enemy)" : ""}${x.left < 9999 ? ` · ${x.left.toFixed(1)} s left` : ""}">
         ${x.icon ? `<img src="${esc(x.icon)}" alt="">` : ""}<span>${esc(x.name)}</span>${x.stacks > 1 ? `<b>×${x.stacks}</b>` : x.n > 1 ? `<b>×${x.n}</b>` : ""}${x.left < 600 ? `<small>${x.left.toFixed(0)}s</small>` : ""}</span>`).join("") || `<span class="muted small">no buffs or debuffs</span>`}</div>`}`;
   }
 
@@ -367,7 +349,7 @@ export async function viewMatch(id, params) {
       let d = "";
       for (let i = 0; i < pts.length; i += step) d += `${d ? "L" : "M"}${cx(pts[i][0]).toFixed(1)},${cy(Math.min(1, pts[i][1])).toFixed(1)} `;
       const last = pts.at(-1)[1];
-      return `<path class="acc-line team-${tr.p.team} ${tr.p.pawn === pawn ? "subject" : ""}" data-pawn="${tr.p.pawn}" d="${d}"><title>${esc(S.profiles[tr.p.account_id]?.name || tr.p.name)}: ${pct(last)}</title></path>`;
+      return `<path class="acc-line team-${tr.p.team} ${tr.p.pawn === pawn ? "subject" : ""}" data-pawn="${tr.p.pawn}" d="${d}"><title>${esc(tr.p.name)}: ${pct(last)}</title></path>`;
     }).join("");
     const grid = [0, 0.25, 0.5, 0.75, 1].map((v) => `<line class="grid" x1="30" x2="${CW - 10}" y1="${cy(v)}" y2="${cy(v)}"/><text class="axis" x="26" y="${cy(v) + 3}" text-anchor="end">${v * 100}%</text>`).join("");
     const span = t0 != null ? `<rect class="acc-span" x="${cx(t0)}" y="4" width="${cx(t) - cx(t0)}" height="${CH - 18}"/>` : "";
@@ -380,7 +362,7 @@ export async function viewMatch(id, params) {
         ${teams.map((tm) => rows.filter((r) => r.p.team === tm).map((r) => `
           <tr class="team-row-${tm} ${r.p.pawn === pawn ? "on" : ""}" data-pawn="${r.p.pawn}">
             <td><img src="${esc(S.assets.hero(r.p.hero_id).icon)}" alt=""></td>
-            <td><a href="#/player/${r.p.account_id}">${esc(S.profiles[r.p.account_id]?.name || r.p.name)}</a></td>
+            <td>${esc(r.p.name)}</td>
             <td>${(() => {
               const h = hpAt(m, r.p.pawn, t);
               if (!h) return "–";
@@ -420,7 +402,7 @@ export async function viewMatch(id, params) {
     const el = $("#laning", app);
     const LANE_END = 600;
     const lane = m.players.filter((p) => p.lane && p.lane === subject.lane);
-    if (lane.length < 2 || m.fromMeta) { el.hidden = true; return; }
+    if (lane.length < 2) { el.hidden = true; return; }
     const at = (p, t) => statsAt(m, p.pawn, t) || [0, 0, 0, 0, 0, 0];
     const mine = lane.filter((p) => p.team === subject.team), theirs = lane.filter((p) => p.team !== subject.team);
     const sumNw = (ps, t) => ps.reduce((a, p) => a + at(p, t)[0], 0);
@@ -435,7 +417,7 @@ export async function viewMatch(id, params) {
         const t = (i / steps) * LANE_END;
         d += `${i ? "L" : "M"}${x(t)},${y(at(p, t)[0])} `;
       }
-      return `<path class="nw-line team-${p.team} ${p.pawn === pawn ? "subject" : ""}" d="${d}"><title>${esc(S.profiles[p.account_id]?.name || p.name)}</title></path>`;
+      return `<path class="nw-line team-${p.team} ${p.pawn === pawn ? "subject" : ""}" d="${d}"><title>${esc(p.name)}</title></path>`;
     }).join("");
     el.innerHTML = `
       <h3>Laning · first 10 minutes <span class="muted">· lane ${subject.lane}</span></h3>
@@ -448,7 +430,7 @@ export async function viewMatch(id, params) {
             ${[...mine, ...theirs].map((p) => {
               const st = at(p, LANE_END);
               return `<tr class="team-row-${p.team} ${p.pawn === pawn ? "on" : ""}"><td><img src="${esc(S.assets.hero(p.hero_id).icon)}" alt=""></td>
-                <td>${esc(S.profiles[p.account_id]?.name || p.name)}</td><td>${k1(st[0])}</td><td>${st[5]}</td><td>${st[2]}/${st[3]}/${st[4]}</td></tr>`;
+                <td>${esc(p.name)}</td><td>${k1(st[0])}</td><td>${st[5]}</td><td>${st[2]}/${st[3]}/${st[4]}</td></tr>`;
             }).join("")}
           </table>
         </div>
@@ -459,7 +441,7 @@ export async function viewMatch(id, params) {
   // incoming skillshots (defense)
   const inc = incoming(m, pawn, S.assets, opts());
   $("#incoming", app).innerHTML = `
-    <h3>Incoming skillshots aimed at ${esc(S.profiles[subject.account_id]?.name || subject.name)}
+    <h3>Incoming skillshots aimed at ${esc(subject.name)}
       <span class="muted">· enemy casts whose aim was within ${AIMED_AT_DEG}° of them</span></h3>
     <div class="summary">
       ${tile("Aimed at", inc.aimed)}${tile("Got hit", inc.hit, "")}${tile("Dodged", inc.dodged, "good")}
@@ -469,7 +451,7 @@ export async function viewMatch(id, params) {
       <tr><th></th><th>enemy</th><th>ability</th><th>aimed</th><th>hit</th><th>dodged</th></tr>
       ${inc.rows.map((r) => `<tr>
         <td><img src="${esc(S.assets.hero(r.player.hero_id).icon)}" alt=""></td>
-        <td>${esc(S.profiles[r.player.account_id]?.name || r.player.name)}</td>
+        <td>${esc(r.player.name)}</td>
         <td><span class="inline-ab">${r.ability.image ? `<img src="${esc(r.ability.image)}" alt="">` : ""}${esc(r.ability.name)}</span></td>
         <td>${r.aimed}</td><td>${r.hit}</td>
         <td><span class="acc-bar"><span style="width:${(1 - r.hit / r.aimed) * 100}%"></span></span>${pct(1 - r.hit / r.aimed)}</td></tr>`).join("")}
@@ -493,11 +475,11 @@ export async function viewMatch(id, params) {
 
   const timeline = createTimeline($(".timeline", app), {
     end: m.end, casts, heroesOnly: settings.heroesOnly, lead, deaths, kills,
-    gun: gunMode ? gun : meleeMode ? melee : null, noChart: !!m.fromMeta,
+    gun: gunMode ? gun : meleeMode ? melee : null,
     gunLabels: meleeMode ? ["swings", "hero hits", meleeKind ? null : "heavy hero hits"] : null,
   }, (t) => seek(t), (a, b) => setSpan(a, b));
   const minimap = createMinimap($(".minimap", app), {
-    match: m, assets: S.assets, profiles: S.profiles, onPick: (p) => setParams({ pawn: p.pawn, ability: null }),
+    match: m, assets: S.assets, profiles: {}, onPick: (p) => setParams({ pawn: p.pawn, ability: null }),
   });
 
   if (params.has("zoom")) settings.mapZoom = Number(params.get("zoom")) || 1;
@@ -637,7 +619,6 @@ export async function viewMatch(id, params) {
     const g = spanGun(gun);
     const pellets = gun.shots ? gun.bullets / gun.shots : 1;
     const st = spanStats();
-    const vAcc = valve?.hero_shots ? valve.hero_hits / valve.hero_shots : null;
     $(".tiles", app).innerHTML =
       tile("Shots fired", g.shots) +
       tile("Bullets", Math.round(g.shots * pellets) + (pellets > 1 ? `<small> ×${pellets.toFixed(0)}</small>` : "")) +
@@ -648,10 +629,7 @@ export async function viewMatch(id, params) {
       tile("Headshots", g.hs) +
       tile("Hero headshot %", g.hits ? pct(g.hs / g.hits) : "–") +
       tile("K / D / A", st ? `${st[2]}/${st[3]}/${st[4]}` : "–") +
-      tile("Souls", st ? k1(st[0]) : "–") +
-      (valve ? tile("Valve: hero accuracy", vAcc != null ? `${pct(vAcc)}<small> ${valve.hero_hits}/${valve.hero_shots}</small>` : "–") +
-        tile("Valve: headshots", valve.hero_headshots ?? "–") +
-        tile("Valve: bullets hit", valve.shots_hit != null ? `${valve.shots_hit}<small> / ${valve.shots_hit + valve.shots_missed}</small>` : "–") : "");
+      tile("Souls", st ? k1(st[0]) : "–");
     const f = settings.feed || "all";
     const evs = [];
     for (const ev of gun.events) {
@@ -671,7 +649,7 @@ export async function viewMatch(id, params) {
 
   function renderMeleeReadout(t) {
     const sw = melee.swings.filter((x) => inSpan(x.t));
-    const name = (pw) => esc(S.profiles[m.byPawn.get(pw)?.account_id]?.name || m.byPawn.get(pw)?.name || "");
+    const name = (pw) => esc(m.byPawn.get(pw)?.name || "");
     const icon = (pw) => { const p = m.byPawn.get(pw); return p ? `<img src="${esc(S.assets.hero(p.hero_id).icon)}" title="${name(pw)}">` : ""; };
     const n = sw.length, near = sw.filter((x) => x.near).length;
     const hero = sw.filter((x) => x.result === "hit").length;
@@ -737,7 +715,7 @@ export async function viewMatch(id, params) {
 
   /** step-by-step reason for a swing's classification (hover text in the melee feed) */
   function swingWhy(x) {
-    const nm = (pw) => S.profiles[m.byPawn.get(pw)?.account_id]?.name || m.byPawn.get(pw)?.name || "?";
+    const nm = (pw) => m.byPawn.get(pw)?.name || "?";
     const d = (v) => (v == null ? "none within 30 m" : `${v.toFixed(1)} m`);
     const lines = [
       `${x.kind === "heavy" ? "Heavy" : "Light"} melee at ${fmtClock(x.t)}.`,
@@ -758,16 +736,10 @@ export async function viewMatch(id, params) {
   function renderReadout(t) {
     if (gunMode) { renderGunReadout(t); return; }
     if (meleeMode) { renderMeleeReadout(t); return; }
-    if (m.fromMeta) {
-      const st = spanStats();
-      $(".tiles", app).innerHTML = tile("K / D / A", st ? `${st[2]}/${st[3]}/${st[4]}` : "–") +
-        tile("Souls", st ? k1(st[0]) : "–") + tile("Level", st ? st[1] : "–") +
-        tile("Last hits", st ? st[5] : "–");
-    }
     const past = casts.filter((c) => inSpan(c.t));
     const c = counts(past, settings.heroesOnly);
     const st = spanStats();
-    if (!m.fromMeta) $(".tiles", app).innerHTML =
+    $(".tiles", app).innerHTML =
       tile("Thrown", c.thrown) +
       tile(settings.heroesOnly ? "Hit heroes" : "Hit", c.scored, "good") +
       tile("Accuracy", c.thrown ? pct(c.acc) : "–", "accent") +
@@ -872,50 +844,4 @@ export async function viewMatch(id, params) {
     minimap.destroy();
   };
   seek(t);
-}
-
-/** Valve metadata report (independent of the demo) */
-function showReport(el, id, account) {
-  loadMeta(id)
-    .then((raw) => { if (el.isConnected) renderReport(el, digestMeta(raw), account); })
-    .catch(() => {
-      if (el.isConnected) el.innerHTML = `<p class="note">No Valve match metadata for this match (deadlock-api doesn't have it, or sync hasn't fetched it yet).</p>`;
-    });
-}
-
-function renderNoDemo(app, id, e) {
-  const c = (S.career || []).find((r) => r.match_id === id);
-  const d = e ? new Date(e.start_time * 1000) : null;
-  const hero = S.assets.hero(e?.hero_id ?? c?.hero_id);
-  const mins = (c?.duration_s || e?.duration_s || 60) / 60;
-  app.innerHTML = `
-    <div class="match-header">
-      <a href="#/" class="back">← matches</a>
-      <div class="mh-title">
-        ${e ? `<span class="result ${e.won ? "win" : "loss"}">${e.won ? "WIN" : "LOSS"}</span>` : ""}
-        <img class="mh-hero" src="${esc(hero.icon)}" alt=""><h2>#${id}</h2>
-        ${d ? `<span class="muted">${fmtDate(d)} · ${ago(d)}</span>` : ""}
-        ${e ? `<span class="muted">${fmtClock(e.duration_s)}</span>` : ""}
-        <a class="muted small" target="_blank" rel="noopener" href="https://statlocker.gg/match/${id}">statlocker ↗</a>
-      </div>
-    </div>
-    <div class="empty">
-      <b>No demo for this match</b> — ${esc(e?.status || "unknown")}.<br>
-      Open the match in Deadlock and click <b>Download Replay</b>; ${S.syncAvailable ? "the server picks it up automatically" : "then run <code>tools/sync.py</code>"}.
-    </div>
-    ${c ? `<h2 class="section-title">Valve end-of-match stats</h2>
-    <div class="summary">
-      ${tile("K / D / A", `${c.kills}/${c.deaths}/${c.assists}`)}
-      ${tile("Souls", k1(c.net_worth || 0))}
-      ${tile("Gun acc. vs heroes", c.hero_shots ? pct(c.hero_hits / c.hero_shots) : "–", "good")}
-      ${tile("Headshots", c.hero_hits ? pct(c.hero_headshots / c.hero_hits) : "–")}
-      ${tile("Hero dmg / min", Math.round((c.player_damage || 0) / mins))}
-      ${tile("Dmg taken / min", Math.round((c.player_damage_taken || 0) / mins))}
-      ${tile("Healing", k1(c.player_healing || 0))}
-      ${tile("Ability kills", c.ability_kills ?? "–")}
-      ${tile("Parry misses", c.parry_miss ?? "–")}
-      ${tile("Avg badge", c.badge ?? "–")}
-    </div>` : ""}
-    <section class="report" id="report"><p class="muted">loading Valve match report…</p></section>`;
-  showReport($("#report", app), id, S.index?.account_id);
 }

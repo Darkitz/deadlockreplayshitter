@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pull the latest haste fork + valveprotos from deadlock-api (they keep them working across
-# Deadlock patches), rebuild the parser and run tools/check.sh. If the check passes, run
-# tools/sync.py: the parser format version decides whether demos get reparsed.
+# Deadlock patches), rebuild the CLI and the browser build (web/parser/dlparse.wasm) and run
+# tools/check.sh. Rolls back on failure; on success commit parser/vendor and the new wasm.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TMP=$(mktemp -d)
@@ -33,4 +33,4 @@ if ! (cd "$ROOT/parser" && cargo build --release -q); then restore; exit 1; fi
 if ! "$ROOT/tools/check.sh"; then restore; exit 1; fi
 rm -rf "$ROOT/parser/vendor/haste.old" "$ROOT/parser/vendor/valveprotos.old"
 git -C "$ROOT" status --short parser/vendor | head -20
-echo "parser updated; commit parser/vendor and run tools/sync.py"
+echo "parser updated; commit parser/vendor and web/parser/dlparse.wasm"

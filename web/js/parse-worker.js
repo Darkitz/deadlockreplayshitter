@@ -5,9 +5,9 @@
 // in:  { file: File, matchId: number }
 // out: { type: "progress", t } (game seconds reached) · { type: "done", json } · { type: "error", message }
 
-self.onmessage = async ({ data: { file, matchId, version } }) => {
+self.onmessage = async ({ data: { file, matchId } }) => {
   try {
-    const url = new URL(`../parser/dlparse.wasm?v=${version || ""}`, import.meta.url);
+    const url = new URL("../parser/dlparse.wasm", import.meta.url);
     const { instance } = await WebAssembly.instantiateStreaming(fetch(url), {
       env: { progress: (t) => self.postMessage({ type: "progress", t }) },
     });

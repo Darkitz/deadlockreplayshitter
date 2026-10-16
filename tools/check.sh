@@ -35,5 +35,4 @@ fi
 echo "unit tests:"
 node --test "$ROOT"/tests/*.test.mjs 2>&1 | grep -E "^ℹ (pass|fail)"
 node --test "$ROOT"/tests/*.test.mjs >/dev/null
-python3 -m unittest discover "$ROOT/tests" 2>&1 | tail -1
 echo "all good"

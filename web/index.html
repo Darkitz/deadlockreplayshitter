@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Drop a Deadlock demo and see every skillshot, gun and melee hit on a scrubbable timeline. Runs entirely in your browser.">
 <title>Skill Hitter</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='none' stroke='%23e0b25a' stroke-width='2'/%3E%3Ccircle cx='8' cy='8' r='2' fill='%236fd08c'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
@@ -13,28 +14,22 @@
     <span class="logo" aria-hidden="true"></span>
     <div>
       <h1>Skill Hitter</h1>
-      <p id="subtitle" class="muted">loading…</p>
+      <p id="subtitle" class="muted">Deadlock demo analysis, in your browser</p>
     </div>
   </a>
   <nav class="top-nav">
-    <a href="#/" data-nav="matches">Matches</a>
-    <a href="#/players" data-nav="players">Players</a>
-    <a href="#/heroes" data-nav="heroes">Heroes</a>
     <a href="#/about" data-nav="about" title="how the numbers are made">How it works</a>
-    <select id="account-switch" title="tracked players" hidden></select>
   </nav>
   <div class="top-right">
     <button class="btn primary" data-open-demo title="parse a .dem / .dem.bz2 in your browser (or drag it onto the page)">open demo</button>
-    <button id="sync" class="btn" hidden>sync</button>
   </div>
-  <pre id="sync-log" class="sync-log" hidden></pre>
 </header>
 
 <main id="app"></main>
 
 <footer class="muted small">
-  <div id="health"></div>
-  Skill Hitter · demos parsed locally with haste · game data from your Deadlock install · match history + salts from deadlock-api.com · profiles from Steam
+  Skill Hitter · demos are parsed in your browser (haste compiled to WebAssembly) and never leave it ·
+  game data from Deadlock's files · not affiliated with Valve
 </footer>
 <script type="module" src="js/app.js"></script>
 </body>

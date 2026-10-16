@@ -1,4 +1,4 @@
-// Loading + lookup helpers for index/assets/profiles and parsed matches.
+// Game assets, parsed matches (from this browser's store) and per-moment lookups.
 
 import { localGet } from "./local.js";
 
@@ -6,56 +6,6 @@ export async function loadJSON(url) {
   const r = await fetch(url, { cache: "no-cache" });
   if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
   return r.json();
-}
-
-// ---- client cache: compressed match files in IndexedDB, 1 h lifetime -------------------
-// (localStorage is ~5 MB per origin; a single match is several MB once unzipped)
-const CACHE_DB = "skillhitter";
-const CACHE_TTL_MS = 60 * 60 * 1000;
-
-function idb() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(CACHE_DB, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore("files");
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function cacheGet(key) {
-  try {
-    const db = await idb();
-    return await new Promise((resolve) => {
-      const r = db.transaction("files").objectStore("files").get(key);
-      r.onsuccess = () => resolve(r.result && Date.now() - r.result.at < CACHE_TTL_MS ? r.result.buf : null);
-      r.onerror = () => resolve(null);
-    });
-  } catch { return null; }
-}
-async function cachePut(key, buf) {
-  try {
-    const db = await idb();
-    db.transaction("files", "readwrite").objectStore("files").put({ at: Date.now(), buf }, key);
-  } catch { /* private mode / quota: just don't cache */ }
-}
-export async function clearCache() {
-  try { indexedDB.deleteDatabase(CACHE_DB); } catch { /* ignore */ }
-}
-
-/** fetches a .json.gz (via the 1 h IndexedDB cache); decompresses unless the server already did. */
-async function loadGzJSON(url) {
-  let buf = await cacheGet(url);
-  if (!buf) {
-    const r = await fetch(url, { cache: "no-cache" });
-    if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
-    buf = await r.arrayBuffer();
-    cachePut(url, buf);
-  }
-  const head = new Uint8Array(buf, 0, 2);
-  if (head[0] === 0x1f && head[1] === 0x8b) {
-    const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"));
-    return JSON.parse(await new Response(stream).text());
-  }
-  return JSON.parse(new TextDecoder().decode(buf));
 }
 
 export class Assets {
@@ -74,7 +24,6 @@ export class Assets {
   itemByClass(cls) { return this.byClass.get(cls); }
   abilityName(cls) { return this.byClass.get(cls)?.name || cls; }
   abilityIcon(cls) { return this.byClass.get(cls)?.image || this.byClass.get(cls)?.image_remote || ""; }
-  /** local icon if mirrored, else the deadlock-api CDN url */
   itemIcon(id) { const it = this.items[id]; return it?.image || it?.image_remote || ""; }
   /** signature abilities of a hero, as item entries (with id) */
   signatures(heroId) {
@@ -85,28 +34,15 @@ export class Assets {
 
 const matchCache = new Map();
 
-/** parsed match with lookup helpers attached */
-let dataVersion = 0;
-/** bump the cache key when the server's parser format changes */
-export function setDataVersion(v) { dataVersion = v || 0; }
-
-export async function loadMeta(id) {
-  return loadGzJSON(`data/meta/${id}.json.gz`);
-}
-
 /** forget a loaded match (a demo dropped again replaces its old parse) */
 export function forgetMatch(id) { matchCache.delete(id); }
 
+/** a demo parsed in this browser (see local.js), prepared for analysis; null if not here */
 export async function loadMatch(id) {
   if (!matchCache.has(id)) {
-    // demos dropped onto the page (parsed in the browser) first, then the server's parsed files
-    const load = async () => {
-      const local = await localGet(id);
-      return local || loadGzJSON(`data/matches/${id}.json.gz?v=${dataVersion}`);
-    };
-    matchCache.set(id, load().then(prepare).catch((e) => {
-      matchCache.delete(id);
-      throw e;
+    matchCache.set(id, localGet(id).then((raw) => {
+      if (!raw) { matchCache.delete(id); return null; }
+      return prepare(raw);
     }));
   }
   return matchCache.get(id);

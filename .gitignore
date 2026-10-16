@@ -2,11 +2,17 @@
 parser/target/
 parser/.protoc/
 
-# demos + generated data (rebuild with tools/sync.py)
-data/
-web/data/
-web/assets/
+# extraction cache
+/data/
+# leftovers from the old server-side sync; the site only ships game assets
+web/data/*
+!web/data/assets.json
+web/assets/*
+!web/assets/game/
 
 __pycache__/
 *.pyc
 tools/.vrf/
+# extracted but unused by the site
+web/assets/game/ranked/
+web/assets/game/heroes/*_card_*
