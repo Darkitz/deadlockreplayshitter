@@ -12,8 +12,6 @@ const load = (f) => prepare(JSON.parse(gunzipSync(readFileSync(new URL(f, dir)))
 test("cast events and cooldown starts share one clock", { skip: !files.length && "no parsed demos" }, () => {
   for (const f of files) {
     const m = load(f);
-    const items = new Map();
-    for (const u of m.uses) items.set(`${u[1]}|${u[2]}`, (items.get(`${u[1]}|${u[2]}`) || []).concat(u[0]));
     let matched = 0, total = 0;
     for (const c of m.casts) {
       // ImportantAbilityUsed carries a class name; compare against any cooldown of that caster

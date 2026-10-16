@@ -22,7 +22,7 @@ use haste::valveprotos::deadlock::{
 use prost::Message;
 use serde::Serialize;
 
-const FORMAT_VERSION: u32 = 4;
+const FORMAT_VERSION: u32 = 5;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`
 const NOISY_ABILITIES: &[u32] = &[
     2573821048, // zip_line
@@ -140,6 +140,9 @@ struct Output {
     duration_s: f32,
     /// game clock when GameOver fired (None if the demo ends early)
     game_over_s: Option<f32>,
+    /// demo tick = game time / tick_interval + demo_tick_offset (for demo_gototick); pauses
+    /// shift it, the value is taken at the end of the match
+    demo_tick_offset: f32,
     map_radius: f32,
     players: Vec<Player>,
     /// [t, pawn, ability_name, x, y, z, yaw, pitch] (ImportantAbilityUsed + caster pose)
@@ -465,6 +468,9 @@ impl Visitor for V {
         self.out.tick_interval = ctx.tick_interval();
         let t = self.time(ctx);
         self.out.duration_s = t;
+        if self.game_start.is_some() && ctx.tick_interval() > 0.0 {
+            self.out.demo_tick_offset = ctx.tick() as f32 - t / ctx.tick_interval();
+        }
         if self.game_start.is_none() || self.pawn_ctrl.is_empty() {
             return Ok(());
         }

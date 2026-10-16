@@ -111,6 +111,7 @@ export async function viewMatch(id, params) {
           <input type="range" class="scrub" min="0" max="${Math.ceil(m.end)}" step="0.5">
           <span class="clock">0:00</span>
           <button class="btn csv" title="download casts as CSV">CSV</button>
+          <button class="btn demo-cmd" title="copy a Deadlock console command that jumps the real replay to this moment">⧉ in-game</button>
         </div>
         <div class="readout">
           <div class="tiles"></div>
@@ -121,6 +122,7 @@ export async function viewMatch(id, params) {
             <ol class="feed"></ol>
           </div>
         </div>
+        <p class="demo-hint small muted"></p>
         <p class="keys small muted">space play · ←/→ 5 s · shift ±30 s · , . previous/next cast · home/end · wheel on timeline zooms</p>
       </div>
     </section>
@@ -215,6 +217,14 @@ export async function viewMatch(id, params) {
     a.download = `${id}_${subject.name}_${ability.class_name}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
+  });
+
+  const demoTick = (tt) => Math.max(0, Math.round(tt / m.tick_interval + (m.demo_tick_offset || 0)));
+  $(".demo-cmd", app).hidden = !m.demo_tick_offset;
+  $(".demo-cmd", app).addEventListener("click", async () => {
+    const cmd = `demo_gototick ${demoTick(t - 3)}`;
+    try { await navigator.clipboard.writeText(cmd); } catch { /* insecure context */ }
+    $(".demo-hint", app).innerHTML = `Deadlock console: <code>playdemo replays/${id}</code> then <code>${cmd}</code> (copied)`;
   });
 
   function seek(nt) {
