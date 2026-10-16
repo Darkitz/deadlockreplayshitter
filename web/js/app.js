@@ -3,7 +3,7 @@
 //   #/hero/<id>              overview for a hero
 //   #/match/<id>?pawn=&ability=   match detail (minimap + timeline)
 
-import { loadJSON, Assets } from "./data.js";
+import { loadJSON, Assets, clearCache, setDataVersion } from "./data.js";
 import { $, esc, S, fmtDate, fmtDay, TZ, settings, saveSettings } from "./ui.js";
 import { viewOverview } from "./overview.js";
 import { viewMatch } from "./match.js";
@@ -20,6 +20,7 @@ async function loadAll() {
     loadJSON(acc ? `data/career-${acc}.json` : "data/career.json").catch(() => []),
   ]);
   S.career = career;
+  setDataVersion(index.parser_version);
   S.valveStats = await loadJSON("data/valve-stats.json").catch(() => ({}));
   S.index = index;
   S.assets = new Assets(assets);
@@ -105,7 +106,7 @@ async function initSync() {
     try {
       const s = await (await fetch("api/status")).json();
       show(s);
-      if (wasRunning && !s.running) { await loadAll(); route(); }
+      if (wasRunning && !s.running) { await clearCache(); await loadAll(); route(); }
       wasRunning = s.running;
     } catch { /* server gone */ }
   };

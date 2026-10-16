@@ -121,6 +121,7 @@ export async function viewMatch(id, params) {
           </select>
           <input type="range" class="scrub" min="0" max="${Math.ceil(m.end)}" step="0.5">
           <span class="clock">0:00</span>
+          <span class="span-info"></span>
           <button class="btn csv" title="download casts as CSV">CSV</button>
           <button class="btn demo-cmd" title="copy a Deadlock console command that jumps the real replay to this moment">in-game ↗</button>
         </div>
@@ -134,7 +135,8 @@ export async function viewMatch(id, params) {
           </div>
         </div>
         <p class="demo-hint small muted"></p>
-        <p class="keys small muted">space play · ←/→ 5 s · shift ±30 s · , . previous/next cast · home/end · wheel on timeline zooms</p>
+        <p class="keys small muted">space play · ←/→ 5 s · shift ±30 s · , . previous/next cast · home/end · wheel on timeline zooms ·
+          <b>shift+drag</b> on the timeline (or <b>[</b> at the playhead) selects a span, Esc clears</p>
       </div>
     </section>
     <section class="chart-card tracker" id="tracker"></section>
@@ -160,15 +162,30 @@ export async function viewMatch(id, params) {
     skill.sort((a, b) => a.t - b.t);
     return { p, skill, gun: gunStats(m, p.pawn, S.assets) };
   });
+  /** [souls, level, k, d, a, lh] at t, or gained inside the span (level stays absolute) */
+  function spanStats() {
+    const end = statsAt(m, pawn, t);
+    if (!end || t0 == null) return end;
+    const start = statsAt(m, pawn, t0) || [0, 0, 0, 0, 0, 0];
+    return end.map((v, i) => (i === 1 ? v : v - start[i]));
+  }
+  /** gun totals inside the current span */
+  function spanGun(g) {
+    const end = gunAt(g, t);
+    if (t0 == null) return end;
+    const start = gunAt(g, t0 - 0.001);
+    return { shots: end.shots - start.shots, hits: end.hits - start.hits, hs: end.hs - start.hs, npc: end.npc - start.npc };
+  }
   function renderTracker(t) {
     const rows = tracked.map(({ p, skill, gun: g }) => {
       let thrown = 0, hit = 0;
       for (const c of skill) {
         if (c.t > t) break;
+        if (t0 != null && c.t < t0) continue;
         thrown++;
         if (c.result === "hit" || (!settings.heroesOnly && c.result === "other")) hit++;
       }
-      const ga = gunAt(g, t);
+      const ga = spanGun(g);
       return { p, thrown, hit, sAcc: thrown ? hit / thrown : null, ...ga, gAcc: ga.shots ? ga.hits / ga.shots : null };
     });
     const best = (k) => Math.max(...rows.filter((r) => (k === "sAcc" ? r.thrown >= 5 : r.shots >= 20)).map((r) => r[k] ?? 0));
@@ -177,7 +194,7 @@ export async function viewMatch(id, params) {
       : `<td class="${isBest ? "best" : ""}"><span class="acc-bar"><span style="width:${v * 100}%"></span></span>${pct(v)} <small class="muted">${n}/${d}</small></td>`;
     const teams = [...new Set(rows.map((r) => r.p.team))].sort();
     $("#tracker", app).innerHTML = `
-      <h3>Accuracy tracker · at ${fmtClock(t)} <span class="muted">· signature skills that connect + gun, every player</span></h3>
+      <h3>Accuracy tracker · ${t0 != null ? `${fmtClock(t0)}–${fmtClock(t)}` : `at ${fmtClock(t)}`} <span class="muted">· signature skills that connect + gun, every player</span></h3>
       <table class="report-table tracker-table">
         <tr><th></th><th>player</th><th>skills thrown</th><th>skill hit %</th><th>shots</th><th>gun hit %</th><th>headshots</th><th>HS %</th></tr>
         ${teams.map((tm) => rows.filter((r) => r.p.team === tm).map((r) => `
@@ -250,12 +267,30 @@ export async function viewMatch(id, params) {
   const timeline = createTimeline($(".timeline", app), {
     end: m.end, casts, heroesOnly: settings.heroesOnly, hp, lead, deaths, kills, items,
     gun: gunMode ? gun : null,
-  }, (t) => seek(t));
+  }, (t) => seek(t), (a, b) => setSpan(a, b));
   const minimap = createMinimap($(".minimap", app), {
     match: m, assets: S.assets, onPick: (p) => setParams({ pawn: p.pawn, ability: null }),
   });
 
   let t = Number(params.get("t")) || m.end;
+  // optional span start: stats then cover [t0, t] instead of [start, t]
+  let t0 = params.has("from") ? Number(params.get("from")) : null;
+  const inSpan = (tt) => tt <= t && (t0 == null || tt >= t0);
+  function setSpan(a, b) {
+    t0 = b - a < 1 ? null : a;
+    seek(b);
+  }
+  let urlTimer = null;
+  function syncUrl() {
+    clearTimeout(urlTimer);
+    urlTimer = setTimeout(() => {
+      const [path, q] = location.hash.slice(1).split("?");
+      const p = new URLSearchParams(q || "");
+      p.set("t", Math.round(t));
+      if (t0 != null) p.set("from", Math.round(t0)); else p.delete("from");
+      history.replaceState(null, "", `#${path}?${p}`);
+    }, 300);
+  }
   let playing = null;
   const scrub = $(".scrub", app);
   scrub.addEventListener("input", () => seek(Number(scrub.value)));
@@ -296,16 +331,20 @@ export async function viewMatch(id, params) {
     t = Math.max(Math.min(nt, m.end), Math.min(0, m.samples.t0));
     scrub.value = t;
     $(".clock", app).textContent = fmtClock(t);
-    timeline.setTime(t);
+    if (t0 != null && t0 >= t) t0 = null;
+    timeline.setTime(t, t0);
+    $(".span-info", app).innerHTML = t0 != null
+      ? `span ${fmtClock(t0)}–${fmtClock(t)} <button class="chip span-clear" title="clear span (Esc)">×</button>` : "";
+    syncUrl();
     minimap.update({ t, subject: pawn, casts, showAll: settings.showAll });
     renderReadout(t);
     renderTracker(t);
   }
 
   function renderGunReadout(t) {
-    const g = gunAt(gun, t);
+    const g = spanGun(gun);
     const pellets = gun.shots ? gun.bullets / gun.shots : 1;
-    const st = statsAt(m, pawn, t);
+    const st = spanStats();
     const vAcc = valve?.hero_shots ? valve.hero_hits / valve.hero_shots : null;
     $(".tiles", app).innerHTML =
       tile("Shots fired", g.shots) +
@@ -324,6 +363,7 @@ export async function viewMatch(id, params) {
     const evs = [];
     for (const ev of gun.events) {
       if (ev.t > t) break;
+      if (t0 != null && ev.t < t0) continue;
       if (ev.kind === "hit" || ev.kind === "hs") {
         if (f === "miss" || f === "kills") continue;
         evs.push(ev);
@@ -338,9 +378,9 @@ export async function viewMatch(id, params) {
 
   function renderReadout(t) {
     if (gunMode) { renderGunReadout(t); return; }
-    const past = casts.filter((c) => c.t <= t);
+    const past = casts.filter((c) => inSpan(c.t));
     const c = counts(past, settings.heroesOnly);
-    const st = statsAt(m, pawn, t);
+    const st = spanStats();
     $(".tiles", app).innerHTML =
       tile("Thrown", c.thrown) +
       tile(settings.heroesOnly ? "Hit heroes" : "Hit", c.scored, "good") +
@@ -361,7 +401,7 @@ export async function viewMatch(id, params) {
       events.push({ t: k.t, kind: "cast", k });
     }
     for (const k of m.kills) {
-      if (k[0] > t || f === "hit" || f === "miss") continue;
+      if (!inSpan(k[0]) || f === "hit" || f === "miss") continue;
       if (k[1] === pawn || k[2] === pawn || (k[4] || []).includes(pawn)) events.push({ t: k[0], kind: "kill", k });
     }
     events.sort((a, b) => b.t - a.t);
@@ -399,6 +439,9 @@ export async function viewMatch(id, params) {
       renderReadout(t);
     });
   }
+  $(".span-info", app).addEventListener("click", (ev) => {
+    if (ev.target.closest(".span-clear")) { t0 = null; seek(t); }
+  });
   $(".feed", app).addEventListener("click", (ev) => {
     const li = ev.target.closest("li[data-t]");
     if (li) seek(Number(li.dataset.t) - 1.5);
@@ -427,6 +470,9 @@ export async function viewMatch(id, params) {
     else if (ev.key === "ArrowRight") seek(t + big);
     else if (ev.key === "ArrowLeft") seek(t - big);
     else if (ev.key === "Home") seek(0);
+    else if (ev.key === "[") { t0 = t; seek(t); }
+    else if (ev.key === "]") { if (t0 != null) seek(t); }
+    else if (ev.key === "Escape") { t0 = null; seek(t); }
     else if (ev.key === "End") seek(m.end);
     else if (ev.key === ".") { const n = casts.find((c) => c.t > t + 0.1); if (n) seek(n.t + 0.6); }
     else if (ev.key === ",") { const p = [...casts].reverse().find((c) => c.t < t - 1.2); if (p) seek(p.t + 0.6); }

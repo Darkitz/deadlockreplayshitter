@@ -6,11 +6,48 @@ export async function loadJSON(url) {
   return r.json();
 }
 
-/** fetches a .json.gz; decompresses unless the server already did (Content-Encoding). */
+// ---- client cache: compressed match files in IndexedDB, 1 h lifetime -------------------
+// (localStorage is ~5 MB per origin; a single match is several MB once unzipped)
+const CACHE_DB = "skillhitter";
+const CACHE_TTL_MS = 60 * 60 * 1000;
+
+function idb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(CACHE_DB, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("files");
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function cacheGet(key) {
+  try {
+    const db = await idb();
+    return await new Promise((resolve) => {
+      const r = db.transaction("files").objectStore("files").get(key);
+      r.onsuccess = () => resolve(r.result && Date.now() - r.result.at < CACHE_TTL_MS ? r.result.buf : null);
+      r.onerror = () => resolve(null);
+    });
+  } catch { return null; }
+}
+async function cachePut(key, buf) {
+  try {
+    const db = await idb();
+    db.transaction("files", "readwrite").objectStore("files").put({ at: Date.now(), buf }, key);
+  } catch { /* private mode / quota: just don't cache */ }
+}
+export async function clearCache() {
+  try { indexedDB.deleteDatabase(CACHE_DB); } catch { /* ignore */ }
+}
+
+/** fetches a .json.gz (via the 1 h IndexedDB cache); decompresses unless the server already did. */
 async function loadGzJSON(url) {
-  const r = await fetch(url, { cache: "no-cache" });
-  if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
-  const buf = await r.arrayBuffer();
+  let buf = await cacheGet(url);
+  if (!buf) {
+    const r = await fetch(url, { cache: "no-cache" });
+    if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+    buf = await r.arrayBuffer();
+    cachePut(url, buf);
+  }
   const head = new Uint8Array(buf, 0, 2);
   if (head[0] === 0x1f && head[1] === 0x8b) {
     const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"));
@@ -43,9 +80,17 @@ export class Assets {
 const matchCache = new Map();
 
 /** parsed match with lookup helpers attached */
+let dataVersion = 0;
+/** bump the cache key when the server's parser format changes */
+export function setDataVersion(v) { dataVersion = v || 0; }
+
+export async function loadMeta(id) {
+  return loadGzJSON(`data/meta/${id}.json.gz`);
+}
+
 export async function loadMatch(id) {
   if (!matchCache.has(id)) {
-    matchCache.set(id, loadGzJSON(`data/matches/${id}.json.gz`).then(prepare).catch((e) => {
+    matchCache.set(id, loadGzJSON(`data/matches/${id}.json.gz?v=${dataVersion}`).then(prepare).catch((e) => {
       matchCache.delete(id);
       throw e;
     }));

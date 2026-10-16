@@ -430,6 +430,52 @@ def sync_career(account):
 
 # ---------------------------------------------------------------- main
 
+def write_match_list(indexes):
+    """web/data/matches.json: every parsed match (any account) with its 12 players."""
+    tracked = {}
+    for idx in indexes:
+        for e in idx["matches"]:
+            tracked.setdefault(e["match_id"], []).append((idx["account_id"], e))
+    try:
+        old = {m["match_id"]: m for m in json.loads((DATA / "matches.json").read_text())}
+    except (OSError, ValueError):
+        old = {}
+    out = []
+    for f in MATCHES.glob("*.json.gz"):
+        mid = int(f.name.split(".")[0])
+        prev = old.get(mid)
+        if prev and prev.get("_mtime") == int(f.stat().st_mtime) and mid not in tracked:
+            out.append(prev)
+            continue
+        pj = read_match(mid)
+        players = [{"account_id": p["account_id"], "hero_id": p["hero_id"], "team": p["team"],
+                    "name": p["name"], "k": p["kills"], "d": p["deaths"], "a": p["assists"],
+                    "nw": p["net_worth"]} for p in pj["players"]]
+        rec = {"match_id": mid, "duration_s": round(pj.get("game_over_s") or pj["duration_s"]),
+               "start_time": None, "winner": pj.get("winning_team"), "mode": None, "_mtime": int(f.stat().st_mtime),
+               "players": players}
+        # winner + start time: from a tracked player's history, else Valve metadata
+        for acc, e in tracked.get(mid, []):
+            me = next((p for p in players if p["account_id"] == acc), None)
+            rec["start_time"] = e["start_time"]
+            rec["mode"] = e.get("mode")
+            if me and rec["winner"] is None:
+                rec["winner"] = me["team"] if e["won"] else ({2: 3, 3: 2}.get(me["team"]))
+        meta = META_DIR / f"{mid}.json.gz"
+        if (rec["winner"] is None or rec["start_time"] is None) and meta.exists():
+            with gzip.open(meta, "rt") as fh:
+                mi = json.load(fh).get("match_info", {})
+            rec["start_time"] = rec["start_time"] or mi.get("start_time")
+            if mi.get("winning_team") is not None:
+                rec["winner"] = 2 + int(mi["winning_team"])  # Team0 = Amber (2), Team1 = Sapphire (3)
+        if prev and rec["start_time"] is None:
+            rec["start_time"] = prev.get("start_time")
+        out.append(rec)
+    out.sort(key=lambda r: -(r["start_time"] or 0))
+    (DATA / "matches.json").write_text(json.dumps(out))
+    log(f"match list: {len(out)} parsed matches")
+
+
 def resolve_heroes(heroes, wanted):
     if any(w.lower() == "all" for w in wanted):
         return None  # every hero
@@ -675,11 +721,14 @@ def main():
     sync_assets(ctx.heroes, ctx.items, ctx.used_heroes, ctx.used_items, ctx.badges)
     sync_valve_stats(sorted({int(p.name.split(".")[0]) for p in MATCHES.glob("*.json.gz")}))
     if not args.no_meta:
-        sync_metadata(sorted(ctx.meta_ids, reverse=True))
+        parsed_ids = {int(p.name.split(".")[0]) for p in MATCHES.glob("*.json.gz")}
+        sync_metadata(sorted(ctx.meta_ids | parsed_ids, reverse=True))
     profiles = sync_profiles(ctx.accounts)
     for idx in indexes:
         idx["profile"] = profiles.get(idx["account_id"])
         (DATA / f"index-{idx['account_id']}.json").write_text(json.dumps(idx))
+
+    write_match_list(indexes)
 
     # the account list the site's switcher shows (everything synced so far, newest run first)
     try:

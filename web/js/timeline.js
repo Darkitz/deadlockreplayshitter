@@ -18,9 +18,10 @@ export const fmtClock = (s) => {
 };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-export function createTimeline(svg, model, onSeek) {
+export function createTimeline(svg, model, onSeek, onSpan) {
   let geom = null;
   let t = model.end;
+  let t0 = null; // span start (null = whole match up to t)
   const full = [Math.min(0, ...(model.hp?.length ? [model.hp[0][0]] : [0])), Math.max(model.end, 60)];
   let view = [...full]; // visible [from, to] in game seconds
 
@@ -167,13 +168,15 @@ export function createTimeline(svg, model, onSeek) {
     if (zoomed) {
       g += `<text class="zoom-label" x="${W - padR}" y="${L.chart.y + 10}" text-anchor="end">${fmtClock(v0)}–${fmtClock(v1)} · double-click to reset</text>`;
     }
+    g += `<rect class="span" x="0" y="4" width="0" height="${L.axis.y - 4}"/>`;
     g += `<line class="cursor" x1="0" x2="0" y1="4" y2="${L.axis.y}"/>`;
     svg.innerHTML = g;
     setTime(t);
   }
 
-  function setTime(nt) {
+  function setTime(nt, nt0 = t0) {
     t = nt;
+    t0 = nt0;
     if (!geom) return;
     // keep the playhead inside a zoomed view
     const span = view[1] - view[0];
@@ -187,8 +190,17 @@ export function createTimeline(svg, model, onSeek) {
     const cur = svg.querySelector(".cursor");
     cur.setAttribute("x1", cx);
     cur.setAttribute("x2", cx);
+    const spanRect = svg.querySelector(".span");
+    if (t0 != null) {
+      const sx = geom.x(t0);
+      spanRect.setAttribute("x", Math.min(sx, cx));
+      spanRect.setAttribute("width", Math.abs(cx - sx));
+    } else {
+      spanRect.setAttribute("width", 0);
+    }
     for (const el of svg.querySelectorAll("[data-t]")) {
-      el.classList.toggle("future", Number(el.dataset.t) > t);
+      const et = Number(el.dataset.t);
+      el.classList.toggle("future", et > t || (t0 != null && et < t0));
     }
   }
 
@@ -220,7 +232,14 @@ export function createTimeline(svg, model, onSeek) {
   }, { passive: false });
   svg.addEventListener("dblclick", () => { view = [...full]; draw(); });
   let dragging = false;
+  let brushFrom = null; // shift+drag selects a span
   svg.addEventListener("pointerdown", (ev) => {
+    if (ev.shiftKey && onSpan) {
+      brushFrom = fromPointer(ev);
+      svg.setPointerCapture(ev.pointerId);
+      onSpan(brushFrom, brushFrom);
+      return;
+    }
     // clicking a marker jumps to just after that event (so the map shows its ray / hit)
     const mark = ev.target.closest?.("[data-t]");
     if (mark) {
@@ -231,8 +250,13 @@ export function createTimeline(svg, model, onSeek) {
     svg.setPointerCapture(ev.pointerId);
     onSeek(fromPointer(ev));
   });
-  svg.addEventListener("pointermove", (ev) => dragging && onSeek(fromPointer(ev)));
-  svg.addEventListener("pointerup", () => (dragging = false));
+  svg.addEventListener("pointermove", (ev) => {
+    if (brushFrom != null) {
+      const at = fromPointer(ev);
+      onSpan(Math.min(brushFrom, at), Math.max(brushFrom, at));
+    } else if (dragging) onSeek(fromPointer(ev));
+  });
+  svg.addEventListener("pointerup", () => { dragging = false; brushFrom = null; });
 
   let lastW = 0;
   const ro = new ResizeObserver(() => {

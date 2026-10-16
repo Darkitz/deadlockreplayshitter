@@ -17,13 +17,13 @@ use haste::fxhash;
 use haste::parser::{Context, Parser, Visitor};
 use haste::valveprotos::common::{CnetMsgTick, NetMessages};
 use haste::valveprotos::deadlock::{
-    CCitadelUserMessageDamage, CCitadelUserMessageImportantAbilityUsed,
+    CCitadelUserMessageDamage, CCitadelUserMessageGameOver, CCitadelUserMessageImportantAbilityUsed,
     CCitadelUserMsgAbilityNotify, CCitadelUserMsgHeroKilled, CitadelUserMessageIds,
 };
 use prost::Message;
 use serde::Serialize;
 
-const FORMAT_VERSION: u32 = 7;
+const FORMAT_VERSION: u32 = 8;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`.
 /// sync.py passes the current ids (resolved by class name) via `--ignore-ids`; this list is only
 /// the fallback.
@@ -145,6 +145,8 @@ struct Output {
     duration_s: f32,
     /// game clock when GameOver fired (None if the demo ends early)
     game_over_s: Option<f32>,
+    /// team number that won (2 = Amber, 3 = Sapphire), from GameOver
+    winning_team: Option<i32>,
     /// demo tick = game time / tick_interval + demo_tick_offset (for demo_gototick); pauses
     /// shift it, the value is taken at the end of the match
     demo_tick_offset: f32,
@@ -443,6 +445,8 @@ impl Visitor for V {
             GAME_OVER => {
                 if self.out.game_over_s.is_none() {
                     self.out.game_over_s = Some(self.time(ctx));
+                    let m: CCitadelUserMessageGameOver = decode(data)?;
+                    self.out.winning_team = m.winning_team;
                 }
             }
             DAMAGE => {
