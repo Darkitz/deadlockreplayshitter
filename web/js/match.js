@@ -317,20 +317,46 @@ export async function viewMatch(id, params) {
     const CW = 1000, CH = 150;
     const cx = (tt) => 30 + (tt / Math.max(m.end, 60)) * (CW - 40);
     const cy = (v) => CH - 14 - v * (CH - 24);
-    const accLines = tracked.map(({ p, skill }) => {
-      let thrown = 0, hit = 0, d = "";
-      for (const c of skill) {
-        thrown++;
-        if (c.result === "hit" || (!settings.heroesOnly && c.result === "other")) hit++;
-        if (thrown >= 5) d += `${d ? "L" : "M"}${cx(c.t).toFixed(1)},${cy(hit / thrown).toFixed(1)} `;
+    // metric follows the mode: skills, gun hero accuracy (excl. trooper shots) or melee hit %
+    const series = ({ p, skill, gun: g }) => {
+      const pts = [];
+      if (gunMode) {
+        let shots = 0, hits = 0, npc = 0;
+        for (const e of g.events) {
+          if (e.kind === "shot") shots += e.n; else if (e.kind === "npc") npc++; else hits++;
+          if (shots >= 20 && shots - npc > 0) pts.push([e.t, hits / (shots - npc)]);
+        }
+      } else if (meleeMode) {
+        let n = 0, h = 0;
+        for (const x of meleeStats(m, p.pawn).swings) {
+          n++; if (x.result === "hit") h++;
+          if (n >= 5) pts.push([x.t, h / n]);
+        }
+      } else {
+        let thrown = 0, hit = 0;
+        for (const c of skill) {
+          thrown++;
+          if (c.result === "hit" || (!settings.heroesOnly && c.result === "other")) hit++;
+          if (thrown >= 5) pts.push([c.t, hit / thrown]);
+        }
       }
-      if (!d) return "";
-      return `<path class="acc-line team-${p.team} ${p.pawn === pawn ? "subject" : ""}" data-pawn="${p.pawn}" d="${d}"><title>${esc(S.profiles[p.account_id]?.name || p.name)}: ${pct(hit / thrown)}</title></path>`;
+      return pts;
+    };
+    const accLines = tracked.map((tr) => {
+      const pts = series(tr);
+      if (!pts.length) return "";
+      // thin long series so the path stays light
+      const step = Math.max(1, Math.floor(pts.length / 400));
+      let d = "";
+      for (let i = 0; i < pts.length; i += step) d += `${d ? "L" : "M"}${cx(pts[i][0]).toFixed(1)},${cy(Math.min(1, pts[i][1])).toFixed(1)} `;
+      const last = pts.at(-1)[1];
+      return `<path class="acc-line team-${tr.p.team} ${tr.p.pawn === pawn ? "subject" : ""}" data-pawn="${tr.p.pawn}" d="${d}"><title>${esc(S.profiles[tr.p.account_id]?.name || tr.p.name)}: ${pct(last)}</title></path>`;
     }).join("");
     const grid = [0, 0.25, 0.5, 0.75, 1].map((v) => `<line class="grid" x1="30" x2="${CW - 10}" y1="${cy(v)}" y2="${cy(v)}"/><text class="axis" x="26" y="${cy(v) + 3}" text-anchor="end">${v * 100}%</text>`).join("");
     const span = t0 != null ? `<rect class="acc-span" x="${cx(t0)}" y="4" width="${cx(t) - cx(t0)}" height="${CH - 18}"/>` : "";
     $("#tracker", app).innerHTML = `
       <svg class="acc-chart" viewBox="0 0 ${CW} ${CH}">${grid}${span}${accLines}<line class="cursor" x1="${cx(t)}" x2="${cx(t)}" y1="4" y2="${CH - 14}"/></svg>
+      <div class="small muted">chart: ${gunMode ? "gun hero accuracy (excl. trooper shots)" : meleeMode ? "melee hit % (hero)" : "skill accuracy"} over the match</div>
       <h3>Accuracy tracker · ${t0 != null ? `${fmtClock(t0)}–${fmtClock(t)}` : `at ${fmtClock(t)}`} <span class="muted">· signature skills that connect + gun, every player</span></h3>
       <table class="report-table tracker-table">
         <tr><th></th><th>player</th><th>HP</th><th>souls</th><th>skills thrown</th><th>skill hit %</th><th>shots</th><th title="hero hits / (shots - shots that hit only troopers/neutrals)">hero accuracy</th><th>hero HS %</th><th>melee → hero <small class="muted">light · heavy</small></th><th>items</th></tr>
@@ -349,7 +375,7 @@ export async function viewMatch(id, params) {
             <td>${r.thrown}</td>
             ${cell(r.sAcc, r.hit, r.thrown, r.thrown >= 5 && r.sAcc === bS)}
             <td>${r.shots}</td>
-            ${cell(r.gAcc, r.hits, r.shots, r.shots >= 20 && r.gAcc === bG)}
+            ${cell(r.gAcc, r.hits, r.shots - r.npc, r.shots >= 20 && r.gAcc === bG)}
             <td>${r.hits ? `${pct(r.hs / r.hits)} <small class="muted">${r.hs}</small>` : "–"}</td>
             <td>${(() => {
               const ms = meleeStats(m, r.p.pawn);
