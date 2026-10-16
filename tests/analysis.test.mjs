@@ -6,7 +6,7 @@ import { analyzeAbility, counts, aimError, median } from "../web/js/analysis.js"
 
 const AB = { class_name: "test_skillshot", id: 42 };
 
-/** me at x=0, enemy at x=1000, ally at x=-500, for 100 s */
+/** me at x=2, enemy at x=1000, ally at x=-500, for 100 s (0,0 = unknown position) */
 function fixture({ casts = [], damage = [], notify = [], uses = [] } = {}) {
   const n = 200;
   const track = (pawn, x) => ({
@@ -23,7 +23,7 @@ function fixture({ casts = [], damage = [], notify = [], uses = [] } = {}) {
       { pawn: 3, controller: 13, account_id: 9, name: "ally", hero_id: 2, team: 2 },
     ],
     casts, uses, damage, notify, kills: [], items: [], upgrades: [],
-    samples: { t0: 0, dt: 0.5, tracks: [track(1, 0), track(2, 1000), track(3, -500)] },
+    samples: { t0: 0, dt: 0.5, tracks: [track(1, 2), track(2, 1000), track(3, -500)] },
     stats: { t0: 0, dt: 10, tracks: [] },
   });
 }
