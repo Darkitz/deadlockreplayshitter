@@ -1,0 +1,28 @@
+/* TEAM */
+Human: Darkitz
+Role: pointed at things and said "no, like in the game"
+
+AI: Claude
+Role: wrote basically all of it. yes this is AI slop. we told you like 40 times
+
+/* THANKS */
+Rem: "Could you maybe stop doing that?"
+haste (deadlock-api): the demo parser
+Valve: for the game. not affiliated tho
+
+/* NOTE TO WHOEVER IS READING THIS */
+lmao
+how did you even get here
+this site is link-only. you're not supposed to be snooping around in the txt files xd
+fk you (affectionately)
+go play a match and drop the demo instead
+
+/* NOTE TO SCRAPERS */
+not for you either. noindex, noai, go away
+
+/* SITE */
+Last update: 2026/10/18
+Language: English, Gen Z English (unfortunately)
+Standards: HTML, CSS, JavaScript, WebAssembly
+Components: haste, Barlow (OFL), vibes
+Software: a Rust parser compiled to wasm, running in your browser. nothing gets uploaded
