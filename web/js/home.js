@@ -8,7 +8,8 @@ import { localDelete } from "./local.js";
 export function viewHome() {
   const app = $("#app");
   const list = [...(S.localMatches || [])].sort((a, b) => b.parsed_at - a.parsed_at);
-  app.innerHTML = `
+  // drop field + list fill at least the window together; the drop field takes the leftover space
+  app.innerHTML = `<div class="home">
     <section class="drop-field" role="button" tabindex="0" data-pick>
       <img class="drop-icon" src="icon.svg" alt="" width="96" height="96">
       <b>Drop a Deadlock demo here</b>
@@ -25,7 +26,7 @@ export function viewHome() {
     </section>
     ${list.length ? `
       <h2 class="section-title">Opened in this browser</h2>
-      <section class="match-grid">${list.map(card).join("")}</section>` : ""}`;
+      <section class="match-grid">${list.map(card).join("")}</section>` : ""}</div>`;
   const pick = $("[data-pick]", app);
   pick.addEventListener("click", () => S.pickDemo?.());
   pick.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); S.pickDemo?.(); } });

@@ -1,41 +1,64 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- DLDI: a weary face (😩) dressed up in Deadlock's art-deco brass -->
+  <!-- DLDI: a weary (😩) brass relief in a fedora, Deadlock-noir art deco -->
   <defs>
-    <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f3d58a"/>
-      <stop offset=".55" stop-color="#d9a441"/>
-      <stop offset="1" stop-color="#8f5e19"/>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6dc96"/>
+      <stop offset=".5" stop-color="#c99236"/>
+      <stop offset="1" stop-color="#7c4f12"/>
     </linearGradient>
-    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f6dc95"/>
-      <stop offset="1" stop-color="#c98f2f"/>
-    </linearGradient>
-    <radialGradient id="bg" cx=".5" cy=".42" r=".6">
-      <stop offset="0" stop-color="#1d3a38"/>
-      <stop offset="1" stop-color="#0b1112"/>
+    <radialGradient id="face" cx=".42" cy=".38" r=".75">
+      <stop offset="0" stop-color="#f4d68c"/>
+      <stop offset=".55" stop-color="#cf9840"/>
+      <stop offset="1" stop-color="#875713"/>
     </radialGradient>
+    <radialGradient id="bg" cx=".5" cy=".55" r=".62">
+      <stop offset="0" stop-color="#1c3533"/>
+      <stop offset="1" stop-color="#070b0c"/>
+    </radialGradient>
+    <linearGradient id="hat" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2f36"/>
+      <stop offset="1" stop-color="#0d0f12"/>
+    </linearGradient>
+    <clipPath id="faceclip"><circle cx="32" cy="37" r="17"/></clipPath>
   </defs>
-  <!-- deco medallion: dark patina disc, double brass ring -->
-  <circle cx="32" cy="32" r="30.5" fill="url(#bg)" stroke="url(#brass)" stroke-width="2.4"/>
-  <circle cx="32" cy="32" r="26.6" fill="none" stroke="#d9a441" stroke-width=".9" opacity=".75"/>
-  <!-- sunburst rays between the rings and the face -->
-  <g stroke="#d9a441" stroke-width="1.3" stroke-linecap="round" opacity=".85">
-    <path d="M32 6.5v4M32 53.5v4M6.5 32h4M53.5 32h4"/>
-    <path d="M13.9 13.9l2.8 2.8M47.3 47.3l2.8 2.8M50.1 13.9l-2.8 2.8M16.7 47.3l-2.8 2.8"/>
+
+  <!-- medallion -->
+  <circle cx="32" cy="32" r="30.6" fill="url(#bg)" stroke="url(#rim)" stroke-width="2.6"/>
+  <circle cx="32" cy="32" r="26.8" fill="none" stroke="#c99236" stroke-width=".8" opacity=".7"/>
+  <!-- deco sunburst behind the head: long and short rays -->
+  <g stroke="#c99236" stroke-linecap="round" opacity=".55">
+    <g stroke-width="1.4">
+      <path d="M32 59.5v-4.5M4.5 37h4.5M59.5 37H55M12.6 56.4l3.2-3.2M51.4 56.4l-3.2-3.2"/>
+    </g>
+    <g stroke-width=".9">
+      <path d="M21.5 58.4l1.4-4.2M42.5 58.4l-1.4-4.2M6 46.6l4.1-1.7M58 46.6l-4.1-1.7"/>
+    </g>
   </g>
-  <!-- top diamond ornament -->
-  <path d="M32 1.5l3.2 3.6L32 8.7l-3.2-3.6z" fill="url(#brass)" stroke="#0b1112" stroke-width=".8"/>
-  <!-- the weary face -->
-  <circle cx="32" cy="33" r="18.5" fill="url(#face)" stroke="#6b4310" stroke-width="1.4"/>
-  <!-- brows: sad, slanted up toward the middle -->
-  <g fill="none" stroke="#3a2406" stroke-width="2.3" stroke-linecap="round">
-    <path d="M20.5 25.2l7.3-3.4"/>
-    <path d="M43.5 25.2l-7.3-3.4"/>
-    <!-- eyes squeezed shut: > < -->
-    <path d="M22.6 28.4l5.2 2.6-5.2 2.6"/>
-    <path d="M41.4 28.4l-5.2 2.6 5.2 2.6"/>
+
+  <!-- the face: engraved brass relief -->
+  <circle cx="32" cy="37" r="17" fill="url(#face)" stroke="#3d2507" stroke-width="1.6"/>
+  <!-- engraving: hatching on the cheeks, inside the face only -->
+  <g clip-path="url(#faceclip)" stroke="#7a4b10" stroke-width=".7" opacity=".55">
+    <path d="M15 46l8 6M15 43l10 8M16 40l12 9M44 52l7-5M42 51l9-7M40 49l10-8"/>
   </g>
-  <!-- open wailing mouth -->
-  <path d="M24.2 45.2c0-5.6 3.6-8.6 7.8-8.6s7.8 3 7.8 8.6c0 1.1-.8 1.6-1.8 1.2-1.8-.7-3.8-1-6-1s-4.2.3-6 1c-1 .4-1.8-.1-1.8-1.2z" fill="#3a2406"/>
-  <path d="M27.2 39.6c1.3-1 2.9-1.4 4.8-1.4s3.5.4 4.8 1.4" fill="none" stroke="#f3e2b4" stroke-width="1.6" stroke-linecap="round"/>
+  <!-- brows: heavy, slanted up to the middle -->
+  <path d="M20.2 33.4l7.6-3.6 .9 2-7.5 3.5z M43.8 33.4l-7.6-3.6-.9 2 7.5 3.5z" fill="#2a1804"/>
+  <!-- eyes squeezed shut: double-line deco chevrons -->
+  <g fill="none" stroke="#2a1804" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 36.6l5.6 2.5L22 41.6" stroke-width="2.1"/>
+    <path d="M42 36.6l-5.6 2.5L42 41.6" stroke-width="2.1"/>
+  </g>
+  <!-- wailing mouth: angular deco trapezoid with a row of teeth -->
+  <path d="M25.6 51.6l2.4-7.4h8l2.4 7.4c-2-.9-4.2-1.3-6.4-1.3s-4.4.4-6.4 1.3z" fill="#24140a" stroke="#2a1804" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M28.4 45.6h7.2" stroke="#f3e2b4" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- sweat drop -->
+  <path d="M46.2 26.6c1.6 2.3 2.4 3.8 2.4 4.9a2.4 2.4 0 0 1-4.8 0c0-1.1.8-2.6 2.4-4.9z" fill="#7fd3e0" stroke="#173a40" stroke-width=".8"/>
+
+  <!-- fedora: brim, crown with the pinch, brass band -->
+  <path d="M10.5 25.4c4.6-2.3 12.6-3.6 21.5-3.6s16.9 1.3 21.5 3.6c.9.5.7 1.6-.3 1.6-5-1.2-13-1.9-21.2-1.9s-16.2.7-21.2 1.9c-1 0-1.2-1.1-.3-1.6z" fill="url(#hat)" stroke="#c99236" stroke-width=".9"/>
+  <path d="M18.6 23.6c.4-5.6 2.2-10.7 5.4-12.4 2.6-1.4 5.3.6 8 .6s5.4-2 8-.6c3.2 1.7 5 6.8 5.4 12.4-4.1-.9-8.6-1.3-13.4-1.3s-9.3.4-13.4 1.3z" fill="url(#hat)" stroke="#c99236" stroke-width=".9"/>
+  <path d="M29.6 12.4c1 1.5 3.8 1.5 4.8 0" fill="none" stroke="#3a3f48" stroke-width=".9" stroke-linecap="round"/>
+  <path d="M18.9 20.1c4.1-.9 8.5-1.3 13.1-1.3s9 .4 13.1 1.3l.3 3.1c-4.1-.9-8.6-1.3-13.4-1.3s-9.3.4-13.4 1.3z" fill="url(#rim)"/>
+  <!-- deco diamond on the band -->
+  <path d="M32 18.4l2 2.3-2 2.3-2-2.3z" fill="#0d0f12" stroke="#f6dc96" stroke-width=".6"/>
 </svg>

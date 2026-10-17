@@ -434,9 +434,11 @@ table.mini td.accent { color: var(--accent); }
 .drop-close { justify-self: end; }
 .chip-s.forget { cursor: pointer; background: none; border-color: var(--line); color: var(--muted); font: inherit; font-size: 11px; }
 
-/* home: the drop field fills the window; demos opened before are listed below it */
+/* home: drop field + opened demos fill at least the window; the drop field takes what's left */
+.home { display: flex; flex-direction: column; gap: 14px; min-height: calc(100dvh - 79px - 40px); }
+.home .section-title { margin: 6px 0 0; }
 .drop-field { display: grid; gap: 14px; justify-items: center; align-content: center; text-align: center;
-  min-height: calc(100dvh - 79px - 40px); margin: 0 0 24px; padding: 40px 24px;
+  flex: 1 0 auto; min-height: 420px; margin: 0; padding: 40px 24px;
   border: 2px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 16px; cursor: pointer;
   background: color-mix(in srgb, var(--accent) 4%, transparent); transition: background .15s, border-color .15s; }
 .drop-field:hover, .drop-field:focus-visible { background: color-mix(in srgb, var(--accent) 9%, transparent); border-color: var(--accent); outline: none; }
