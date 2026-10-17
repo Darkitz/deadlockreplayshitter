@@ -9,10 +9,10 @@ web/data/*
 !web/data/assets.json
 web/assets/*
 !web/assets/game/
+!web/assets/fonts/
 
 __pycache__/
 *.pyc
 tools/.vrf/
 # extracted but unused by the site
 web/assets/game/ranked/
-web/assets/game/heroes/*_card_*

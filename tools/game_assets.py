@@ -199,6 +199,51 @@ def extract_icons(vpk_paths):
     shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ---------------------------------------------------------------- post-game UI art
+
+# white shapes the site tints in team / stat colors, like the game's post-game screens
+UI_FILES = {
+    "logo_team2": "panorama/images/hud/core/logo_team1.vsvg_c",   # demo team 2 = "Hidden King"
+    "logo_team3": "panorama/images/hud/core/logo_team2.vsvg_c",   # demo team 3 = "Archmother"
+    "sigil_team2": "panorama/images/post_game/nav_icon_team1_png.vtex_c",
+    "sigil_team3": "panorama/images/post_game/nav_icon_team2_png.vtex_c",
+    "starburst": "panorama/images/post_game/starburst_team1.vsvg_c",
+    "mvp_trophy": "panorama/images/post_game/mvp_trophy.vsvg_c",
+    "key_trophy": "panorama/images/post_game/key_player_trophy.vsvg_c",
+    "icon_kill": "panorama/images/post_game/attributes/icon_kill.vsvg_c",
+    "icon_heal": "panorama/images/post_game/attributes/icon_heart.vsvg_c",
+    "icon_playerdmg": "panorama/images/post_game/attributes/icon_playerdmg.vsvg_c",
+    "icon_objdmg": "panorama/images/post_game/attributes/icon_objdmg.vsvg_c",
+    "icon_souls": "panorama/images/post_game/attributes/icon_souls.vsvg_c",
+}
+UI_DIR = ICON_DIR / "ui"
+
+
+def extract_ui():
+    """post-game UI art -> web/assets/game/ui/<name>.svg|png; returns {name: site path}"""
+    out, todo = {}, {}
+    for name, vpk in UI_FILES.items():
+        ext = "svg" if vpk.endswith(".vsvg_c") else "png"
+        dest = UI_DIR / f"{name}.{ext}"
+        out[name] = f"assets/game/ui/{name}.{ext}"
+        if not dest.exists():
+            todo[name] = (vpk, dest)
+    if todo:
+        tmp = CACHE / "ui_tmp"
+        shutil.rmtree(tmp, ignore_errors=True)
+        subprocess.run([str(VRF), "-i", str(VPK), "-d", "-o", str(tmp), "-f", ",".join(v for v, _ in todo.values())],
+                       capture_output=True)
+        UI_DIR.mkdir(parents=True, exist_ok=True)
+        for name, (vpk, dest) in todo.items():
+            src = tmp / vpk.replace(".vsvg_c", ".svg").replace(".vtex_c", ".png")
+            if src.exists():
+                shutil.move(src, dest)
+            else:
+                out.pop(name)
+        shutil.rmtree(tmp, ignore_errors=True)
+    return out
+
+
 # ---------------------------------------------------------------- chat wheel
 
 SERVER_DLL = GAME / "bin" / "win64" / "server.dll"
@@ -411,6 +456,7 @@ def build_assets(previous=None):
             "accolades": accolades, "modifiers": modifiers, "pings": build_pings(loc), "lanes": lane_names(loc),
             # team 2 / 3 in demos; the in-game names (the post-game graphs use these short forms)
             "teams": {"2": loc.get("citadel_graph_team1", "Amber"), "3": loc.get("citadel_graph_team2", "Sapphire")},
+            "ui": extract_ui(),
             "source": "game files"}
 
 
