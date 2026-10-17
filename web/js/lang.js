@@ -389,6 +389,8 @@ const PROSE_MIN = 40;
 /** never rewritten: player-written or player-named text, code */
 const SKIP = ".body, .sb-name, .ts-name, .who, code, pre, script, style, textarea, input, [data-raw]";
 const originals = new WeakMap();
+/** text we wrote ourselves, so the observer can tell our edits from the page's */
+const written = new WeakMap();
 
 function slang(text) {
   let out = text;
@@ -414,8 +416,11 @@ export function translateTree(root = document.body) {
   for (const g of root.querySelectorAll?.("optgroup[label]") || []) {
     if (g.dataset.origLabel == null && Object.hasOwn(PHRASES, g.label)) { g.dataset.origLabel = g.label; g.label = PHRASES[g.label]; }
   }
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+  // a text node root (changed in place) is handled itself; the walker only visits descendants
+  const nodes = [];
+  if (root.nodeType === Node.TEXT_NODE) nodes.push(root);
+  else { const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); for (let x = w.nextNode(); x; x = w.nextNode()) nodes.push(x); }
+  for (const n of nodes) {
     if (originals.has(n) || n.parentElement?.closest(SKIP)) continue;
     const out = genz(n.nodeValue, n.parentElement);
     if (out == null) continue;
@@ -423,13 +428,17 @@ export function translateTree(root = document.body) {
     // the hover help looks labels up by their English text
     n.parentElement.dataset.orig ??= n.parentElement.textContent;
     n.nodeValue = out;
+    written.set(n, out);
   }
 }
 
 function restoreTree(root = document.body) {
   for (const g of root.querySelectorAll("optgroup[data-orig-label]")) { g.label = g.dataset.origLabel; delete g.dataset.origLabel; }
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+  // a text node root (changed in place) is handled itself; the walker only visits descendants
+  const nodes = [];
+  if (root.nodeType === Node.TEXT_NODE) nodes.push(root);
+  else { const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); for (let x = w.nextNode(); x; x = w.nextNode()) nodes.push(x); }
+  for (const n of nodes) {
     if (originals.has(n)) { n.nodeValue = originals.get(n); originals.delete(n); }
   }
 }
@@ -451,12 +460,21 @@ export function initLang(onChange) {
     btn.title = lang === "genz" ? "back to normal English" : "switch to Gen Z English (it's cringe, you've been warned)";
   };
   paint();
-  let queued = false;
-  new MutationObserver(() => {
-    if (lang !== "genz" || queued) return;
-    queued = true;
-    requestAnimationFrame(() => { queued = false; translateTree(); });
-  }).observe(document.body, { childList: true, subtree: true });
+  // translate new / changed text right in the observer callback: it runs as a microtask,
+  // before the browser paints, so the English text never shows (no flicker while playing)
+  new MutationObserver((records) => {
+    if (lang !== "genz") return;
+    for (const r of records) {
+      if (r.type === "childList") {
+        for (const n of r.addedNodes) if (n.isConnected) translateTree(n);
+      } else if (r.type === "characterData") {
+        const n = r.target;
+        if (written.get(n) === n.nodeValue) continue; // our own edit
+        originals.delete(n);
+        translateTree(n);
+      }
+    }
+  }).observe(document.body, { childList: true, subtree: true, characterData: true });
   btn.addEventListener("click", () => {
     lang = lang === "genz" ? "en" : "genz";
     try { localStorage.setItem(KEY, lang); } catch { /* private mode */ }
