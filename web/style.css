@@ -87,7 +87,9 @@ select {
 .brand p { margin: 2px 0 0; font-size: 13px; }
 .top-right { display: flex; gap: 14px; align-items: center; }
 
-main { padding: 16px 24px 24px; display: flex; flex-direction: column; gap: 16px; }
+/* header + content + footer fill at least the window (the home page stretches its drop field) */
+body { display: flex; flex-direction: column; min-height: 100dvh; }
+main { padding: 16px 24px 24px; display: flex; flex-direction: column; gap: 16px; flex: 1 0 auto; }
 footer { padding: 16px 24px 28px; }
 .empty { padding: 32px; text-align: center; color: var(--muted); background: var(--panel); border-radius: var(--radius); border: 1px dashed var(--line); }
 .note { margin: 0; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--panel); color: var(--muted); font-size: 13px; }
@@ -435,7 +437,7 @@ table.mini td.accent { color: var(--accent); }
 .chip-s.forget { cursor: pointer; background: none; border-color: var(--line); color: var(--muted); font: inherit; font-size: 11px; }
 
 /* home: drop field + opened demos fill at least the window; the drop field takes what's left */
-.home { display: flex; flex-direction: column; gap: 14px; min-height: calc(100dvh - 79px - 40px); }
+.home { display: flex; flex-direction: column; gap: 14px; flex: 1 0 auto; }
 .home .section-title { margin: 6px 0 0; }
 .drop-field { display: grid; gap: 14px; justify-items: center; align-content: center; text-align: center;
   flex: 1 0 auto; min-height: 420px; margin: 0; padding: 40px 24px;
