@@ -90,7 +90,9 @@ select {
 /* header + content + footer fill at least the window (the home page stretches its drop field) */
 body { display: flex; flex-direction: column; min-height: 100dvh; }
 main { padding: 16px 24px 24px; display: flex; flex-direction: column; gap: 16px; flex: 1 0 auto; }
-footer { padding: 16px 24px 28px; }
+footer { padding: 16px 24px 28px; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; }
+.footer-link { font-weight: 600; color: var(--accent); white-space: nowrap; }
+.footer-link.on { text-decoration: underline; text-underline-offset: 3px; }
 .empty { padding: 32px; text-align: center; color: var(--muted); background: var(--panel); border-radius: var(--radius); border: 1px dashed var(--line); }
 .note { margin: 0; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--panel); color: var(--muted); font-size: 13px; }
 
@@ -278,9 +280,6 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
 /* deco wordmark: spaced capitals in brass */
 .brand h1 { letter-spacing: .22em; font-weight: 800; background: linear-gradient(180deg, #f3d58a, #d9a441 55%, #a8701a);
   -webkit-background-clip: text; background-clip: text; color: transparent; }
-.top-nav { display: flex; gap: 14px; align-items: center; margin-right: auto; margin-left: 24px; }
-.top-nav a { color: var(--muted); font-weight: 600; padding: 6px 2px; border-bottom: 2px solid transparent; }
-.top-nav a.on, .top-nav a:hover { color: var(--text); border-color: var(--accent); text-decoration: none; }
 .sb-name { color: var(--text); }
 .sb-name:hover { color: var(--accent); }
 input[type=search] { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: inherit; min-width: 240px; }
