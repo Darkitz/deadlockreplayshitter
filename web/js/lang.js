@@ -105,6 +105,7 @@ const PHRASES = {
   "airborne": "air time 🦅",
   "on foot": "walking (NPC behavior) 🚶",
   "Summary": "The tea ☕",
+  "Simple Graphs": "Line go up 📈",
   "Replay & analysis": "Replay & analysis (lore drop) 🔍",
   "victorious": "ate and left no crumbs 💅",
   "Victorious": "W 🏆",

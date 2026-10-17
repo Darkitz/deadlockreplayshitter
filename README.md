@@ -28,7 +28,7 @@ The home page lists them; × removes one.
 
 ## What's on a match
 
-**Summary** (opens first): Deadlock's post-game screen, without the 3D art.
+**Summary** (opens first): Deadlock's post-game screen, without the 3D art. The graphs live in their own **Simple Graphs** tab.
 - **Winner, MVP and key players:** picked by the game; read from Valve's post-game summary, which the server writes into the demo at game end.
 - **Award cards for all 12 players** ("Most ability kills", "Second most player dmg", … computed like the game: ties share a place).
 - **Full scoreboard:** souls, K/D/A, player and objective damage, healing incl. barriers, last hits, final build, ability upgrades.

@@ -188,13 +188,12 @@ export function renderSummary(el, m, { onPick }) {
     <section class="pg-scoreboard">${teams.map(scoreboard).join("")}
       <p class="small muted">Starburst = best in the match. Numbers are the game's own counters read from the demo; healing includes barriers given, like the in-game scoreboard.</p>
     </section>
-    <section class="pg-graphs" id="graphs"></section>`;
+`;
 
   el.onclick = (ev) => {
     const hit = ev.target.closest("[data-pawn]");
     if (hit && !ev.target.closest("#graphs")) onPick(Number(hit.dataset.pawn));
   };
-  renderGraphs(el.querySelector("#graphs"), m, model);
 }
 
 // ------------------------------------------------------------------ graphs
@@ -224,6 +223,12 @@ const GRAPHS = [
 ];
 
 let graphState = { id: "souls", pawn: null };
+
+/** the "Simple Graphs" tab: the game's post-game graphs, at demo resolution */
+export function renderSimpleGraphs(el, m) {
+  el.innerHTML = `<section class="pg-graphs" id="graphs"></section>`;
+  renderGraphs(el.querySelector("#graphs"), m, summaryModel(m));
+}
 
 function renderGraphs(el, m, model) {
   const players = model.rows.map((r) => r.p).sort((a, b) => a.team - b.team || b.net_worth - a.net_worth);

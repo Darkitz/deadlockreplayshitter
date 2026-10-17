@@ -30,7 +30,7 @@ await page.waitForSelector(".drop-field");
 const t0 = Date.now();
 await page.setInputFiles("input[type=file]", demo);
 await page.waitForFunction(() => location.hash.startsWith("#/match/"), null, { timeout: 240000 });
-await page.waitForSelector("#summary:not([hidden]) .pg-board, #replay-view:not([hidden]) .tiles .tile", { timeout: 30000 });
+await page.waitForSelector("#summary:not([hidden]) .pg-board, #simple-graphs:not([hidden]) .pg-chart, #replay-view:not([hidden]) .tiles .tile", { timeout: 30000 });
 console.log(`parsed + opened in ${Date.now() - t0} ms: ${await page.evaluate(() => location.hash)}`);
 if (after) {
   await page.evaluate((h) => { location.hash = location.hash.split("?")[0] + h; }, after);

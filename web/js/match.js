@@ -8,7 +8,7 @@ import {
 } from "./analysis.js";
 import { createTimeline, fmtClock } from "./timeline.js";
 import { createMinimap } from "./minimap.js";
-import { renderSummary, teamLogo } from "./postgame.js";
+import { renderSummary, renderSimpleGraphs, teamLogo } from "./postgame.js";
 import {
   $, esc, S, settings, saveSettings, opts, k1, tile, controlsHTML,
   wireControls, abilityButtons, setParams,
@@ -113,7 +113,7 @@ export async function viewMatch(id, params) {
   if (params.has("castheat")) settings.castHeat = params.get("castheat");
 
   // Summary (post-game screen) by default; Replay & analysis once a player is picked
-  const view = ["summary", "replay"].includes(params.get("view")) ? params.get("view") : subject ? "replay" : "summary";
+  const view = ["summary", "graphs", "replay"].includes(params.get("view")) ? params.get("view") : subject ? "replay" : "summary";
 
   // the long per-match sections live in tabs under the replay
   const chatLines = chatLog(m);
@@ -140,9 +140,11 @@ export async function viewMatch(id, params) {
     </div>
     <nav class="view-switch" role="tablist">
       <button class="tab ${view === "summary" ? "on" : ""}" data-view="summary">Summary</button>
+      <button class="tab ${view === "graphs" ? "on" : ""}" data-view="graphs">Simple Graphs</button>
       <button class="tab ${view === "replay" ? "on" : ""}" data-view="replay">Replay &amp; analysis</button>
     </nav>
     <section id="summary" class="pg" ${view === "summary" ? "" : "hidden"}></section>
+    <section id="simple-graphs" class="pg" ${view === "graphs" ? "" : "hidden"}></section>
     <div id="replay-view" ${view === "replay" ? "" : "hidden"}>
     <section class="scoreboard">
       ${teams.map((t) => `
@@ -243,6 +245,7 @@ export async function viewMatch(id, params) {
 
   // wiring
   renderSummary($("#summary", app), m, { onPick: (pw) => setParams({ pawn: pw, view: "replay", ability: null }) });
+  renderSimpleGraphs($("#simple-graphs", app), m);
   for (const b of app.querySelectorAll("[data-view]")) b.addEventListener("click", () => setParams({ view: b.dataset.view }));
   for (const b of app.querySelectorAll(".sb-row")) {
     b.addEventListener("click", (ev) => {
