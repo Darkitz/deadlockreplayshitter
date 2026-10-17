@@ -2,6 +2,8 @@
 
 <img src="web/icon.svg" width="96" alt="">
 
+**Live: [darkitz.github.io/deadlockreplayshitter/](https://darkitz.github.io/deadlockreplayshitter/)**
+
 Drop a Deadlock demo onto the page and see, for every player in the match, how many skillshots,
 gun shots and melee swings were **thrown vs hit**. The match plays back on a minimap with timelines
 you can scrub or select a span on.
@@ -113,9 +115,11 @@ The native CLI is still available for debugging:
 
 ## GitHub Pages
 
+The site is live at **https://darkitz.github.io/deadlockreplayshitter/**.
+
 `.github/workflows/pages.yml` runs the unit tests and publishes `web/` on every push to `main`.
-In the repository settings, set **Pages → Source** to **GitHub Actions**. All paths are relative
-and routing uses the URL hash, so the site works under `https://<user>.github.io/<repo>/`.
+In the repository settings, **Pages → Source** must be **GitHub Actions**. All paths are relative
+and routing uses the URL hash, so the site works under any `https://<user>.github.io/<repo>/`.
 
 ## After a Deadlock patch
 
