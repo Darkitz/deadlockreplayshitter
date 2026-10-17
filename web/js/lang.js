@@ -105,6 +105,136 @@ const PHRASES = {
   "airborne": "air time 🦅",
   "on foot": "walking (NPC behavior) 🚶",
   "Summary": "The tea ☕",
+  // home
+  "or click to pick a file ·": "or tap here to pick a file bestie ·",
+  "Download Replay": "Download Replay (the sacred button 🙏)",
+  "AI slop": "AI slop 🤖💀",
+  "Your demo is read and analyzed": "Your demo gets cooked and analyzed",
+  ", right in this browser tab.": ", right here in this tab, no cap 🧢",
+  "It is never uploaded. No server, no account, no tracking.": "Never uploaded. No server, no account, no tracking. We do NOT want your data fr 🙅",
+  "Rem": "Rem 🐐",
+  "Drop the demo again to open it.": "Yeet the demo in again to open it 📂",
+  // summary
+  "Standard match": "Standard match (sweaty) 😤",
+  "MVP": "MVP (goated) 🐐",
+  "Most": "most (no contest) 👑",
+  "Second most": "second most (so close) 😮‍💨",
+  "Third most": "third most (bronze arc) 🥉",
+  "ability kills": "ability bodies 🪄☠️",
+  "player dmg": "opp dmg 🔥",
+  "plyr dmg": "opp dmg 🔥",
+  "obj dmg": "building beef 🏗️",
+  "assists": "carried homies 🤝",
+  "healing": "heals (therapist arc) 💚",
+  "weapon kills": "gun bodies 🔫",
+  "melee kills": "bonk bodies 🔨",
+  "headshot kills": "dome bodies 🧠",
+  "kills": "bodies ☠️",
+  "souls": "bag 💰",
+  "Key Players": "Key Players (real ones) 🫡",
+  "Key": "Real one 🫡",
+  "Graph type": "Graph vibe 📊",
+  "Player": "Player 🎮",
+  // graph picker
+  "General": "General vibes ✨",
+  "Souls collected": "Bag collected 💰",
+  "Souls per minute": "Bag per minute 💸",
+  "Deaths": "Ls taken 💀",
+  "Assists": "Carried homies 🤝",
+  "Player damage": "Opp damage 🔥",
+  "Objective damage": "Building beef 🏗️",
+  "Healing (without barriers)": "Heals (no shields) 💚",
+  "Last hits": "Last hits (farming sim) 🌾",
+  "Team souls": "Team bag 💰",
+  "Time fighting heroes": "Time spent beefing 🥊",
+  "Time on ziplines": "Zipline era 🚡",
+  "Movement actions (jumps, dashes, slides)": "Zoomies (jumps, dashes, slides) 🏃💨",
+  "Damage dealt by type": "Damage by flavor 🍦",
+  "Damage to players": "Damage to opps 🎯",
+  "Damage from players": "Damage tanked (ouch) 🤕",
+  "Time split: combat": "Where the time went: beef 🥊",
+  "Time split: movement": "Where the time went: zoomies 🏃",
+  "Movement actions by type": "Zoomies by type 🏃",
+  "Souls by source": "Where the bag came from 💰",
+  "Permanent buffs": "Perma buffs (stat glow up) 📈",
+  "cast heatmap…": "where they spammed it 🔥…",
+  // overview + replay
+  "Kills": "Bodies ☠️",
+  "Souls lead": "Bag lead 💰",
+  "Winner": "Winner (W) 🏆",
+  "Game time": "Game time ⏱️",
+  "Fights": "Beef 🥩",
+  "Match overview.": "Match overview (vibe check) ✅",
+  "abilities": "abilities ✨",
+  "Light melee": "Light bonk 🔨",
+  "Heavy melee": "Heavy bonk 💪",
+  "Gun": "Gun (pew pew) 🔫",
+  "Parry": "Parry (no u) 🛡️",
+  "melee → hero": "bonk → opp 🥊",
+  "light · heavy · parried": "light · heavy · got denied 😭",
+  "· signature skills that connect + gun, every player": "· signature skills that actually connect + gun, whole lobby 👥",
+  "· alive time, from the demo every 0.5 s": "· alive time only (no ghost arc 👻), every 0.5 s",
+  "shift+drag": "shift+drag (galaxy brain move 🧠)",
+  "dead": "unalived 💀",
+  "no items yet": "no drip yet 🥲",
+  "no buffs or debuffs": "no buffs, just vibes 😐",
+  "nothing yet": "nothing yet (it's giving empty) 🫥",
+  "no kills yet": "no bodies yet 🕊️",
+  "no swings yet": "no bonks yet 🔨",
+  "no hero hits yet": "no opp hits yet 😶",
+  "Hit window": "Hit window ⏳",
+  "Hidden King": "Hidden King 👑",
+  "Archmother": "Archmother 🔮",
+  // how it works headings + labels
+  "1. Finding swings": "1. Finding the bonks 🔍",
+  "2. Measuring the surroundings": "2. Reading the room 👀",
+  "3. Intent": "3. What were they even trying 🤔",
+  "4. Outcome": "4. Did it slap? 👋",
+  "5. The numbers": "5. The numbers (math class) 🧮",
+  "Limits": "Limits (the fine print) 📜",
+  "Combat (first match wins)": "Beef (first match wins) 🥊",
+  "Fighting heroes": "Beefing with opps 🥊",
+  "Fighting troopers / objectives": "Farming troopers / objectives 🏗️",
+  "Farming neutrals": "Jungle farming 🌾",
+  "Out of combat": "Chilling 🧘",
+  "Zipline": "Zippin' 🚡",
+  "Dash": "Dashin' 💨",
+  "Slide": "Slidin' 🛝",
+  "Airborne": "Air time 🦅",
+  "On foot": "Walking (NPC behavior) 🚶",
+  "At heroes": "At opps 🥊",
+  "At NPCs": "At NPCs 🤖",
+  "Movement": "Zoomies 🏃",
+  "Parried": "Got denied 😭",
+  "Whiff": "Whiff 💨",
+  "Hit NPC": "Bonked an NPC 🤖",
+  "Melee use %": "Bonk usage % 🔨",
+  "Demo": "Demo (the evidence) 📼",
+  "Game time": "Game time ⏱️",
+  "Point / span": "Point / span 📍↔️",
+  "Skill %": "Skill % 🎯",
+  "Skill hit %": "Skill hit % 🎯",
+  "Skills thrown": "Skills yeeted 🚀",
+  "Aim error (miss · N° off)": "Aim error (how cooked the aim was) 🫠",
+  "Hero HS %": "Dome % 🧠",
+  "Swings": "Bonks 🔨",
+  "At heroes / hero melees": "At opps / opp bonks 🥊",
+  "Acc": "Acc 🎯",
+  "Melee → hero": "Bonk → opp 🥊",
+  "Dmg": "Dmg 🔥",
+  "Team souls lead": "Team bag lead 💰",
+  "Heat (map)": "Heat (map) 🔥",
+  "Cast heatmap (map)": "Spam map 🔥",
+  "Deaths (map)": "Deaths (map) 💀",
+  "MVP / key player": "MVP / real ones 🐐",
+  "Awards (most / second most …)": "Awards (the flex list) 🏅",
+  "Healing": "Heals 💚",
+  "Shots": "Shots 🔫",
+  "Hits": "Hits 🎯",
+  "What it hit": "What it hit 🎯",
+  "Nearest living enemy hero.": "Closest opp still breathing. 😤",
+  "soul orbs": "soul orbs 💰",
+  "oldest unclaimed shot of the last 1.5 s": "oldest unclaimed shot of the last 1.5 s (first come first served) 🍽️",
   "AI SLOP": "AI SLOP 🤖💀",
   "Simple Graphs": "Line go up 📈",
   "Replay & analysis": "Replay & analysis (lore drop) 🔍",
@@ -202,10 +332,33 @@ const PATTERNS = [
   [/^parried by$/, "parried by 😭"],
   [/^Parser warnings for this demo: (.*)$/, "the parser is lowkey confused 😵‍💫: $1"],
   [/^(\w+) melee at (.*)$/, "$1 bonk at $2 🔨"],
+  [/^(\d+:\d+) kill \/ assist$/, "$1 bodied someone ☠️"],
+  [/^(\d+:\d+) died$/, "$1 got sent to the lobby 💀"],
+  [/^(\d+:\d+) hit · (\d+) dmg$/, "$1 landed 🎯 · $2 dmg"],
+  [/^(\d+:\d+) hit$/, "$1 landed 🎯"],
+  [/^(\d+:\d+) miss$/, "$1 whiffed 💀"],
+  [/^(\d+:\d+) other · (\d+) dmg$/, "$1 hit an NPC 🤖 · $2 dmg"],
+  [/^([^:]{1,40}): (\d+%)$/, "$1: $2 aim rizz 🎯"],
+  [/^(\d+) \/ (\d+) HP$/, "$1 / $2 HP ❤️"],
+  [/^(Hidden King|Archmother|Amber|Sapphire) won$/, "$1 won (W) 🏆"],
+  [/^Match (\d+)$/, "Match $1 🎮"],
+  [/^· lane (\d+)$/, "· lane $1 🛣️"],
+  [/^\/ (\d+) tried(.*)$/, "/ $1 attempts$2 🛡️"],
+  [/^enemy ≤ (\d+) m$/, "opp within $1 m 👀"],
+  [/^chart: (.*) over the match$/, "chart: $1 over the whole match 📈"],
+  [/^· enemy casts whose aim was within (\d+)° of them$/, "· opp casts aimed within $1° of them (they were locked in 🔒)"],
+  [/^(\d+(?:\.\d+)?k?) souls$/, "$1 bag 💰"],
+  [/^(Hidden King|Amber) – (Archmother|Sapphire)$/, "$1 👑 vs $2 🔮"],
 ];
 
 /** long prose (notes, help popups, the "How it works" page): slang swaps + a closer */
 const WORDS = [
+  [/(?<![-\w])game(?![-\w])/gi, "game (the grind)"], [/\bnet worth\b/gi, "bag"], [/\bplayhead\b/gi, "playhead 📍"],
+  [/\bdamage\b/gi, "dmg"], [/\blevel\b/gi, "lvl"], [/\battacks\b/gi, "hits"], [/\bplayer's\b/gi, "gamer's"], [/\bwinner\b/gi, "W-er"],
+  [/\bnumbers?\b/gi, (m) => (m.endsWith("s") ? "numbers (math 🤓)" : "number")],
+  [/\bcomputer\b/gi, "PC (the battlestation)"], [/\binternet\b/gi, "interwebs"],
+  [/\bexplain(s|ed)?\b/gi, "spill$1"], [/\bcheck(ed)?\b/gi, "vibe-check$1"], [/\bbugs\b/gi, "bugs (skill issue)"],
+  [/\bsuccessful\b/gi, "clean"], [/\bperfect\b/gi, "immaculate"], [/\bhowever\b/gi, "but lowkey"],
   [/\benem(y|ies)\b/gi, (m, e) => (e === "y" ? "opp" : "opps")],
   [/\bkills\b/gi, "bodies"], [/\bkilled\b/gi, "unalived"], [/\bdied\b/gi, "got unalived"],
   [/\bgood\b/gi, "bussin"], [/\bbad\b/gi, "mid"], [/\bgreat\b/gi, "goated"], [/\bbest\b/gi, "most goated"],
@@ -215,7 +368,9 @@ const WORDS = [
   [/\bmoney\b/gi, "bag"], [/\bsouls\b/gi, "bag"], [/\baccuracy\b/gi, "aim rizz"], [/\bmissed\b/gi, "fumbled"],
   [/\bmiss(es)?\b/gi, "L$1"], [/\bheadshots?\b/gi, "domeshot"], [/\bmelee\b/gi, "bonk"], [/\bswings\b/gi, "bonks"],
 ];
-const CLOSERS = [" no cap 🧢", " fr fr 💯", " type shit 🔥", " 💀💀💀", " (real) 😤", " ong 🙏", " it's giving accuracy 💅",
+const CLOSERS = [" skibidi 🚽", " gyatt 😳", " rizzler behavior 😏", " sigma grindset 🗿", " it's giving 💅", " cooked 🍳", " we're so back 📈",
+  " it's so over 📉", " mid fr 😐", " NPC energy 🤖", " no thoughts head empty 🫥", " delulu is the solulu 🌈", " caught in 4K 📸",
+  " touch grass 🌱", " ohio moment 🌽", " slay queen 👑", " bussin bussin 😋", " real and true 🙏", " brainrot certified 🧠🔥"," no cap 🧢", " fr fr 💯", " type shit 🔥", " 💀💀💀", " (real) 😤", " ong 🙏", " it's giving accuracy 💅",
   " bussin 😋", " sheesh 🥶", " lowkey 👀", " W 🏆", " ifykyk 🤫", " and that's on period 💅", " slay 💅", " based 🗿",
   " vibe check passed ✅", " rent free 🧠", " understood the assignment 📝", " main character energy ✨", " it's the aim for me 🎯"];
 
@@ -228,24 +383,37 @@ function zoomerify(text) {
   return out.replace(/\s*$/, "") + CLOSERS[h % CLOSERS.length];
 }
 /** prose gets zoomerified: these containers, text this long */
-const PROSE = ".about, .note, p.small, .keys, .drop-field span, dd";
+const PROSE = ".about, .note, p.small, .keys, .drop-field, dd, .offline, .slop-note, .pick-hint, .pg-graph-note, .small.muted, footer, .empty, .chart-card > div.small";
 const PROSE_MIN = 40;
 
 /** never rewritten: player-written or player-named text, code */
 const SKIP = ".body, .sb-name, .ts-name, .who, code, pre, script, style, textarea, input, [data-raw]";
 const originals = new WeakMap();
 
+function slang(text) {
+  let out = text;
+  for (const [re, rep2] of WORDS) out = out.replace(re, rep2);
+  return out;
+}
+
 function genz(text, el) {
   const t = text.trim();
   if (!t) return null;
   if (Object.hasOwn(PHRASES, t)) return text.replace(t, PHRASES[t]);
-  for (const [re, rep] of PATTERNS) if (re.test(t)) return text.replace(t, t.replace(re, rep));
-  if (t.length >= PROSE_MIN && el?.closest(PROSE)) return text.replace(t, zoomerify(t));
+  for (const [re, rep2] of PATTERNS) if (re.test(t)) return text.replace(t, t.replace(re, rep2));
+  if (el?.closest(PROSE)) {
+    if (t.length >= PROSE_MIN) return text.replace(t, zoomerify(t));
+    const swapped = slang(t);
+    if (swapped !== t) return text.replace(t, swapped);
+  }
   return null;
 }
 
 export function translateTree(root = document.body) {
   if (lang !== "genz") return;
+  for (const g of root.querySelectorAll?.("optgroup[label]") || []) {
+    if (g.dataset.origLabel == null && Object.hasOwn(PHRASES, g.label)) { g.dataset.origLabel = g.label; g.label = PHRASES[g.label]; }
+  }
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     if (originals.has(n) || n.parentElement?.closest(SKIP)) continue;
@@ -259,6 +427,7 @@ export function translateTree(root = document.body) {
 }
 
 function restoreTree(root = document.body) {
+  for (const g of root.querySelectorAll("optgroup[data-orig-label]")) { g.label = g.dataset.origLabel; delete g.dataset.origLabel; }
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     if (originals.has(n)) { n.nodeValue = originals.get(n); originals.delete(n); }
