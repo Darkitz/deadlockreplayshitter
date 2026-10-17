@@ -4,6 +4,7 @@
 //   #/                                    drop a demo · demos opened in this browser
 //   #/match/<id>?pawn=&ability=&from=&t=   one match: minimap + timeline + tracker
 //   #/about                               how every number is derived
+//   #/builds · #/build/<id> · #/builds/<player>   hero builds (deadlock-api; js/builds.js)
 
 import { loadJSON, Assets, TEAM_NAMES } from "./data.js";
 import { $, S, loadTips, hasTip, tipHTML } from "./ui.js";
@@ -29,11 +30,17 @@ async function route() {
   const params = new URLSearchParams(q || "");
   const parts = (path || "/").split("/").filter(Boolean);
   window.scrollTo({ top: 0 });
-  for (const a of document.querySelectorAll("[data-nav]")) a.classList.toggle("on", a.dataset.nav === (parts[0] || "home"));
+  const nav = parts[0] === "build" ? "builds" : parts[0] || "home";
+  for (const a of document.querySelectorAll("[data-nav]")) a.classList.toggle("on", a.dataset.nav === nav);
 
   if (parts[0] === "match" && parts[1]) {
     S.view = "match";
     await viewMatch(Number(parts[1]), params);
+  } else if (parts[0] === "builds" || parts[0] === "build") {
+    // loaded on demand: only these pages talk to deadlock-api
+    S.view = "builds";
+    const { viewBuilds } = await import("./builds.js");
+    await viewBuilds(parts, params);
   } else if (parts[0] === "about") {
     S.view = "about";
     viewAbout($("#app"), params);

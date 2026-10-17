@@ -4,7 +4,7 @@
 // barriers and souls by source come from Valve's post-game summary, which the server embeds in
 // the demo at game end (absent in some demos; those parts then stay hidden).
 
-import { esc, S, k1, itemHelp } from "./ui.js";
+import { esc, S, k1, itemHelp, buildLink } from "./ui.js";
 import { TEAM_NAMES, statsAt, itemsAt, abilityLevelsAt } from "./data.js";
 import { fmtClock } from "./timeline.js";
 import { timeSplit } from "./analysis.js";
@@ -138,7 +138,7 @@ export function renderSummary(el, m, { onPick }) {
         const lv = abilityLevelsAt(m, r.p.pawn, m.end);
         return `<tr data-pawn="${r.p.pawn}" title="open ${esc(r.p.name)} in the replay">
           <td class="pg-icon"><img src="${esc(heroOf(r.p).icon)}" alt=""></td>
-          <td class="pg-who"><b>${esc(r.p.name)}</b><small>${esc(heroOf(r.p).name)}</small></td>
+          <td class="pg-who"><b>${esc(r.p.name)}</b><small>${esc(heroOf(r.p).name)}</small>${buildLink(r.p)}</td>
           <td class="pg-mvp-cell">${r.mvp ? ui(r.mvp === 1 ? "mvp_trophy" : "key_trophy", "pg-trophy-sm") : ""}</td>
           ${cols.map(([k, , fmt]) => {
             // the game marks the best value of each column, but not deaths

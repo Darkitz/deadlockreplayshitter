@@ -69,7 +69,8 @@ const SLOT_NAME = { weapon: "Weapon", vitality: "Vitality", spirit: "Spirit" };
 /** hover text for an item icon: name, then slot / tier */
 export function itemHelp(it) {
   if (!it) return "";
-  const meta = [it.slot && `${SLOT_NAME[it.slot] || it.slot} item`, it.tier && `tier ${it.tier}`].filter(Boolean).join(" · ");
+  const cost = it.tier && S.assets?.prices?.[it.tier];
+  const meta = [it.slot && `${SLOT_NAME[it.slot] || it.slot} item`, it.tier && `tier ${it.tier}`, cost && `${cost.toLocaleString()} souls`].filter(Boolean).join(" · ");
   return meta ? `${it.name}\n${meta}` : it.name;
 }
 
@@ -119,6 +120,16 @@ export function abilityButtons(list, selected, extra = () => "", help = (ab) => 
       ${ab.image ? `<img src="${esc(ab.image)}" alt="">` : `<span class="ab-ph">${esc((ab.name || "?")[0])}</span>`}
       <span class="ab-name">${esc(ab.name)}</span>${extra(ab)}
     </button>`).join("");
+}
+
+/** link to the build a player had selected (from the demo; see data.js demoBuild) */
+export function buildLink(p, cls = "pg-build") {
+  const b = p.heroBuild;
+  if (!b) return "";
+  const q = new URLSearchParams({ hero: b.hero_id ?? p.hero_id, author: b.author ?? 0, name: b.name, player: p.name });
+  if (b.origin) q.set("origin", b.origin);
+  const help = `Build: ${b.name || "unnamed"}\nThe build ${p.name} had selected${b.author && b.author !== p.account_id ? " (made by someone else)" : ""}.\nOpens it with items, ability order and share string (loads from deadlock-api.com).`;
+  return `<a class="${cls}" href="#/build/${b.id}?${esc(q.toString())}" data-help="${esc(help)}">📋 ${esc(b.name || `build #${b.id}`)}</a>`;
 }
 
 // ------------------------------------------------------------------ navigation

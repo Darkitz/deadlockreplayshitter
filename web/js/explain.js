@@ -220,6 +220,38 @@ export const DEEP_DIVES = [
         end-of-match hero accuracy.</li>
       </ol>`,
   },
+  {
+    id: "builds",
+    title: "Hero builds: the one part that goes online",
+    body: `
+      <p>The <b>builds</b> pages (merged in from Build Shitter) look up any hero build by ID, or every build a player
+      published, and make the in-game share string. Unlike everything else here they need the internet: your browser
+      asks <a href="https://deadlock-api.com" target="_blank" rel="noopener">deadlock-api.com</a> directly. Replay
+      analysis never does.</p>
+      <h4>Which build each player ran</h4>
+      <p>Every hero in a demo carries the build its player had selected (<code>m_sHeroBuildSerialized</code>, a
+      <code>CMsgHeroBuild</code>). The game sends it as a C string, so the demo only keeps it up to its first zero byte:
+      the build's ID, hero, author, name, and sometimes its version and the build it was copied from. Never the items.
+      The scoreboard on <b>Summary</b> shows that name and links the build. The full build is only fetched when you
+      open it. Builds with small IDs are usually a player's own unpublished copies. Looking one up returns someone
+      else's build, so the page checks the hero and author and says when it can't be found.</p>
+      <h4>Where builds come from</h4>
+      <p>For a build ID the browser asks Valve's game coordinator live through deadlock-api
+      (<code>/v1/builds/{hero}/{id}</code>) and, at the same time, its search index. If Valve answers within 3 seconds you get
+      that copy. Otherwise you get the indexed one, and the live one replaces it in the cache when it arrives. A player's
+      builds come from the search index (<code>/v1/builds?author_id=</code>), which can lag a bit behind.</p>
+      <h4>The share string</h4>
+      <p>It's <code>base64(zstd(CMsgHeroBuild))</code>, the same format the game exports. The protobuf is encoded here and
+      wrapped in a zstd frame of <b>stored (uncompressed) blocks</b>, because browsers can't compress zstd. Any zstd decoder
+      reads it back byte for byte. It's just about 1.6× as long as the game's own strings. If the game ever refuses one,
+      that's the first suspect.</p>
+      <h4>Souls, levels and caching</h4>
+      <p>Item prices per tier and the hero level table come from the game files. Clicking items adds up their price. The
+      level shown is the last one whose required souls fit in that total. For each ability step, the page shows the
+      earliest level with enough ability unlocks or points, buying every earlier step first. Builds and players are
+      cached in this browser (IndexedDB) for 24 hours. Old versions are kept forever. ↻ Refresh works once per hour each.</p>
+      <p><button type="button" class="btn" data-clear-builds>clear cached builds</button></p>`,
+  },
 ];
 
 export function viewAbout(app, params) {
@@ -230,7 +262,7 @@ export function viewAbout(app, params) {
         things and saying "no, like in the game". The numbers below explain what the code does, and many were checked against
         Deadlock's own post-game screens and Valve's match data. That's spot checks, not proof. Expect bugs, especially after
         patches and in unusual matches.</div>
-      <p class="muted">Everything is computed in your browser from the demo alone. Hover any underlined label on the site for the same text.</p>
+      <p class="muted">Everything is computed in your browser from the demo alone (the hero build pages are the one exception: they load builds from deadlock-api). Hover any underlined label on the site for the same text.</p>
       <nav class="about-toc">${[...DEEP_DIVES.map((d) => [d.id, d.title]), ...SECTIONS.map((x, i) => [`s${i}`, x.title])]
         .map(([id, t]) => `<a href="#/about?s=${id}" data-jump="${id}">${t}</a>`).join("")}</nav>
       ${DEEP_DIVES.map((d) => `<div class="about-sec deep" id="about-${d.id}"><h3>${d.title}</h3>${d.body}</div>`).join("")}
@@ -240,6 +272,11 @@ export function viewAbout(app, params) {
           <dl>${s.items.map(([, label, text]) => `<dt>${label}</dt><dd>${text}</dd>`).join("")}</dl>
         </div>`).join("")}
     </section>`;
+  app.querySelector("[data-clear-builds]")?.addEventListener("click", async (e) => {
+    const { clearAll } = await import("./builds/store.js");
+    await clearAll();
+    e.target.textContent = "cleared";
+  });
   const jump = params?.get("s");
   if (jump) requestAnimationFrame(() => document.getElementById(`about-${jump}`)?.scrollIntoView());
 }

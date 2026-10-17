@@ -23,7 +23,7 @@ use haste::valveprotos::deadlock::{
 use prost::Message;
 use serde::Serialize;
 
-pub const FORMAT_VERSION: u32 = 15;
+pub const FORMAT_VERSION: u32 = 16;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`.
 /// They are string tokens of the class names, so they survive patches. The CLI can override them
 /// with `--ignore-ids`; the browser build always uses this list.
@@ -102,6 +102,8 @@ const GOLD_SOURCES: [(&str, u64); 6] = [
     ("solo_bonus", fkey_from_path(&["m_PlayerDataGlobal", "m_iCreepGoldSoloBonus"])),
 ];
 const PAWN_CONTROLLER: u64 = fkey_from_path(&["m_hController"]);
+/// the selected hero build, serialized CMsgHeroBuild (not valid utf-8, hence raw bytes)
+const PAWN_BUILD: u64 = fkey_from_path(&["m_sHeroBuildSerialized"]);
 const PAWN_HERO_ID: u64 =
     fkey_from_path(&["m_CCitadelHeroComponent", "m_spawnedHero", "m_nHeroID"]);
 const HEALTH: u64 = fkey_from_path(&["m_iHealth"]);
@@ -205,6 +207,10 @@ struct Player {
     gold: i32,
     /// souls by source, where the demo has them
     gold_sources: std::collections::BTreeMap<String, i32>,
+    /// the hero build the player had selected (raw CMsgHeroBuild protobuf, base64; the site
+    /// decodes it and makes the in-game share string from it). Empty: no build / default build.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    build: String,
 }
 
 /// Per-pawn time series, index i = time `samples.t0 + i * samples.dt`.
@@ -330,6 +336,7 @@ struct V {
     controllers: HashMap<i32, Player>,
     pawn_ctrl: HashMap<i32, i32>,
     pawn_hero: HashMap<i32, u32>,
+    pawn_build: HashMap<i32, std::sync::Arc<[u8]>>,
     abilities: HashMap<i32, AbilityState>,
     noisy: Vec<u32>,
     /// ActiveModifiers row index -> (hash of user data, index into out.modifiers)
@@ -703,6 +710,11 @@ impl Visitor for V {
                     self.pawn_ctrl.insert(e.index(), ehandle_to_index(h));
                 }
             }
+            if let Some(FieldValue::String(b)) = e.get_field_value(&PAWN_BUILD) {
+                if !b.is_empty() {
+                    self.pawn_build.insert(e.index(), b.clone());
+                }
+            }
             if let Some(h) = e.get_value::<u32>(&PAWN_HERO_ID) {
                 if h != 0 {
                     self.pawn_hero.insert(e.index(), h);
@@ -960,6 +972,9 @@ pub fn parse_demo<R: Read + Seek>(
         if let Some(h) = v.pawn_hero.get(pawn) {
             p.hero_id = *h;
         }
+        if let Some(b) = v.pawn_build.get(pawn) {
+            p.build = base64(b);
+        }
         players.push(p);
     }
     players.sort_by_key(|p| (p.team, p.lane, p.controller));
@@ -984,6 +999,18 @@ pub fn parse_demo<R: Read + Seek>(
     }
     v.out.warnings = sanity_check(&v.out, v.game_start.is_some());
     Ok(v.out)
+}
+
+fn base64(data: &[u8]) -> String {
+    const A: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    for c in data.chunks(3) {
+        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        for i in 0..4 {
+            out.push(if i <= c.len() { A[(n >> (18 - 6 * i) & 63) as usize] as char } else { '=' });
+        }
+    }
+    out
 }
 
 #[cfg(target_arch = "wasm32")]

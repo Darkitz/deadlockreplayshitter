@@ -25,7 +25,7 @@ LOCALIZATION = GAME / "resource" / "localization"
 VRF = ROOT / "tools" / ".vrf" / "Source2Viewer-CLI"
 CACHE = ROOT / "data" / "game"
 ICON_DIR = ROOT / "web" / "assets" / "game"
-SCRIPTS = ["heroes", "abilities", "modifiers", "accolades", "ping_wheel_messages"]
+SCRIPTS = ["heroes", "abilities", "modifiers", "accolades", "ping_wheel_messages", "generic_data"]
 MAP_RADIUS = 10752  # world units covered by the minimap image (half its width)
 
 
@@ -339,11 +339,22 @@ def build_assets(previous=None):
     abilities_kv = load_script("abilities")
     modifiers_kv = load_script("modifiers")
     accolades_kv = load_script("accolades")
+    generic = load_script("generic_data")
     icons = set()
 
     def name_of(key, fallback=None):
         return loc.get(key.lower()) or fallback or key
 
+    def level_table(h):
+        """[required souls, ability unlocks gained, ability points gained] per hero level"""
+        info = h.get("m_mapLevelInfo") or {}
+        rows = []
+        for _, l in sorted(info.items(), key=lambda kv: int(kv[0])):
+            bonus = l.get("m_mapBonusCurrencies") or {}
+            rows.append([l.get("m_unRequiredGold", 0), bonus.get("EAbilityUnlocks", 0), bonus.get("EAbilityPoints", 0)])
+        return rows
+
+    base_levels = level_table(heroes_kv.get("hero_base") or {})
     heroes, ability_hero = {}, {}
     for key, h in heroes_kv.items():
         if not key.startswith("hero_") or not isinstance(h, dict) or not h.get("m_HeroID"):
@@ -365,6 +376,8 @@ def build_assets(previous=None):
             "weapon": bound.get("ESlot_Weapon_Primary"),
             "disabled": bool(h.get("m_bDisabled")),
         }
+        if level_table(h) and level_table(h) != base_levels:
+            heroes[h["m_HeroID"]]["levels"] = level_table(h)
 
     items = {}
     for key, a in abilities_kv.items():
@@ -541,6 +554,9 @@ def build_assets(previous=None):
             # team 2 / 3 in demos; the in-game names (the post-game graphs use these short forms)
             "teams": {"2": loc.get("citadel_graph_team1", "Amber"), "3": loc.get("citadel_graph_team2", "Sapphire")},
             "ui": extract_ui(),
+            # shop price per item tier (index = tier) and the standard hero level table (build pages)
+            "prices": generic.get("m_nItemPricePerTier") or [],
+            "levels": base_levels,
             "source": "game files"}
 
 

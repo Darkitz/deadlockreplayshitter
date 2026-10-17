@@ -1,6 +1,7 @@
 // Game assets, parsed matches (from this browser's store) and per-moment lookups.
 
 import { localGet } from "./local.js";
+import { decodeHeroBuildPrefix } from "./builds/proto.js";
 
 export async function loadJSON(url) {
   const r = await fetch(url, { cache: "no-cache" });
@@ -19,6 +20,8 @@ export class Assets {
     this.pings = raw.pings || {};
     this.lanes = raw.lanes || {};
     this.ui = raw.ui || {};
+    this.prices = raw.prices || [];  // shop price per item tier
+    this.levels = raw.levels || [];  // [required souls, ability unlocks, ability points] per hero level
     this.byClass = new Map();
     for (const [id, it] of Object.entries(raw.items)) this.byClass.set(it.class_name, { id: Number(id), ...it });
     // recast / trigger abilities ("Flow State (recast)") count toward their parent ability
@@ -61,7 +64,22 @@ export function prepare(m) {
   m.tracks = new Map(m.samples.tracks.map((t) => [t.pawn, t]));
   m.statTracks = new Map(m.stats.tracks.map((t) => [t.pawn, t]));
   m.player = (accountId) => m.players.find((p) => p.account_id === accountId);
+  for (const p of m.players) p.heroBuild = demoBuild(p.build);
   return m;
+}
+
+/** the build a player had selected, from the demo (parser format 16+). The demo only has its
+ *  first fields (see parser: m_sHeroBuildSerialized): id, hero, author, name, sometimes version
+ *  and the build it was copied from. Small ids are the author's own unpublished copies. */
+function demoBuild(b64) {
+  if (!b64) return null;
+  try {
+    const b = decodeHeroBuildPrefix(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+    return b.hero_build_id ? { id: b.hero_build_id, hero_id: b.hero_id, author: b.author_account_id, name: b.name || "",
+      version: b.version ?? null, origin: b.origin_build_id ?? null, updated: b.last_updated_timestamp ?? null } : null;
+  } catch {
+    return null;
+  }
 }
 
 /** interpolated [x, y] of a pawn at game time t (null if unknown / dead / teleporting) */

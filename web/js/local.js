@@ -66,7 +66,7 @@ function summarize(m, file) {
     parser_version: m.version, duration_s: m.game_over_s ?? m.duration_s, winner: m.winning_team ?? null,
     warnings: m.warnings || [],
     players: m.players.map((p) => ({
-      name: p.name, hero_id: p.hero_id, team: p.team,
+      name: p.name, account_id: p.account_id, hero_id: p.hero_id, team: p.team,
       k: p.kills, d: p.deaths, a: p.assists, net_worth: p.net_worth,
     })),
   };

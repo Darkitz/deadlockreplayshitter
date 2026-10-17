@@ -18,6 +18,13 @@ Everything runs in the browser. The demo parser ([haste](https://github.com/dead
 in `parser/`) is compiled to WebAssembly and parses the file locally. Nothing is uploaded and there
 is no server, so the site can be hosted on GitHub Pages.
 
+**Hero builds** (`#/builds`, merged in from Build Shitter) are the one online part: look up any build by ID, or
+every build a player published, see its items (with souls and level totals) and ability order, and copy the
+in-game share string. Builds load from [deadlock-api.com](https://deadlock-api.com) straight into the browser and
+are cached there. On a match's **Summary**, each player's row links the build they had selected: the demo
+carries its ID and name (only those, the game cuts it off at the first zero byte), the full build loads when you
+open it.
+
 ## Using it
 
 1. Get a demo:
@@ -98,7 +105,8 @@ Some metrics need explaining:
 | `web/data/assets.json`, `web/assets/game/` | hero/ability/item names and icons from the game files (committed) |
 | `parser/dlparse/` | the parser: `src/lib.rs` (demo → JSON), `src/wasm.rs` (browser exports), `src/main.rs` (CLI) |
 | `parser/vendor/` | deadlock-api's haste fork and protos |
-| `tools/game_assets.py` | extracts `assets.json` + icons from a local Deadlock install |
+| `tools/game_assets.py` | extracts `assets.json` + icons from a local Deadlock install, and `data/tips.json` (in-game tooltips, `tools/ability_tips.py`) |
+| `web/js/builds.js`, `web/js/builds/` | hero build pages: deadlock-api client + cache, share-string codec (protobuf + stored zstd frame) |
 | `tests/` | `node --test tests/*.test.mjs` |
 | `tools/smoke.mjs` | browser smoke test: drops a demo into the running site and screenshots it |
 
