@@ -249,6 +249,14 @@ def extract_ui():
     return out
 
 
+# ---------------------------------------------------------------- ability profiles
+
+try:
+    PROFILES = json.loads((ROOT / "tools" / "ability_profiles.json").read_text())
+except (OSError, ValueError):
+    PROFILES = {}
+
+
 # ---------------------------------------------------------------- chat wheel
 
 SERVER_DLL = GAME / "bin" / "win64" / "server.dll"
@@ -378,6 +386,37 @@ def build_assets(previous=None):
         tier = str(a.get("m_iItemTier") or "")
         if tier.startswith("EModTier_"):
             entry["tier"] = int(tier.rsplit("_", 1)[1])
+        # how to score it (see tools/profile_abilities.py): measured in real matches where we have
+        # enough casts, otherwise guessed from the game's own flags
+        behaviors = str(a.get("m_AbilityBehaviorsBits", ""))
+        activation = str(a.get("m_eAbilityActivation", ""))
+        props_all = a.get("m_mapAbilityProperties") or {}
+        prof = PROFILES.get(key)
+        if activation.endswith("PASSIVE"):
+            entry["kind"] = "proc"
+        elif prof:
+            entry["kind"] = prof["kind"]
+            if prof.get("window"):
+                entry["window"] = prof["window"]
+        else:
+            def num(k):
+                v = props_all.get(k)
+                v = v.get("m_strValue") if isinstance(v, dict) else v
+                try:
+                    return float(str(v).rstrip("sm"))
+                except (TypeError, ValueError):
+                    return 0.0
+            hurts = any(k for k in props_all if ("Damage" in k or k in ("DPS", "StunDuration", "SlowPercent", "SilenceDuration"))
+                        and "Reduction" not in k and "Resist" not in k and "Bonus" not in k and num(k) > 0)
+            if "CAN_HEAL_PLAYERS" in behaviors and not hurts:
+                entry["kind"] = "support"
+            elif hurts:
+                entry["kind"] = "offensive"
+                dur = min(num("AbilityDuration"), 10.0) + num("AbilityCastDelay")
+                if dur > 2:
+                    entry["window"] = round(dur + 1, 1)
+            else:
+                entry["kind"] = "self"
         # "your next N bullets / shots are empowered" abilities (Living Ink, Slam Fire, Hellfire
         # Salvo, ...): the gun fires the projectiles, so the site scores each one
         props = a.get("m_mapAbilityProperties") or {}

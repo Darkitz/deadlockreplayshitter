@@ -72,7 +72,15 @@ export async function viewMatch(id, params) {
       if (r?.projectiles) {
         lines.push(`${r.projHit} / ${r.projectiles}: ${ab.name}'s bullets that ${settings.heroesOnly ? "hit an enemy hero" : "hit anything"} / bullets fired.`,
           `Each cast empowers your next ${ab.shots} shot${ab.shots > 1 ? "s" : ""}; ${r.hit} of ${r.thrown} casts hit a hero, ${r.miss} hit nothing.`);
-      } else if (r?.thrown) lines.push(`${r.scored} / ${r.thrown}: casts that ${settings.heroesOnly ? "hit an enemy hero" : "hit anything"} / all casts (hit window ${settings.window} s).`);
+      } else if (r?.thrown && ab.kind === "support") {
+        lines.push(`${r.ally} / ${r.thrown}: uses that reached an ally / all uses (heal, shield or buff on a teammate).`,
+          `${r.allyHeroes} different allies helped; ${r.selfOnly} uses only affected ${esc(subject.name)}. ${r.inFight} of ${r.thrown} were used in a fight.`);
+      } else if (r?.thrown && ab.kind === "self") {
+        lines.push(`×${r.thrown}: uses. A self buff, mobility or utility ability, so there's nothing to hit.`,
+          `${r.inFight} of ${r.thrown} were used in a fight (enemy hero within 25 m, or hero damage within 3 s).`);
+      } else if (r?.thrown && ab.kind === "proc") {
+        lines.push(`×${r.thrown}: times it triggered (passive with a cooldown).`, `${r.hit} of those dealt damage to an enemy hero.`);
+      } else if (r?.thrown) lines.push(`${r.scored} / ${r.thrown}: casts that ${settings.heroesOnly ? "hit an enemy hero" : "hit anything"} (damage or debuff) / all casts (hit window ${Math.max(settings.window, ab.window || 0)} s${ab.window > settings.window ? ", longer for this ability: its effects land late" : ""}).`);
       else lines.push("Not used this match.");
       if (r?.item) lines.push("Active item.");
     }
@@ -91,6 +99,9 @@ export async function viewMatch(id, params) {
     }
     const r = table.find((x) => x.ability.class_name === ab.class_name);
     if (r?.projectiles) return `<span class="ab-stat">${r.projHit}/${r.projectiles}</span>`;
+    const kind = ab.kind || "offensive";
+    if (r?.thrown && kind === "support") return `<span class="ab-stat ab-support">${r.ally}/${r.thrown}</span>`;
+    if (r?.thrown && (kind === "self" || kind === "proc")) return `<span class="ab-stat ab-uses">×${r.thrown}</span>`;
     return r && r.thrown ? `<span class="ab-stat">${r.scored}/${r.thrown}</span>` : `<span class="ab-stat muted">–</span>`;
   }
   // signature-ability accuracy of every player (who hits their skills best this match)
@@ -98,8 +109,8 @@ export async function viewMatch(id, params) {
     let thrown = 0, scored = 0;
     for (const ab of S.assets.signatures(p.hero_id)) {
       const c = counts(analyzeAbility(m, p.pawn, ab, opts()).casts, settings.heroesOnly);
-      // abilities that never connect with anything (buffs, movement) would only add noise
-      if (c.scored + c.other === 0) continue;
+      // only abilities meant to hit enemies (buffs, heals, mobility have no accuracy)
+      if ((ab.kind && ab.kind !== "offensive") || c.scored + c.other === 0) continue;
       thrown += c.thrown; scored += c.scored;
     }
     return [p.pawn, { thrown, scored }];
@@ -289,7 +300,7 @@ export async function viewMatch(id, params) {
     const skill = [];
     for (const ab of S.assets.signatures(p.hero_id)) {
       const cs = analyzeAbility(m, p.pawn, ab, opts()).casts;
-      if (!cs.some((c) => c.result !== "miss")) continue; // never connects: buff / passive
+      if ((ab.kind && ab.kind !== "offensive") || !cs.some((c) => c.result === "hit" || c.result === "other")) continue; // buffs, heals, mobility
       skill.push(...cs);
     }
     skill.sort((a, b) => a.t - b.t);
@@ -972,7 +983,26 @@ export async function viewMatch(id, params) {
     const c = counts(past, settings.heroesOnly);
     const st = spanStats();
     const hitWord = settings.heroesOnly ? "heroes" : "anything";
-    if (c.projectiles != null) $(".tiles", app).innerHTML =
+    const akind = ability.kind || "offensive";
+    const common = tile("K / D / A", st ? `${st[2]}/${st[3]}/${st[4]}` : "–") + tile("Souls", st ? k1(st[0]) : "–") +
+      tile("Ready → recast", c.idle != null ? `${c.idle.toFixed(1)}<small> s</small>` : "–");
+    if (akind === "support" && c.projectiles == null) $(".tiles", app).innerHTML =
+      tile("Uses", c.thrown) +
+      tile("Reached an ally", `${c.ally}<small> / ${c.thrown}</small>`, "good") +
+      tile("Allies helped", c.allyHeroes) +
+      tile("Only on self", c.selfOnly) +
+      tile("Used in a fight", c.thrown ? `${pct(c.inFight / c.thrown)}<small> ${c.inFight}</small>` : "–", "accent") +
+      tile("Hit enemies", c.hit) + common;
+    else if (akind === "self" && c.projectiles == null) $(".tiles", app).innerHTML =
+      tile("Uses", c.thrown) +
+      tile("Used in a fight", c.thrown ? `${pct(c.inFight / c.thrown)}<small> ${c.inFight}</small>` : "–", "accent") +
+      tile("Out of fights", c.thrown - c.inFight) + common +
+      tile("Level", st ? st[1] : "–");
+    else if (akind === "proc" && c.projectiles == null) $(".tiles", app).innerHTML =
+      tile("Triggers", c.thrown) +
+      tile("Damaged an enemy hero", `${c.hit}<small> / ${c.thrown}</small>`, "good") +
+      tile("Damage", k1(c.dmg)) + common;
+    else if (c.projectiles != null) $(".tiles", app).innerHTML =
       tile("Casts", c.thrown) +
       tile(`Bullets fired <small>×${ability.shots} per cast</small>`, c.projectiles) +
       tile(`Bullets hit ${hitWord}`, c.projHit, "good") +
@@ -1018,6 +1048,10 @@ export async function viewMatch(id, params) {
         const dist = k.dist != null ? ` · ${Math.round(k.dist)} m` : "";
         const label = k.result === "hit" ? `hit${k.delay != null ? ` +${k.delay.toFixed(2)}s` : ""}${dist} · ${k.dmg} dmg`
           : k.result === "other" ? `hit non-hero${dist} · ${k.dmg} dmg`
+          : k.result === "ally" ? `on ${k.allies.map((a) => esc(m.byPawn.get(a)?.name || "ally")).join(", ")}${k.onSelf ? " + self" : ""}`
+          : k.result === "self" ? `used${k.inFight ? " · in a fight" : ""}`
+          : ability.kind === "support" ? `no ally reached${k.inFight ? " · in a fight" : ""}`
+          : ability.kind === "self" ? `used${k.inFight ? " · in a fight" : " · out of fights"}`
           : k.aimErr != null ? `miss · ${k.aimErr.toFixed(0)}° off <img src="${esc(S.assets.hero(m.byPawn.get(k.aimPawn)?.hero_id).icon)}" title="${esc(m.byPawn.get(k.aimPawn)?.name)}"> @ ${Math.round(k.aimDist)} m`
           : "miss · no enemy in range";
         const bullets = k.projectiles ? ` · <b>${k.projectiles.filter((p) => p.result === "hit").length}/${k.projectiles.length}</b> bullets hit` : "";

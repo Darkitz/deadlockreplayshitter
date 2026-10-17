@@ -1,0 +1,2102 @@
+{
+ "ability_artist_bamboogrove": {
+  "ally": 0.667,
+  "casts": 18,
+  "enemy": 0.944,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.444,
+  "self": 0.944,
+  "window": 1.5
+ },
+ "ability_artist_homingbrush": {
+  "ally": 0.0,
+  "casts": 181,
+  "enemy": 0.436,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.481,
+  "self": 0.994,
+  "window": 3.1
+ },
+ "ability_artist_rollingprojectile": {
+  "ally": 0.272,
+  "casts": 81,
+  "enemy": 0.259,
+  "kind": "offensive",
+  "none": 0.086,
+  "npc": 0.432,
+  "self": 0.802,
+  "window": 1.1
+ },
+ "ability_artist_tether": {
+  "ally": 0.0,
+  "casts": 59,
+  "enemy": 1.0,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 1.0,
+  "window": 1.0
+ },
+ "ability_baba_bench_run": {
+  "ally": 0.0,
+  "casts": 180,
+  "enemy": 0.328,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.383,
+  "self": 1.0,
+  "window": 6.4
+ },
+ "ability_baba_bubbling_brew": {
+  "ally": 0.0,
+  "casts": 322,
+  "enemy": 0.668,
+  "kind": "offensive",
+  "none": 0.165,
+  "npc": 0.391,
+  "self": 0.596,
+  "window": 1.9
+ },
+ "ability_baba_hexing_brew": {
+  "ally": 0.114,
+  "casts": 184,
+  "enemy": 0.174,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.174,
+  "self": 1.0,
+  "window": 8.5
+ },
+ "ability_baba_ultimate_2": {
+  "ally": 0.0,
+  "casts": 40,
+  "enemy": 0.975,
+  "kind": "offensive",
+  "none": 0.025,
+  "npc": 0.0,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_blood_bomb": {
+  "ally": 0.0,
+  "casts": 1199,
+  "enemy": 0.46,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.586,
+  "self": 1.0,
+  "window": 2.0
+ },
+ "ability_blood_shards": {
+  "ally": 0.0,
+  "casts": 1147,
+  "enemy": 0.526,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.327,
+  "self": 1.0,
+  "window": 1.0
+ },
+ "ability_bookworm_aoemagic": {
+  "ally": 0.0,
+  "casts": 439,
+  "enemy": 0.679,
+  "kind": "offensive",
+  "none": 0.178,
+  "npc": 0.289,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_bookworm_dragonfire": {
+  "ally": 0.0,
+  "casts": 737,
+  "enemy": 0.431,
+  "kind": "offensive",
+  "none": 0.161,
+  "npc": 0.578,
+  "self": 0.0,
+  "window": 3.2
+ },
+ "ability_bookworm_knightbarrier": {
+  "ally": 0.611,
+  "casts": 301,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.04,
+  "npc": 0.0,
+  "self": 0.651,
+  "window": null
+ },
+ "ability_bookworm_knightcharge": {
+  "ally": 0.727,
+  "casts": 77,
+  "enemy": 0.753,
+  "kind": "offensive",
+  "none": 0.026,
+  "npc": 0.377,
+  "self": 0.922,
+  "window": 1.9
+ },
+ "ability_bounce_pad": {
+  "ally": 0.155,
+  "casts": 413,
+  "enemy": 0.186,
+  "kind": "offensive",
+  "none": 0.053,
+  "npc": 0.102,
+  "self": 0.939,
+  "window": 4.4
+ },
+ "ability_bullet_flurry": {
+  "ally": 0.0,
+  "casts": 146,
+  "enemy": 0.973,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.24,
+  "self": 0.952,
+  "window": 1.0
+ },
+ "ability_burrow": {
+  "ally": 0.0,
+  "casts": 201,
+  "enemy": 0.562,
+  "kind": "offensive",
+  "none": 0.005,
+  "npc": 0.279,
+  "self": 0.99,
+  "window": 6.0
+ },
+ "ability_charged_shot": {
+  "ally": 0.0,
+  "casts": 286,
+  "enemy": 0.458,
+  "kind": "offensive",
+  "none": 0.185,
+  "npc": 0.241,
+  "self": 0.301,
+  "window": 1.0
+ },
+ "ability_chessmaster_forkpiece": {
+  "ally": 0.0,
+  "casts": 162,
+  "enemy": 0.475,
+  "kind": "offensive",
+  "none": 0.272,
+  "npc": 0.389,
+  "self": 0.0,
+  "window": 3.0
+ },
+ "ability_chessmaster_knightbuff": {
+  "ally": 0.321,
+  "casts": 106,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.019,
+  "npc": 0.0,
+  "self": 0.66,
+  "window": null
+ },
+ "ability_chessmaster_queen": {
+  "ally": 0.0,
+  "casts": 28,
+  "enemy": 0.893,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.679,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_chessmaster_throwbishop": {
+  "ally": 0.0,
+  "casts": 246,
+  "enemy": 0.366,
+  "kind": "offensive",
+  "none": 0.366,
+  "npc": 0.557,
+  "self": 0.0,
+  "window": 10.6
+ },
+ "ability_deadpack_chargeblast": {
+  "ally": 0.0,
+  "casts": 1154,
+  "enemy": 0.314,
+  "kind": "offensive",
+  "none": 0.592,
+  "npc": 0.171,
+  "self": 0.0,
+  "window": 1.6
+ },
+ "ability_deadpack_flamethrower": {
+  "ally": 0.0,
+  "casts": 573,
+  "enemy": 0.696,
+  "kind": "offensive",
+  "none": 0.047,
+  "npc": 0.283,
+  "self": 0.45,
+  "window": 1.0
+ },
+ "ability_deadpack_rocketeer": {
+  "ally": 0.0,
+  "casts": 268,
+  "enemy": 0.612,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.168,
+  "self": 1.0,
+  "window": 1.4
+ },
+ "ability_deadpack_ultimate": {
+  "ally": 0.0,
+  "casts": 66,
+  "enemy": 0.879,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 1.0,
+  "window": 1.0
+ },
+ "ability_doorman_bomb": {
+  "ally": 0.0,
+  "casts": 1056,
+  "enemy": 0.554,
+  "kind": "offensive",
+  "none": 0.131,
+  "npc": 0.473,
+  "self": 0.0,
+  "window": 1.3
+ },
+ "ability_doorman_doorway": {
+  "ally": 0.028,
+  "casts": 429,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.751,
+  "npc": 0.0,
+  "self": 0.247,
+  "window": null
+ },
+ "ability_doorman_hotel": {
+  "ally": 0.0,
+  "casts": 101,
+  "enemy": 0.99,
+  "kind": "offensive",
+  "none": 0.01,
+  "npc": 0.0,
+  "self": 0.96,
+  "window": 1.0
+ },
+ "ability_doorman_luggage_cart": {
+  "ally": 0.0,
+  "casts": 281,
+  "enemy": 0.626,
+  "kind": "offensive",
+  "none": 0.374,
+  "npc": 0.0,
+  "self": 0.0,
+  "window": 1.1
+ },
+ "ability_explosive_barrel": {
+  "ally": 0.0,
+  "casts": 994,
+  "enemy": 0.439,
+  "kind": "offensive",
+  "none": 0.276,
+  "npc": 0.351,
+  "self": 0.0,
+  "window": 1.2
+ },
+ "ability_familiar_ability01": {
+  "ally": 0.0,
+  "casts": 140,
+  "enemy": 0.971,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.193,
+  "self": 0.986,
+  "window": 1.0
+ },
+ "ability_familiar_ability02": {
+  "ally": 0.0,
+  "casts": 1235,
+  "enemy": 0.457,
+  "kind": "offensive",
+  "none": 0.212,
+  "npc": 0.432,
+  "self": 0.0,
+  "window": 1.4
+ },
+ "ability_familiar_attach": {
+  "ally": 0.968,
+  "casts": 401,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.002,
+  "npc": 0.0,
+  "self": 0.998,
+  "window": null
+ },
+ "ability_familiar_helpinghands": {
+  "ally": 0.302,
+  "casts": 1220,
+  "enemy": 0.183,
+  "kind": "offensive",
+  "none": 0.254,
+  "npc": 0.457,
+  "self": 0.0,
+  "window": 12.8
+ },
+ "ability_fencer_lunge": {
+  "ally": 0.0,
+  "casts": 986,
+  "enemy": 0.424,
+  "kind": "offensive",
+  "none": 0.114,
+  "npc": 0.241,
+  "self": 0.697,
+  "window": 1.6
+ },
+ "ability_fencer_riposte": {
+  "ally": 0.0,
+  "casts": 198,
+  "enemy": 0.293,
+  "kind": "offensive",
+  "none": 0.086,
+  "npc": 0.0,
+  "self": 0.909,
+  "window": 1.6
+ },
+ "ability_fencer_throwblade": {
+  "ally": 0.0,
+  "casts": 554,
+  "enemy": 0.498,
+  "kind": "offensive",
+  "none": 0.06,
+  "npc": 0.475,
+  "self": 0.572,
+  "window": 1.0
+ },
+ "ability_fencer_ultimate": {
+  "ally": 0.0,
+  "casts": 70,
+  "enemy": 0.829,
+  "kind": "offensive",
+  "none": 0.014,
+  "npc": 0.343,
+  "self": 0.986,
+  "window": 1.0
+ },
+ "ability_fire_bomb": {
+  "ally": 0.0,
+  "casts": 74,
+  "enemy": 0.608,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.284,
+  "self": 0.986,
+  "window": 3.8
+ },
+ "ability_flame_dash": {
+  "ally": 0.0,
+  "casts": 390,
+  "enemy": 0.546,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.597,
+  "self": 0.992,
+  "window": 3.0
+ },
+ "ability_frank_painaura": {
+  "ally": 0.0,
+  "casts": 799,
+  "enemy": 0.258,
+  "kind": "offensive",
+  "none": 0.011,
+  "npc": 0.388,
+  "self": 0.989,
+  "window": 1.8
+ },
+ "ability_frank_selfzap": {
+  "ally": 0.0,
+  "casts": 448,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.007,
+  "npc": 0.0,
+  "self": 0.993,
+  "window": null
+ },
+ "ability_frank_shocktarget2": {
+  "ally": 0.0,
+  "casts": 394,
+  "enemy": 0.647,
+  "kind": "offensive",
+  "none": 0.071,
+  "npc": 0.251,
+  "self": 0.632,
+  "window": 1.0
+ },
+ "ability_gravity_lasso": {
+  "ally": 0.0,
+  "casts": 81,
+  "enemy": 0.58,
+  "kind": "offensive",
+  "none": 0.42,
+  "npc": 0.0,
+  "self": 0.543,
+  "window": 1.0
+ },
+ "ability_guided_arrow": {
+  "ally": 0.0,
+  "casts": 19,
+  "enemy": 1.0,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.263,
+  "self": 0.895,
+  "window": 1.0
+ },
+ "ability_health_swap": {
+  "ally": 0.0,
+  "casts": 47,
+  "enemy": 0.979,
+  "kind": "offensive",
+  "none": 0.021,
+  "npc": 0.0,
+  "self": 0.447,
+  "window": 1.0
+ },
+ "ability_ice_dome": {
+  "ally": 0.617,
+  "casts": 47,
+  "enemy": 0.723,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 1.0,
+  "window": 1.0
+ },
+ "ability_ice_grenade": {
+  "ally": 0.0,
+  "casts": 657,
+  "enemy": 0.381,
+  "kind": "offensive",
+  "none": 0.237,
+  "npc": 0.457,
+  "self": 0.0,
+  "window": 1.2
+ },
+ "ability_icebeam": {
+  "ally": 0.0,
+  "casts": 258,
+  "enemy": 0.748,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.516,
+  "self": 0.934,
+  "window": 1.0
+ },
+ "ability_icepath": {
+  "ally": 0.646,
+  "casts": 223,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.009,
+  "npc": 0.0,
+  "self": 0.987,
+  "window": null
+ },
+ "ability_immobilize_trap": {
+  "ally": 0.0,
+  "casts": 69,
+  "enemy": 0.406,
+  "kind": "offensive",
+  "none": 0.594,
+  "npc": 0.043,
+  "self": 0.0,
+  "window": 12.4
+ },
+ "ability_incendiary_projectile": {
+  "ally": 0.0,
+  "casts": 442,
+  "enemy": 0.419,
+  "kind": "offensive",
+  "none": 0.215,
+  "npc": 0.419,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_intimidate": {
+  "ally": 0.0,
+  "casts": 523,
+  "enemy": 0.623,
+  "kind": "offensive",
+  "none": 0.033,
+  "npc": 0.671,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_lash_flog": {
+  "ally": 0.0,
+  "casts": 1081,
+  "enemy": 0.623,
+  "kind": "offensive",
+  "none": 0.054,
+  "npc": 0.568,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_life_drain": {
+  "ally": 0.0,
+  "casts": 377,
+  "enemy": 0.729,
+  "kind": "offensive",
+  "none": 0.008,
+  "npc": 0.268,
+  "self": 0.947,
+  "window": 1.0
+ },
+ "ability_magician_animalhexarea": {
+  "ally": 0.0,
+  "casts": 104,
+  "enemy": 0.625,
+  "kind": "offensive",
+  "none": 0.375,
+  "npc": 0.019,
+  "self": 0.0,
+  "window": 1.4
+ },
+ "ability_magician_cloneturret": {
+  "ally": 0.0,
+  "casts": 154,
+  "enemy": 0.584,
+  "kind": "offensive",
+  "none": 0.006,
+  "npc": 0.506,
+  "self": 0.974,
+  "window": 3.8
+ },
+ "ability_magician_copyult": {
+  "ally": 0.0,
+  "casts": 41,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.098,
+  "npc": 0.0,
+  "self": 0.902,
+  "window": null
+ },
+ "ability_magician_magicbolt": {
+  "ally": 0.0,
+  "casts": 365,
+  "enemy": 0.422,
+  "kind": "offensive",
+  "none": 0.279,
+  "npc": 0.359,
+  "self": 0.0,
+  "window": 2.0
+ },
+ "ability_nano_catform": {
+  "ally": 0.0,
+  "casts": 257,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.008,
+  "npc": 0.0,
+  "self": 0.992,
+  "window": null
+ },
+ "ability_nano_clustergrenade": {
+  "ally": 0.0,
+  "casts": 482,
+  "enemy": 0.448,
+  "kind": "offensive",
+  "none": 0.247,
+  "npc": 0.344,
+  "self": 0.0,
+  "window": 1.3
+ },
+ "ability_nano_dash": {
+  "ally": 0.0,
+  "casts": 480,
+  "enemy": 0.512,
+  "kind": "offensive",
+  "none": 0.298,
+  "npc": 0.229,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_nano_shadow_pulse": {
+  "ally": 0.0,
+  "casts": 92,
+  "enemy": 0.815,
+  "kind": "offensive",
+  "none": 0.011,
+  "npc": 0.239,
+  "self": 0.957,
+  "window": 1.0
+ },
+ "ability_necro_gravestone": {
+  "ally": 0.0,
+  "casts": 173,
+  "enemy": 0.543,
+  "kind": "offensive",
+  "none": 0.439,
+  "npc": 0.168,
+  "self": 0.0,
+  "window": 12.0
+ },
+ "ability_necro_hauntingskull": {
+  "ally": 0.0,
+  "casts": 656,
+  "enemy": 0.604,
+  "kind": "offensive",
+  "none": 0.107,
+  "npc": 0.511,
+  "self": 0.027,
+  "window": 3.5
+ },
+ "ability_necro_zombiewall": {
+  "ally": 0.0,
+  "casts": 318,
+  "enemy": 0.384,
+  "kind": "offensive",
+  "none": 0.44,
+  "npc": 0.277,
+  "self": 0.0,
+  "window": 5.3
+ },
+ "ability_power_jump": {
+  "ally": 0.0,
+  "casts": 43,
+  "enemy": 0.326,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 1.0,
+  "window": 3.9
+ },
+ "ability_power_surge": {
+  "ally": 0.0,
+  "casts": 393,
+  "enemy": 0.616,
+  "kind": "offensive",
+  "none": 0.005,
+  "npc": 0.7,
+  "self": 0.992,
+  "window": 5.2
+ },
+ "ability_priest_beartrap": {
+  "ally": 0.0,
+  "casts": 866,
+  "enemy": 0.196,
+  "kind": "offensive",
+  "none": 0.798,
+  "npc": 0.016,
+  "self": 0.0,
+  "window": 10.0
+ },
+ "ability_priest_flashbang": {
+  "ally": 0.0,
+  "casts": 1168,
+  "enemy": 0.4,
+  "kind": "offensive",
+  "none": 0.268,
+  "npc": 0.497,
+  "self": 0.0,
+  "window": 1.4
+ },
+ "ability_priest_knockback": {
+  "ally": 0.0,
+  "casts": 535,
+  "enemy": 0.697,
+  "kind": "offensive",
+  "none": 0.183,
+  "npc": 0.176,
+  "self": 0.097,
+  "window": 1.0
+ },
+ "ability_priest_weaponswap": {
+  "ally": 0.0,
+  "casts": 146,
+  "enemy": 0.719,
+  "kind": "offensive",
+  "none": 0.027,
+  "npc": 0.164,
+  "self": 0.959,
+  "window": 5.2
+ },
+ "ability_punkgoat_blasted": {
+  "ally": 0.0,
+  "casts": 193,
+  "enemy": 0.725,
+  "kind": "offensive",
+  "none": 0.005,
+  "npc": 0.088,
+  "self": 0.995,
+  "window": 4.5
+ },
+ "ability_punkgoat_goatflip": {
+  "ally": 0.0,
+  "casts": 292,
+  "enemy": 0.452,
+  "kind": "offensive",
+  "none": 0.01,
+  "npc": 0.034,
+  "self": 0.925,
+  "window": 1.0
+ },
+ "ability_punkgoat_tether": {
+  "ally": 0.0,
+  "casts": 94,
+  "enemy": 0.979,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 0.957,
+  "window": 1.2
+ },
+ "ability_punkgoat_ult": {
+  "ally": 0.0,
+  "casts": 526,
+  "enemy": 0.629,
+  "kind": "offensive",
+  "none": 0.101,
+  "npc": 0.392,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_ratking_ratarmor": {
+  "ally": 0.0,
+  "casts": 314,
+  "enemy": 0.385,
+  "kind": "offensive",
+  "none": 0.006,
+  "npc": 0.169,
+  "self": 0.99,
+  "window": 4.4
+ },
+ "ability_ratking_ratnibble": {
+  "ally": 0.0,
+  "casts": 358,
+  "enemy": 0.601,
+  "kind": "offensive",
+  "none": 0.223,
+  "npc": 0.372,
+  "self": 0.0,
+  "window": 2.3
+ },
+ "ability_ratking_scrap_grenade": {
+  "ally": 0.0,
+  "casts": 490,
+  "enemy": 0.512,
+  "kind": "offensive",
+  "none": 0.124,
+  "npc": 0.665,
+  "self": 0.0,
+  "window": 4.2
+ },
+ "ability_ratking_standard_bearer": {
+  "ally": 0.768,
+  "casts": 56,
+  "enemy": 0.821,
+  "kind": "offensive",
+  "none": 0.054,
+  "npc": 0.536,
+  "self": 0.929,
+  "window": 6.5
+ },
+ "ability_sleep_dagger": {
+  "ally": 0.0,
+  "casts": 539,
+  "enemy": 0.518,
+  "kind": "offensive",
+  "none": 0.312,
+  "npc": 0.174,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_smoke_bomb": {
+  "ally": 0.0,
+  "casts": 501,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.01,
+  "npc": 0.0,
+  "self": 0.99,
+  "window": null
+ },
+ "ability_throw_sand": {
+  "ally": 0.0,
+  "casts": 174,
+  "enemy": 0.856,
+  "kind": "offensive",
+  "none": 0.115,
+  "npc": 0.161,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_ult_combo": {
+  "ally": 0.0,
+  "casts": 79,
+  "enemy": 1.0,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 1.0,
+  "window": 1.0
+ },
+ "ability_unicorn_dazzlingorb": {
+  "ally": 0.0,
+  "casts": 155,
+  "enemy": 0.813,
+  "kind": "offensive",
+  "none": 0.006,
+  "npc": 0.387,
+  "self": 0.929,
+  "window": 1.0
+ },
+ "ability_unicorn_luminousstrike": {
+  "ally": 0.0,
+  "casts": 1453,
+  "enemy": 0.354,
+  "kind": "offensive",
+  "none": 0.299,
+  "npc": 0.425,
+  "self": 0.308,
+  "window": 1.9
+ },
+ "ability_unicorn_prismaticguard": {
+  "ally": 0.0,
+  "casts": 467,
+  "enemy": 0.381,
+  "kind": "offensive",
+  "none": 0.024,
+  "npc": 0.135,
+  "self": 0.953,
+  "window": 3.7
+ },
+ "ability_unicorn_radiantblast": {
+  "ally": 0.0,
+  "casts": 1030,
+  "enemy": 0.611,
+  "kind": "offensive",
+  "none": 0.068,
+  "npc": 0.515,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_vampirebat_batblink": {
+  "ally": 0.0,
+  "casts": 180,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.006,
+  "npc": 0.0,
+  "self": 0.994,
+  "window": null
+ },
+ "ability_vampirebat_batswarm": {
+  "ally": 0.0,
+  "casts": 82,
+  "enemy": 0.939,
+  "kind": "offensive",
+  "none": 0.012,
+  "npc": 0.427,
+  "self": 0.0,
+  "window": 1.3
+ },
+ "ability_vampirebat_steallife": {
+  "ally": 0.0,
+  "casts": 694,
+  "enemy": 0.402,
+  "kind": "offensive",
+  "none": 0.037,
+  "npc": 0.684,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_viper_debuffdagger": {
+  "ally": 0.0,
+  "casts": 206,
+  "enemy": 0.597,
+  "kind": "offensive",
+  "none": 0.238,
+  "npc": 0.18,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_viper_petrifybola": {
+  "ally": 0.0,
+  "casts": 43,
+  "enemy": 0.767,
+  "kind": "offensive",
+  "none": 0.186,
+  "npc": 0.116,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_viper_venom": {
+  "ally": 0.0,
+  "casts": 68,
+  "enemy": 0.941,
+  "kind": "offensive",
+  "none": 0.015,
+  "npc": 0.044,
+  "self": 0.191,
+  "window": 1.0
+ },
+ "ability_warden_crowd_control": {
+  "ally": 0.0,
+  "casts": 541,
+  "enemy": 0.436,
+  "kind": "offensive",
+  "none": 0.211,
+  "npc": 0.44,
+  "self": 0.0,
+  "window": 1.3
+ },
+ "ability_warden_high_alert": {
+  "ally": 0.0,
+  "casts": 165,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.055,
+  "npc": 0.0,
+  "self": 0.945,
+  "window": null
+ },
+ "ability_warden_lock_down": {
+  "ally": 0.0,
+  "casts": 114,
+  "enemy": 0.974,
+  "kind": "offensive",
+  "none": 0.026,
+  "npc": 0.0,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_warden_riot_protocol": {
+  "ally": 0.0,
+  "casts": 30,
+  "enemy": 0.933,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.667,
+  "self": 1.0,
+  "window": 1.0
+ },
+ "ability_werewolf_cripplingslash": {
+  "ally": 0.0,
+  "casts": 39,
+  "enemy": 0.795,
+  "kind": "offensive",
+  "none": 0.205,
+  "npc": 0.0,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_werewolf_frenzy": {
+  "ally": 0.0,
+  "casts": 61,
+  "enemy": 0.656,
+  "kind": "offensive",
+  "none": 0.213,
+  "npc": 0.23,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_werewolf_kickflip": {
+  "ally": 0.0,
+  "casts": 400,
+  "enemy": 0.407,
+  "kind": "offensive",
+  "none": 0.02,
+  "npc": 0.065,
+  "self": 0.98,
+  "window": 1.0
+ },
+ "ability_werewolf_maulingleap": {
+  "ally": 0.0,
+  "casts": 58,
+  "enemy": 0.534,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 0.862,
+  "window": 1.0
+ },
+ "ability_werewolf_netshot": {
+  "ally": 0.0,
+  "casts": 472,
+  "enemy": 0.559,
+  "kind": "offensive",
+  "none": 0.337,
+  "npc": 0.119,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "ability_werewolf_transformation": {
+  "ally": 0.0,
+  "casts": 109,
+  "enemy": 0.174,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 1.0,
+  "window": 8.3
+ },
+ "ability_werewolf_unloadgun": {
+  "ally": 0.0,
+  "casts": 667,
+  "enemy": 0.561,
+  "kind": "offensive",
+  "none": 0.09,
+  "npc": 0.285,
+  "self": 0.498,
+  "window": 1.4
+ },
+ "citadel_ability_bebop_laser_beam": {
+  "ally": 0.0,
+  "casts": 157,
+  "enemy": 0.892,
+  "kind": "offensive",
+  "none": 0.025,
+  "npc": 0.516,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "citadel_ability_bull_charge": {
+  "ally": 0.0,
+  "casts": 423,
+  "enemy": 0.638,
+  "kind": "offensive",
+  "none": 0.002,
+  "npc": 0.109,
+  "self": 0.986,
+  "window": 1.1
+ },
+ "citadel_ability_bull_heal": {
+  "ally": 0.0,
+  "casts": 401,
+  "enemy": 0.691,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.531,
+  "self": 0.998,
+  "window": 1.0
+ },
+ "citadel_ability_bull_leap": {
+  "ally": 0.0,
+  "casts": 92,
+  "enemy": 0.554,
+  "kind": "offensive",
+  "none": 0.011,
+  "npc": 0.207,
+  "self": 0.989,
+  "window": 4.0
+ },
+ "citadel_ability_card_toss": {
+  "ally": 0.0,
+  "casts": 933,
+  "enemy": 0.499,
+  "kind": "offensive",
+  "none": 0.206,
+  "npc": 0.328,
+  "self": 0.021,
+  "window": 1.3
+ },
+ "citadel_ability_chrono_kinetic_carbine": {
+  "ally": 0.0,
+  "casts": 632,
+  "enemy": 0.527,
+  "kind": "offensive",
+  "none": 0.011,
+  "npc": 0.13,
+  "self": 0.986,
+  "window": 4.6
+ },
+ "citadel_ability_chrono_pulse_grenade": {
+  "ally": 0.0,
+  "casts": 626,
+  "enemy": 0.527,
+  "kind": "offensive",
+  "none": 0.166,
+  "npc": 0.49,
+  "self": 0.0,
+  "window": 1.8
+ },
+ "citadel_ability_chrono_swap": {
+  "ally": 0.0,
+  "casts": 156,
+  "enemy": 0.731,
+  "kind": "offensive",
+  "none": 0.269,
+  "npc": 0.0,
+  "self": 0.718,
+  "window": 1.0
+ },
+ "citadel_ability_chrono_time_wall": {
+  "ally": 0.0,
+  "casts": 346,
+  "enemy": 0.396,
+  "kind": "offensive",
+  "none": 0.598,
+  "npc": 0.014,
+  "self": 0.0,
+  "window": 3.1
+ },
+ "citadel_ability_fissure_wall": {
+  "ally": 0.0,
+  "casts": 37,
+  "enemy": 0.73,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.216,
+  "self": 0.946,
+  "window": 1.8
+ },
+ "citadel_ability_flying_strike": {
+  "ally": 0.026,
+  "casts": 416,
+  "enemy": 0.875,
+  "kind": "offensive",
+  "none": 0.024,
+  "npc": 0.048,
+  "self": 0.786,
+  "window": 1.2
+ },
+ "citadel_ability_healing_slash": {
+  "ally": 0.0,
+  "casts": 542,
+  "enemy": 0.642,
+  "kind": "offensive",
+  "none": 0.079,
+  "npc": 0.432,
+  "self": 0.773,
+  "window": 1.0
+ },
+ "citadel_ability_hook": {
+  "ally": 0.025,
+  "casts": 734,
+  "enemy": 0.474,
+  "kind": "offensive",
+  "none": 0.019,
+  "npc": 0.005,
+  "self": 0.97,
+  "window": 1.0
+ },
+ "citadel_ability_hornet_chain": {
+  "ally": 0.0,
+  "casts": 453,
+  "enemy": 0.649,
+  "kind": "offensive",
+  "none": 0.221,
+  "npc": 0.291,
+  "self": 0.0,
+  "window": 1.4
+ },
+ "citadel_ability_hornet_leap": {
+  "ally": 0.0,
+  "casts": 326,
+  "enemy": 0.73,
+  "kind": "offensive",
+  "none": 0.006,
+  "npc": 0.255,
+  "self": 0.945,
+  "window": 5.1
+ },
+ "citadel_ability_hornet_snipe": {
+  "ally": 0.0,
+  "casts": 390,
+  "enemy": 0.915,
+  "kind": "offensive",
+  "none": 0.038,
+  "npc": 0.077,
+  "self": 0.538,
+  "window": 2.7
+ },
+ "citadel_ability_hornet_sting": {
+  "ally": 0.0,
+  "casts": 567,
+  "enemy": 0.593,
+  "kind": "offensive",
+  "none": 0.228,
+  "npc": 0.265,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "citadel_ability_infinity_slash": {
+  "ally": 0.0,
+  "casts": 74,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 1.0,
+  "window": null
+ },
+ "citadel_ability_lash": {
+  "ally": 0.0,
+  "casts": 830,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.589,
+  "npc": 0.0,
+  "self": 0.411,
+  "window": null
+ },
+ "citadel_ability_lash_down_strike": {
+  "ally": 0.0,
+  "casts": 1002,
+  "enemy": 0.511,
+  "kind": "offensive",
+  "none": 0.019,
+  "npc": 0.454,
+  "self": 0.809,
+  "window": 1.1
+ },
+ "citadel_ability_lash_ultimate": {
+  "ally": 0.0,
+  "casts": 140,
+  "enemy": 0.979,
+  "kind": "offensive",
+  "none": 0.021,
+  "npc": 0.15,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "citadel_ability_lightning_ball": {
+  "ally": 0.0,
+  "casts": 861,
+  "enemy": 0.444,
+  "kind": "offensive",
+  "none": 0.089,
+  "npc": 0.634,
+  "self": 0.0,
+  "window": 1.6
+ },
+ "citadel_ability_mobile_resupply": {
+  "ally": 0.522,
+  "casts": 46,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 0.913,
+  "window": null
+ },
+ "citadel_ability_nikuman": {
+  "ally": 0.64,
+  "casts": 258,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.008,
+  "npc": 0.0,
+  "self": 0.992,
+  "window": null
+ },
+ "citadel_ability_power_slash": {
+  "ally": 0.0,
+  "casts": 485,
+  "enemy": 0.536,
+  "kind": "offensive",
+  "none": 0.097,
+  "npc": 0.464,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "citadel_ability_projectmind": {
+  "ally": 0.0,
+  "casts": 171,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.351,
+  "npc": 0.0,
+  "self": 0.649,
+  "window": null
+ },
+ "citadel_ability_psychic_lift": {
+  "ally": 0.0,
+  "casts": 86,
+  "enemy": 0.942,
+  "kind": "offensive",
+  "none": 0.058,
+  "npc": 0.0,
+  "self": 0.0,
+  "window": 1.2
+ },
+ "citadel_ability_rocket_barrage": {
+  "ally": 0.0,
+  "casts": 18,
+  "enemy": 0.944,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.722,
+  "self": 1.0,
+  "window": 1.6
+ },
+ "citadel_ability_self_vacuum": {
+  "ally": 0.0,
+  "casts": 63,
+  "enemy": 0.889,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.286,
+  "self": 0.952,
+  "window": 1.0
+ },
+ "citadel_ability_shieldedsentry": {
+  "ally": 0.0,
+  "casts": 178,
+  "enemy": 0.522,
+  "kind": "offensive",
+  "none": 0.118,
+  "npc": 0.556,
+  "self": 0.0,
+  "window": 4.1
+ },
+ "citadel_ability_shiv_dagger": {
+  "ally": 0.0,
+  "casts": 666,
+  "enemy": 0.644,
+  "kind": "offensive",
+  "none": 0.234,
+  "npc": 0.147,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "citadel_ability_shiv_dash": {
+  "ally": 0.0,
+  "casts": 393,
+  "enemy": 0.489,
+  "kind": "offensive",
+  "none": 0.003,
+  "npc": 0.374,
+  "self": 0.964,
+  "window": 1.0
+ },
+ "citadel_ability_shiv_defer_damage": {
+  "ally": 0.0,
+  "casts": 103,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.32,
+  "npc": 0.0,
+  "self": 0.68,
+  "window": null
+ },
+ "citadel_ability_shiv_killing_blow": {
+  "ally": 0.0,
+  "casts": 53,
+  "enemy": 0.698,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.019,
+  "self": 0.925,
+  "window": 1.0
+ },
+ "citadel_ability_static_charge": {
+  "ally": 0.0,
+  "casts": 322,
+  "enemy": 0.994,
+  "kind": "offensive",
+  "none": 0.006,
+  "npc": 0.0,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "citadel_ability_sticky_bomb": {
+  "ally": 0.022,
+  "casts": 1106,
+  "enemy": 0.571,
+  "kind": "offensive",
+  "none": 0.063,
+  "npc": 0.439,
+  "self": 0.19,
+  "window": 1.0
+ },
+ "citadel_ability_stomp": {
+  "ally": 0.0,
+  "casts": 913,
+  "enemy": 0.475,
+  "kind": "offensive",
+  "none": 0.145,
+  "npc": 0.559,
+  "self": 0.0,
+  "window": 1.1
+ },
+ "citadel_ability_storm_cloud": {
+  "ally": 0.0,
+  "casts": 80,
+  "enemy": 0.975,
+  "kind": "offensive",
+  "none": 0.013,
+  "npc": 0.738,
+  "self": 0.963,
+  "window": 1.1
+ },
+ "citadel_ability_tangotether": {
+  "ally": 0.703,
+  "casts": 128,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.008,
+  "npc": 0.0,
+  "self": 0.992,
+  "window": null
+ },
+ "citadel_ability_tengu_airlift": {
+  "ally": 0.171,
+  "casts": 76,
+  "enemy": 0.605,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.447,
+  "self": 1.0,
+  "window": 10.5
+ },
+ "citadel_ability_tengu_stone_form": {
+  "ally": 0.0,
+  "casts": 181,
+  "enemy": 0.459,
+  "kind": "offensive",
+  "none": 0.436,
+  "npc": 0.155,
+  "self": 0.0,
+  "window": 1.9
+ },
+ "citadel_ability_tengu_urn": {
+  "ally": 0.0,
+  "casts": 509,
+  "enemy": 0.473,
+  "kind": "offensive",
+  "none": 0.122,
+  "npc": 0.595,
+  "self": 0.0,
+  "window": 1.5
+ },
+ "citadel_ability_uppercut": {
+  "ally": 0.033,
+  "casts": 698,
+  "enemy": 0.609,
+  "kind": "offensive",
+  "none": 0.143,
+  "npc": 0.458,
+  "self": 0.284,
+  "window": 1.0
+ },
+ "citadel_ability_void_sphere": {
+  "ally": 0.183,
+  "casts": 186,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.011,
+  "npc": 0.0,
+  "self": 0.984,
+  "window": null
+ },
+ "citadel_ability_wraith_rapidfire": {
+  "ally": 0.102,
+  "casts": 303,
+  "enemy": 0.512,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.614,
+  "self": 0.97,
+  "window": 1.4
+ },
+ "drifter_blood_blast": {
+  "ally": 0.0,
+  "casts": 821,
+  "enemy": 0.611,
+  "kind": "offensive",
+  "none": 0.082,
+  "npc": 0.462,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "drifter_darkness": {
+  "ally": 0.635,
+  "casts": 156,
+  "enemy": 0.987,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.083,
+  "self": 0.994,
+  "window": 1.0
+ },
+ "drifter_shadow_mark": {
+  "ally": 0.0,
+  "casts": 645,
+  "enemy": 0.487,
+  "kind": "offensive",
+  "none": 0.448,
+  "npc": 0.062,
+  "self": 0.064,
+  "window": 1.0
+ },
+ "mirage_fire_beetles": {
+  "ally": 0.0,
+  "casts": 228,
+  "enemy": 0.61,
+  "kind": "offensive",
+  "none": 0.167,
+  "npc": 0.206,
+  "self": 0.197,
+  "window": 1.0
+ },
+ "mirage_sand_phantom": {
+  "ally": 0.0,
+  "casts": 248,
+  "enemy": 0.758,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.468,
+  "self": 0.109,
+  "window": 1.0
+ },
+ "mirage_teleport": {
+  "ally": 0.0,
+  "casts": 24,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.625,
+  "npc": 0.0,
+  "self": 0.375,
+  "window": null
+ },
+ "mirage_tornado": {
+  "ally": 0.0,
+  "casts": 117,
+  "enemy": 0.598,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.171,
+  "self": 0.983,
+  "window": 1.0
+ },
+ "synth_affliction": {
+  "ally": 0.0,
+  "casts": 100,
+  "enemy": 0.92,
+  "kind": "offensive",
+  "none": 0.06,
+  "npc": 0.28,
+  "self": 0.0,
+  "window": 1.0
+ },
+ "synth_barrage": {
+  "ally": 0.0,
+  "casts": 431,
+  "enemy": 0.643,
+  "kind": "offensive",
+  "none": 0.002,
+  "npc": 0.647,
+  "self": 0.991,
+  "window": 1.4
+ },
+ "synth_plasma_flux": {
+  "ally": 0.0,
+  "casts": 624,
+  "enemy": 0.407,
+  "kind": "offensive",
+  "none": 0.059,
+  "npc": 0.532,
+  "self": 0.641,
+  "window": 1.7
+ },
+ "synth_pulse": {
+  "ally": 0.0,
+  "casts": 586,
+  "enemy": 0.486,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.544,
+  "self": 1.0,
+  "window": 1.8
+ },
+ "upgrade_ability_power_shard": {
+  "ally": 0.0,
+  "casts": 224,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.888,
+  "npc": 0.0,
+  "self": 0.112,
+  "window": null
+ },
+ "upgrade_ability_refresher": {
+  "ally": 0.0,
+  "casts": 39,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.897,
+  "npc": 0.0,
+  "self": 0.103,
+  "window": null
+ },
+ "upgrade_aoe_root": {
+  "ally": 0.0,
+  "casts": 107,
+  "enemy": 0.85,
+  "kind": "offensive",
+  "none": 0.131,
+  "npc": 0.0,
+  "self": 0.103,
+  "window": 1.1
+ },
+ "upgrade_arctic_blast": {
+  "ally": 0.0,
+  "casts": 220,
+  "enemy": 0.618,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.464,
+  "self": 0.959,
+  "window": 1.0
+ },
+ "upgrade_blood_tribute": {
+  "ally": 0.0,
+  "casts": 136,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.118,
+  "npc": 0.0,
+  "self": 0.882,
+  "window": null
+ },
+ "upgrade_capacitor": {
+  "ally": 0.0,
+  "casts": 101,
+  "enemy": 0.881,
+  "kind": "offensive",
+  "none": 0.04,
+  "npc": 0.594,
+  "self": 0.921,
+  "window": 1.7
+ },
+ "upgrade_cloaking_device_active": {
+  "ally": 0.0,
+  "casts": 65,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 1.0,
+  "window": null
+ },
+ "upgrade_cold_front": {
+  "ally": 0.0,
+  "casts": 959,
+  "enemy": 0.504,
+  "kind": "offensive",
+  "none": 0.005,
+  "npc": 0.442,
+  "self": 0.973,
+  "window": 1.0
+ },
+ "upgrade_colossus": {
+  "ally": 0.0,
+  "casts": 80,
+  "enemy": 0.85,
+  "kind": "offensive",
+  "none": 0.013,
+  "npc": 0.0,
+  "self": 0.988,
+  "window": 1.0
+ },
+ "upgrade_containment": {
+  "ally": 0.0,
+  "casts": 543,
+  "enemy": 0.945,
+  "kind": "offensive",
+  "none": 0.048,
+  "npc": 0.0,
+  "self": 0.118,
+  "window": 1.0
+ },
+ "upgrade_discord": {
+  "ally": 0.348,
+  "casts": 66,
+  "enemy": 0.803,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.485,
+  "self": 0.697,
+  "window": 3.3
+ },
+ "upgrade_divine_barrier": {
+  "ally": 0.729,
+  "casts": 118,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.025,
+  "npc": 0.0,
+  "self": 0.322,
+  "window": null
+ },
+ "upgrade_dps_aura": {
+  "ally": 0.858,
+  "casts": 204,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.005,
+  "npc": 0.0,
+  "self": 0.941,
+  "window": null
+ },
+ "upgrade_fleetfoot_boots": {
+  "ally": 0.0,
+  "casts": 984,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.014,
+  "npc": 0.0,
+  "self": 0.986,
+  "window": null
+ },
+ "upgrade_focus_lens": {
+  "ally": 0.0,
+  "casts": 41,
+  "enemy": 0.976,
+  "kind": "offensive",
+  "none": 0.024,
+  "npc": 0.0,
+  "self": 0.195,
+  "window": 1.0
+ },
+ "upgrade_fury_trance": {
+  "ally": 0.0,
+  "casts": 91,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 1.0,
+  "window": null
+ },
+ "upgrade_glitch": {
+  "ally": 0.0,
+  "casts": 89,
+  "enemy": 0.899,
+  "kind": "offensive",
+  "none": 0.067,
+  "npc": 0.0,
+  "self": 0.461,
+  "window": 1.1
+ },
+ "upgrade_goose_egg": {
+  "ally": 0.0,
+  "casts": 14,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.929,
+  "npc": 0.0,
+  "self": 0.071,
+  "window": null
+ },
+ "upgrade_greater_withering_whip": {
+  "ally": 0.0,
+  "casts": 71,
+  "enemy": 0.915,
+  "kind": "offensive",
+  "none": 0.056,
+  "npc": 0.0,
+  "self": 0.127,
+  "window": 1.4
+ },
+ "upgrade_grit": {
+  "ally": 0.021,
+  "casts": 95,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.021,
+  "npc": 0.0,
+  "self": 0.958,
+  "window": null
+ },
+ "upgrade_guardian_ward": {
+  "ally": 0.626,
+  "casts": 348,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.023,
+  "npc": 0.0,
+  "self": 0.428,
+  "window": null
+ },
+ "upgrade_health_nova": {
+  "ally": 0.773,
+  "casts": 44,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.045,
+  "npc": 0.0,
+  "self": 0.705,
+  "window": null
+ },
+ "upgrade_health_stimpak": {
+  "ally": 0.16,
+  "casts": 362,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.017,
+  "npc": 0.0,
+  "self": 0.848,
+  "window": null
+ },
+ "upgrade_infuser": {
+  "ally": 0.0,
+  "casts": 105,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.038,
+  "npc": 0.0,
+  "self": 0.962,
+  "window": null
+ },
+ "upgrade_magic_carpet": {
+  "ally": 0.0,
+  "casts": 39,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 1.0,
+  "window": null
+ },
+ "upgrade_metal_skin": {
+  "ally": 0.0,
+  "casts": 88,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.034,
+  "npc": 0.0,
+  "self": 0.966,
+  "window": null
+ },
+ "upgrade_non_player_bonus_sacrifice": {
+  "ally": 0.0,
+  "casts": 194,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.0,
+  "npc": 1.0,
+  "self": 0.979,
+  "window": null
+ },
+ "upgrade_phantom_strike": {
+  "ally": 0.0,
+  "casts": 112,
+  "enemy": 1.0,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 0.17,
+  "window": 1.0
+ },
+ "upgrade_reduce_debuff_duration": {
+  "ally": 0.0,
+  "casts": 203,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.108,
+  "npc": 0.0,
+  "self": 0.892,
+  "window": null
+ },
+ "upgrade_rescue_beam": {
+  "ally": 0.767,
+  "casts": 116,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.009,
+  "npc": 0.0,
+  "self": 0.966,
+  "window": null
+ },
+ "upgrade_restorative_locket": {
+  "ally": 0.0,
+  "casts": 136,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.838,
+  "npc": 0.0,
+  "self": 0.162,
+  "window": null
+ },
+ "upgrade_return_fire": {
+  "ally": 0.0,
+  "casts": 50,
+  "enemy": 0.8,
+  "kind": "offensive",
+  "none": 0.0,
+  "npc": 0.2,
+  "self": 0.98,
+  "window": 1.9
+ },
+ "upgrade_rocket_booster": {
+  "ally": 0.0,
+  "casts": 112,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.009,
+  "npc": 0.0,
+  "self": 0.991,
+  "window": null
+ },
+ "upgrade_rupture": {
+  "ally": 0.0,
+  "casts": 178,
+  "enemy": 0.972,
+  "kind": "offensive",
+  "none": 0.028,
+  "npc": 0.0,
+  "self": 0.129,
+  "window": 2.7
+ },
+ "upgrade_self_bubble": {
+  "ally": 0.0,
+  "casts": 20,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.0,
+  "npc": 0.0,
+  "self": 1.0,
+  "window": null
+ },
+ "upgrade_spirit_sap": {
+  "ally": 0.0,
+  "casts": 66,
+  "enemy": 0.97,
+  "kind": "offensive",
+  "none": 0.03,
+  "npc": 0.0,
+  "self": 0.106,
+  "window": 1.1
+ },
+ "upgrade_split_shot": {
+  "ally": 0.0,
+  "casts": 83,
+  "enemy": 0.518,
+  "kind": "offensive",
+  "none": 0.036,
+  "npc": 0.241,
+  "self": 0.952,
+  "window": 2.5
+ },
+ "upgrade_surging_power": {
+  "ally": 0.0,
+  "casts": 197,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.02,
+  "npc": 0.0,
+  "self": 0.98,
+  "window": null
+ },
+ "upgrade_target_stun": {
+  "ally": 0.0,
+  "casts": 212,
+  "enemy": 0.991,
+  "kind": "offensive",
+  "none": 0.005,
+  "npc": 0.0,
+  "self": 0.142,
+  "window": 1.0
+ },
+ "upgrade_targeted_silence": {
+  "ally": 0.0,
+  "casts": 135,
+  "enemy": 0.726,
+  "kind": "offensive",
+  "none": 0.23,
+  "npc": 0.0,
+  "self": 0.111,
+  "window": 1.0
+ },
+ "upgrade_thermal_detonator": {
+  "ally": 0.0,
+  "casts": 230,
+  "enemy": 0.6,
+  "kind": "offensive",
+  "none": 0.104,
+  "npc": 0.491,
+  "self": 0.174,
+  "window": 1.6
+ },
+ "upgrade_unstoppable": {
+  "ally": 0.0,
+  "casts": 80,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.05,
+  "npc": 0.0,
+  "self": 0.95,
+  "window": null
+ },
+ "upgrade_warp_stone": {
+  "ally": 0.0,
+  "casts": 353,
+  "enemy": 0.0,
+  "kind": "self",
+  "none": 0.031,
+  "npc": 0.0,
+  "self": 0.969,
+  "window": null
+ },
+ "upgrade_withering_whip": {
+  "ally": 0.0,
+  "casts": 99,
+  "enemy": 0.98,
+  "kind": "offensive",
+  "none": 0.01,
+  "npc": 0.0,
+  "self": 0.152,
+  "window": 1.3
+ },
+ "viscous_goo_bowling_ball": {
+  "ally": 0.0,
+  "casts": 100,
+  "enemy": 0.44,
+  "kind": "offensive",
+  "none": 0.02,
+  "npc": 0.2,
+  "self": 0.97,
+  "window": 4.1
+ },
+ "viscous_goo_grenade": {
+  "ally": 0.319,
+  "casts": 998,
+  "enemy": 0.577,
+  "kind": "offensive",
+  "none": 0.071,
+  "npc": 0.539,
+  "self": 0.422,
+  "window": 2.4
+ },
+ "viscous_restorative_goo": {
+  "ally": 0.357,
+  "casts": 235,
+  "enemy": 0.0,
+  "kind": "support",
+  "none": 0.004,
+  "npc": 0.0,
+  "self": 0.651,
+  "window": null
+ },
+ "viscous_telepunch": {
+  "ally": 0.089,
+  "casts": 1028,
+  "enemy": 0.375,
+  "kind": "offensive",
+  "none": 0.329,
+  "npc": 0.239,
+  "self": 0.137,
+  "window": 1.2
+ }
+}

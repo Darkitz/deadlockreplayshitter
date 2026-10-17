@@ -155,6 +155,25 @@ tools/check.sh || tools/update-parser.sh
 - Bump `FORMAT_VERSION` in `parser/dlparse/src/lib.rs` when the JSON changes. Demos dropped
   earlier then need to be dropped again to pick up new fields.
 
+## How abilities are scored
+
+Every ability and active item is scored by what it's for. `tools/profile_abilities.py` measures
+this on real matches (parsed demo JSON) and writes `tools/ability_profiles.json`, which
+`tools/game_assets.py` merges into `assets.json`. Abilities without enough data fall back to the
+game's own flags.
+
+| kind | what it is | shown as |
+| --- | --- | --- |
+| offensive | damage or debuffs on enemies | hits / casts (accuracy) |
+| empowered shots | "your next N bullets" (Living Ink, Slam Fire, Hellfire Salvo) | bullets that hit / bullets fired |
+| support | heals, shields, buffs on teammates | uses that reached an ally / uses |
+| self | self buffs, mobility, utility | uses, % used in a fight |
+| proc | passive items with a cooldown | triggers |
+
+Effects include the buffs and debuffs an ability applied (from the demo's modifier table), not
+just damage. Abilities whose effects land late (traps, fuses, slow projectiles) get a longer hit
+window: the time in which 80 % of their first enemy effects landed.
+
 ## How "hit" is decided (`web/js/analysis.js`)
 
 - **Thrown:** `ImportantAbilityUsed` for the ability. Old demos don't have it, so there a cast is

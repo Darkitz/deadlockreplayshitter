@@ -85,7 +85,7 @@ export function createTimeline(svg, model, onSeek, onSpan) {
     }
     const maxY = Math.max(casts.length, 1);
     const cy = (n) => c.y + c.h - (n / maxY) * (c.h - 4);
-    const scored = (k) => k.result === "hit" || (!model.heroesOnly && k.result === "other");
+    const scored = (k) => k.result === "hit" || k.result === "ally" || (!model.heroesOnly && k.result === "other");
     const stepPath = (filter) => {
       let n = 0, d = `M${x(0)},${cy(0)}`;
       for (const k of casts) {

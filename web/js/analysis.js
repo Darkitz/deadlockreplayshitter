@@ -67,31 +67,43 @@ export function analyzeAbility(m, pawn, ability, opts) {
   }
   if (!casts.length) source = "none";
 
-  // [t, victimPawn|-1, dmg, x, y]
+  // effects: [t, targetPawn|-1, dmg, x, y, "dmg"|"notify"|"mod"]. Modifiers are the buffs /
+  // debuffs the ability applied, so debuffs (Slowing Hex), heals and shields count too.
   const hits = [];
   if (aid != null) {
     for (const d of m.damage) {
       if (d[1] !== pawn || d[4] !== aid || d[3] === pawn) continue;
-      hits.push([d[0], d[3], d[5], d[7], d[8]]);
+      hits.push([d[0], d[3], d[5], d[7], d[8], "dmg"]);
     }
     for (const n of m.notify) {
-      if (n[1] !== pawn || n[3] !== aid || n[2] === pawn || n[2] < 0) continue;
-      hits.push([n[0], n[2], 0, null, null]);
+      if (n[1] !== pawn || n[3] !== aid || n[2] < 0) continue;
+      hits.push([n[0], n[2], 0, null, null, "notify"]);
+    }
+    for (const x of m.modifiers || []) {
+      if (x[3] !== pawn || x[5] !== aid) continue;
+      hits.push([x[0], m.byPawn.has(x[2]) ? x[2] : -1, 0, null, null, "mod"]);
     }
   }
   hits.sort((a, b) => a[0] - b[0]);
+  const kind = ability.kind || "offensive";
+  // traps, fuses and slow projectiles land later than the hit window: the measured window wins
+  const window = Math.max(opts.window, ability.window || 0);
 
   let j = 0;
   for (let i = 0; i < casts.length; i++) {
     const c = casts[i];
-    const end = Math.min(c.t + opts.window, i + 1 < casts.length ? casts[i + 1].t : Infinity);
-    while (j < hits.length && hits[j][0] < c.t) j++;
-    let heroHit = null, otherHit = null, dmg = 0;
-    const victims = new Set();
+    const end = Math.min(c.t + window, i + 1 < casts.length ? casts[i + 1].t : Infinity);
+    while (j < hits.length && hits[j][0] < c.t - 0.05) j++;
+    let heroHit = null, otherHit = null, dmg = 0, onSelf = false;
+    const victims = new Set(), allies = new Set();
     for (let k = j; k < hits.length && hits[k][0] < end; k++) {
       const h = hits[k];
       const vic = h[1] >= 0 ? m.byPawn.get(h[1]) : null;
-      if (vic && vic.team === me?.team) continue; // ally buff / self
+      if (vic && vic.team === me?.team) { // ally buff / self
+        if (h[1] === pawn) onSelf = true; else allies.add(h[1]);
+        continue;
+      }
+      if (h[5] === "mod" && !vic) continue; // buffs on non-heroes (own summons, ...)
       if (vic) {
         heroHit ??= h;
         victims.add(h[1]);
@@ -101,7 +113,9 @@ export function analyzeAbility(m, pawn, ability, opts) {
       dmg += h[2];
     }
     const first = heroHit || otherHit;
-    c.result = heroHit ? "hit" : otherHit ? "other" : "miss";
+    c.result = heroHit ? "hit" : otherHit ? "other" : kind === "support" && allies.size ? "ally" : kind !== "offensive" && onSelf ? "self" : "miss";
+    c.allies = [...allies];
+    c.onSelf = onSelf;
     c.dmg = dmg;
     c.delay = first ? first[0] - c.t : null;
     c.victims = [...victims];
@@ -116,7 +130,20 @@ export function analyzeAbility(m, pawn, ability, opts) {
     }
   }
   // "next N bullets" abilities (Living Ink, Slam Fire, ...): score every projectile
-  if (ability.shots) scoreProjectiles(m, pawn, ability, casts, hits);
+  if (ability.shots) scoreProjectiles(m, pawn, ability, casts, hits.filter((h) => h[5] === "dmg"));
+
+  // self buffs / mobility: was it used in a fight? (enemy hero within 25 m, or hero damage
+  // dealt or taken within 3 s)
+  if (kind === "self" || kind === "support") {
+    const heroDmg = m.damage.filter((d) => (d[1] === pawn && d[3] >= 0 && m.byPawn.get(d[3])?.team !== me?.team)
+      || (d[3] === pawn && m.byPawn.get(d[1])?.team !== me?.team)).map((d) => d[0]);
+    for (const c of casts) {
+      const p = posAt(m, pawn, c.t);
+      const near = p && m.players.some((o) => o.team !== me?.team && hpAt(m, o.pawn, c.t)?.hp > 0
+        && (() => { const q = posAt(m, o.pawn, c.t); return q && Math.hypot(q[0] - p[0], q[1] - p[1]) * UNIT_M <= 25; })());
+      c.inFight = !!near || heroDmg.some((t) => Math.abs(t - c.t) <= 3);
+    }
+  }
 
   // kill conversion + idle time (how long the ability was ready before this cast)
   const deaths = m.kills.map((k) => [k[0], k[1]]);
@@ -197,13 +224,18 @@ export function counts(casts, heroesOnly = true) {
   }
   const thrown = casts.length;
   const scored = heroesOnly ? hit : hit + other;
+  const ally = casts.filter((c) => c.result === "ally" || c.allies?.length).length;
+  const allyHeroes = new Set(casts.flatMap((c) => c.allies || [])).size;
+  const selfOnly = casts.filter((c) => c.result === "self").length;
+  const inFight = casts.filter((c) => c.inFight).length;
   const kills = casts.filter((c) => c.killed).length;
   const idles = casts.map((c) => c.idle).filter((v) => v != null);
   // projectile abilities: per-bullet numbers too
   const proj = casts.some((c) => c.projectiles) ? casts.flatMap((c) => c.projectiles || []) : null;
   const projHit = proj ? proj.filter((p) => p.result === "hit" || (!heroesOnly && p.result === "other")).length : 0;
   return {
-    thrown, hit, other, miss: thrown - hit - other, scored, dmg, acc: thrown ? scored / thrown : 0,
+    thrown, hit, other, miss: casts.filter((c) => c.result === "miss").length, scored, dmg, acc: thrown ? scored / thrown : 0,
+    ally, allyHeroes, selfOnly, inFight,
     projectiles: proj ? proj.length : null, projHit, projAcc: proj?.length ? projHit / proj.length : null,
     perShot: proj ? Math.max(...casts.map((c) => c.projectiles?.length || 0), 0) : null,
     kills, idle: idles.length ? idles.reduce((a, b) => a + b, 0) / idles.length : null,

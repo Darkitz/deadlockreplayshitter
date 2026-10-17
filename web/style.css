@@ -949,3 +949,9 @@ body { word-spacing: .08em; }
 @keyframes rem-wiggle { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(-14deg) scale(1.08); } 45% { transform: rotate(12deg) scale(1.12); } 70% { transform: rotate(-6deg); } }
 .rem-btn.has-help, .rem-btn .has-help { text-decoration: none; }
 .rem-btn { min-width: 104px; justify-content: center; padding: 0 16px 0 30px; }
+/* support / self results (heals on allies, buffs, mobility) */
+.dot.ally { background: #5fd3c0; } .dot.self { background: var(--muted); }
+.m-ally { fill: #5fd3c0; } .m-self { fill: var(--muted); }
+.ab-stat.ab-support { color: #5fd3c0; }
+.ab-stat.ab-uses { color: var(--text); }
+:root[data-theme="light"] .ab-stat.ab-support { color: #0f8a78; }

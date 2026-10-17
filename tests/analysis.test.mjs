@@ -273,3 +273,23 @@ test("empowered-bullet abilities: every bullet is scored (Living Ink)", () => {
   const c = counts(casts, true);
   assert.deepEqual([c.projectiles, c.projHit, c.thrown, c.hit, c.miss], [6, 2, 2, 1, 0]);
 });
+
+test("ability kinds: debuffs hit, heals reach allies, self buffs count fight usage", () => {
+  const m = fixture({ casts: [cast(10), cast(30), cast(50)], enemyX: 100 });
+  m.modifiers = [
+    [10.1, 12, 2, 1, 777, AB.id, 1], // debuff on the enemy hero (no damage)
+    [30.1, 35, 3, 1, 778, AB.id, 1], // buff on the ally
+    [50.1, 55, 1, 1, 779, AB.id, 1], // buff on self only
+  ];
+  const off = analyzeAbility(m, 1, { ...AB, kind: "offensive" }, { window: 3 }).casts.map((c) => c.result);
+  assert.deepEqual(off, ["hit", "miss", "miss"]);
+  m._analysis = null;
+  const sup = analyzeAbility(m, 1, { ...AB, kind: "support" }, { window: 3 }).casts;
+  assert.deepEqual(sup.map((c) => c.result), ["hit", "ally", "self"]);
+  const c = counts(sup);
+  assert.deepEqual([c.ally, c.allyHeroes, c.selfOnly], [1, 1, 1]);
+  m._analysis = null;
+  const self = analyzeAbility(m, 1, { ...AB, kind: "self" }, { window: 3 }).casts;
+  assert.deepEqual(self.map((x) => x.result), ["hit", "miss", "self"]);
+  assert.ok(self.every((x) => x.inFight)); // the enemy stands 2.5 m away the whole time
+});
