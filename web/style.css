@@ -790,3 +790,50 @@ body { word-spacing: .08em; }
 .stage-right .feed-wrap { min-height: 0; }
 .stage-right .feed { flex: 1 1 0; height: 0; min-height: 260px; max-height: none; }
 @media (max-width: 1000px) { .stage-right .feed { flex: none; height: auto; max-height: 360px; } }
+/* smaller portraits: head-and-shoulders crops instead of full card art */
+.pg-card-frame { aspect-ratio: 1 / 0.95; }
+.pg-art { object-position: center 12%; }
+.pg-mvp .pg-card-frame { aspect-ratio: 1 / 1.1; }
+.pg-mvp-stage { grid-template-columns: 1fr minmax(180px, 230px) 1.1fr; padding: 18px 22px; }
+.pg-mvp-hero img { max-width: 230px; aspect-ratio: 1 / 1.05; object-position: center 10%; }
+.pg-mvp-heroname { margin-top: -40px; font-size: 32px; }
+.pg-keys .pg-card-frame { aspect-ratio: 1 / 0.85; }
+
+/* both teams in one row: small portrait cards, a divider with the match time in the middle */
+.pg-teams { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 14px; align-items: stretch; }
+@media (max-width: 1200px) { .pg-teams { grid-template-columns: 1fr; } .pg-divider { flex-direction: row !important; justify-content: center; } .pg-divider::before, .pg-divider::after { display: none; } }
+.pg-team-head { margin-bottom: 10px; min-height: 38px; align-items: center; }
+.pg-team.team-3 .pg-team-head { justify-content: flex-end; flex-direction: row-reverse; }
+.pg-logo-md .pg-logo-mask { width: 190px; height: 34px; }
+.pg-team.team-3 .pg-logo-md .pg-logo-mask { -webkit-mask-position: right center; mask-position: right center; }
+.pg-team-result { font-size: 16px; }
+.pg-cards { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; gap: 8px; }
+@media (max-width: 700px) { .pg-cards { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; } }
+.pg-card { align-content: start; justify-items: stretch; gap: 3px; }
+.pg-card-frame { aspect-ratio: 1 / 1.05; }
+.pg-mvp .pg-card-frame { aspect-ratio: 1 / 1.05; }
+.pg-art { object-position: center 10%; }
+.pg-card-frame::after { background: linear-gradient(180deg, transparent 65%, rgba(8, 8, 10, .6)); }
+.pg-badge { top: 4px; left: 5px; font-size: 11px; gap: 2px; }
+.pg-mvp .pg-badge { font-size: 12px; }
+.pg-badge .pg-trophy { width: 13px; height: 16px; }
+.pg-card-name { margin-top: 4px; font-size: 13px; text-align: center; }
+.pg-card-hero { margin-top: 0; font-size: 11px; text-align: center; }
+.pg-card .aw-list { position: static; margin-top: 4px; gap: 3px; }
+.pg-card .aw { grid-template-columns: 12px auto; column-gap: 4px; row-gap: 0; }
+.pg-card .aw-icon { width: 11px; height: 11px; }
+.pg-card .aw b { font-size: 15px; }
+.pg-card .aw span { grid-column: 1 / -1; font-size: 9px; letter-spacing: .03em; }
+.pg-card .aw span small { font-size: 8.5px; display: inline; margin-right: 3px; }
+.pg-divider { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding-top: 40px; }
+.pg-divider::before, .pg-divider::after { content: ""; width: 1px; flex: 1; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 50%, transparent), transparent); }
+.pg-divider img { width: 26px; height: 26px; opacity: .85; }
+.pg-divider-time { font-weight: 700; font-size: 15px; letter-spacing: .06em; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  transform: rotate(45deg); border-radius: 3px; background: #0d0d10; }
+.pg-divider-time { transform: none; border-radius: 999px; color: var(--text); }
+/* MVP stage key-player cards: same compact cards, a bit larger */
+.pg-keys { grid-template-columns: repeat(2, minmax(0, 150px)); }
+.pg-keys .pg-card-frame { aspect-ratio: 1 / 1.05; }
+.pg-mvp-stage { grid-template-columns: 1fr minmax(150px, 180px) 1.1fr; }
+.pg-mvp-hero img { max-width: 180px; }
+.pg-mvp-heroname { margin-top: -30px; font-size: 26px; }

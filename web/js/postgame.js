@@ -101,12 +101,12 @@ function card(r, list, badge) {
   const h = heroOf(r.p);
   return `<button class="pg-card team-${r.p.team} ${badge ? `pg-${badge}` : ""}" data-pawn="${r.p.pawn}" title="open ${esc(r.p.name)} in the replay">
     <span class="pg-card-frame">
-      ${h.card ? `<img class="pg-art" src="${esc(h.card)}" alt="" loading="lazy">` : `<img class="pg-art pg-art-icon" src="${esc(h.icon)}" alt="">`}
-      ${badge ? `<span class="pg-badge">${ui(badge === "mvp" ? "mvp_trophy" : "key_trophy", "pg-trophy")}${badge === "mvp" ? "MVP" : "Key Player"}</span>` : ""}
-      ${awardList(list, badge === "mvp" ? 5 : 2)}
+      ${h.card ? `<img class="pg-art" src="${esc(h.card)}" alt="">` : `<img class="pg-art pg-art-icon" src="${esc(h.icon)}" alt="">`}
+      ${badge ? `<span class="pg-badge">${ui(badge === "mvp" ? "mvp_trophy" : "key_trophy", "pg-trophy")}${badge === "mvp" ? "MVP" : "Key"}</span>` : ""}
     </span>
-    <span class="pg-card-hero">${esc(h.name)}</span>
     <span class="pg-card-name">${esc(r.p.name)}</span>
+    <span class="pg-card-hero">${esc(h.name)}</span>
+    ${awardList(list, badge === "mvp" ? 5 : 2)}
   </button>`;
 }
 
@@ -175,10 +175,16 @@ export function renderSummary(el, m, { onPick }) {
         <div class="pg-keys">${keys.map((r) => card(r, aw.get(r.p.pawn), "key")).join("")}</div>
       </div>
     </section>` : ""}
-    ${teams.map((t) => `<section class="pg-team team-${t}">
-      <div class="pg-team-head">${teamLogo(t)}<span class="pg-team-result">${model.winner === t ? "Victorious" : model.winner ? "Defeated" : ""}</span></div>
-      <div class="pg-cards">${byTeam(t).map((r) => card(r, aw.get(r.p.pawn), r.mvp === 1 ? "mvp" : r.mvp ? "key" : null)).join("")}</div>
-    </section>`).join("")}
+    <section class="pg-teams">
+      ${teams.map((t) => `<div class="pg-team team-${t}">
+        <div class="pg-team-head">${teamLogo(t, "pg-logo-md")}<span class="pg-team-result">${model.winner === t ? "Victorious" : model.winner ? "Defeated" : ""}</span></div>
+        <div class="pg-cards">${(t === 2 ? byTeam(t) : byTeam(t)).map((r) => card(r, aw.get(r.p.pawn), r.mvp === 1 ? "mvp" : r.mvp ? "key" : null)).join("")}</div>
+      </div>${t === 2 ? `<div class="pg-divider" aria-hidden="true">
+        ${S.assets.ui?.sigil_team2 ? `<img src="${S.assets.ui.sigil_team2}" alt="">` : ""}
+        <span class="pg-divider-time">${fmtClock(m.end)}</span>
+        ${S.assets.ui?.sigil_team3 ? `<img src="${S.assets.ui.sigil_team3}" alt="">` : ""}
+      </div>` : ""}`).join("")}
+    </section>
     <section class="pg-scoreboard">${teams.map(scoreboard).join("")}
       <p class="small muted">Starburst = best in the match. Numbers are the game's own counters read from the demo; healing includes barriers given, like the in-game scoreboard.</p>
     </section>
