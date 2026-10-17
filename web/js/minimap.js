@@ -2,7 +2,7 @@
 
 import { posAt, hpAt, statsAt, itemsAt } from "./data.js";
 
-const TEAM_COLOR = { 2: "#e8a33d", 3: "#4f8fe8" };
+const TEAM_COLOR = { 2: "#e8962e", 3: "#4f86e8" }; // the game's team colors
 const RESULT_COLOR = { hit: "#6fd08c", other: "#e0b25a", miss: "#d9644f" };
 const RAY_LEN = 3200;      // world units drawn for a cast's aim line
 const RAY_FADE = 5;        // seconds a cast stays visible

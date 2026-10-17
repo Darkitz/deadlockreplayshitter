@@ -1,21 +1,23 @@
 :root {
-  --bg: #0a0b0d;
-  --panel: #121418;
-  --panel-2: #191c21;
-  --panel-3: #22262d;
-  --line: #262a31;
-  --text: #e9ebef;
-  --muted: #8b919c;
-  --accent: #e0b25a;
+  /* warm near-black and off-white like Deadlock's UI, the game's gold for accents */
+  --bg: #0b0b0d;
+  --panel: #141418;
+  --panel-2: #1b1b21;
+  --panel-3: #26252b;
+  --line: #2c2a2f;
+  --text: #f2ead8;
+  --muted: #9b9385;
+  --accent: #e2b34f;
   --hit: #5fd38d;
   --other: #e0b25a;
   --miss: #e5645a;
   --thrown: #b9bec8;
   --death: #ff6b5a;
   --kill: #a98bff;
-  --amber: #e8a33d;
-  --sapphire: #4f8fe8;
-  --radius: 10px;
+  /* the game's team colors: Hidden King (team 2), Archmother (team 3) */
+  --amber: #e8962e;
+  --sapphire: #4f86e8;
+  --radius: 8px;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -681,3 +683,103 @@ table.mini td.accent { color: var(--accent); }
 :root[data-theme="light"] .pg-graphs, :root[data-theme="light"] .pg-mvp-stage { color-scheme: dark; }
 .aw-list { text-align: left; justify-items: start; }
 .aw span { justify-items: start; }
+
+/* ================================================================ Deadlock look, site-wide
+   the post-game screens' style for every view: Barlow, warm ink on near-black, small-caps
+   labels, team-tinted rows, gold for the selected / best thing. Only presentation changes. */
+body { font-family: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14.5px; }
+code, .tin { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* labels: small caps like the game's column headers */
+.tile .k, .team-head, .report-table th, .tracker-table th, table.mini tr:first-child th, .section-title, .drop-hint small,
+.legend-row, .map-legend .check, .fights > .muted, .items-row > .muted {
+  text-transform: uppercase; letter-spacing: .07em; font-weight: 700; font-size: 11px; color: color-mix(in srgb, var(--text) 55%, transparent);
+}
+.section-title { font-size: 15px; }
+.chart-card h3 { font-size: 17px; font-weight: 700; color: var(--text); letter-spacing: .01em; }
+.chart-card h3 .muted, .chart-card h3 span.muted { font-size: 13px; font-weight: 500; }
+
+/* panels */
+.top { background: linear-gradient(180deg, #121115, #0d0d10); border-bottom-color: #2a2620; }
+.chart-card, .tile, .team, .match-card, .chat-col, .drop-card, .about .deep {
+  background: linear-gradient(180deg, #16161b, #111115); border-color: #2a2830;
+}
+.chart-card { border-radius: 12px; padding: 16px; }
+
+/* stat tiles: the game's big numbers */
+.tile { border-radius: 6px; }
+.tile .v { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+.readout .tile .v { font-size: 22px; }
+.tile .v small { font-weight: 600; color: color-mix(in srgb, var(--text) 50%, transparent); }
+
+/* buttons, chips, tabs */
+.btn { border-radius: 6px; font-family: inherit; font-weight: 600; }
+.chip { border-radius: 4px; font-family: inherit; font-weight: 600; background: #17161b; }
+.chip.on { background: color-mix(in srgb, var(--accent) 14%, #17161b); }
+.tab, .view-switch .tab { text-transform: uppercase; letter-spacing: .08em; font-size: 13px; font-family: inherit; }
+.tab.on { color: var(--text); border-bottom-color: var(--accent); }
+.ab { border-radius: 6px; background: linear-gradient(180deg, #19181e, #131217); font-family: inherit; }
+.ab.on { border-color: var(--accent); background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 16%, #19181e), #131217);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 0 18px -6px var(--accent); }
+.ab-name { font-weight: 600; }
+.ab-stat { font-weight: 700; }
+
+/* replay scoreboard: team-tinted rows like the post-game board */
+.scoreboard .team { border-top: 0; padding: 10px; }
+.scoreboard .team h3 { display: flex; align-items: center; gap: 12px; margin: 0 4px 8px; min-height: 30px; }
+.sb-won { font-size: 15px; font-weight: 700; color: var(--text); text-transform: none; letter-spacing: 0; }
+.sb-yours { font-size: 12px; font-weight: 600; color: color-mix(in srgb, var(--text) 55%, transparent); text-transform: none; letter-spacing: 0; }
+.sb-row { margin-bottom: 3px; border-radius: 4px; padding: 5px 6px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--row-team, var(--line)) 30%, #0d0d10), color-mix(in srgb, var(--row-team, var(--line)) 14%, #0d0d10)); }
+.team-2 .sb-row { --row-team: var(--amber); }
+.team-3 .sb-row { --row-team: var(--sapphire); }
+.sb-row:hover { filter: brightness(1.2); background: linear-gradient(90deg, color-mix(in srgb, var(--row-team) 38%, #0d0d10), color-mix(in srgb, var(--row-team) 18%, #0d0d10)); }
+.sb-row.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.sb-hero { border-radius: 50%; background: #0d0d10; box-shadow: 0 0 0 2px rgba(0, 0, 0, .5); }
+.sb-name { font-size: 14.5px; font-weight: 700; }
+.sb-kda, .sb-nw { font-size: 14px; font-weight: 700; color: var(--text); }
+.sb-acc { font-size: 14px; font-weight: 700; }
+
+/* tables in the tabs (tracker, incoming, laning): game scoreboard rows */
+.report-table { border-collapse: separate; border-spacing: 0 3px; }
+.report-table td { background: color-mix(in srgb, var(--panel-2) 90%, transparent); font-weight: 600; }
+.report-table tr td:first-child { border-radius: 4px 0 0 4px; }
+.report-table tr td:last-child { border-radius: 0 4px 4px 0; }
+.tracker-table tr.team-row-2 td { background: linear-gradient(90deg, color-mix(in srgb, var(--amber) 16%, #0f0f12), color-mix(in srgb, var(--amber) 7%, #0f0f12)); }
+.tracker-table tr.team-row-3 td { background: linear-gradient(90deg, color-mix(in srgb, var(--sapphire) 16%, #0f0f12), color-mix(in srgb, var(--sapphire) 7%, #0f0f12)); }
+.tracker-table tr.on td { box-shadow: 0 1px 0 var(--accent) inset, 0 -1px 0 var(--accent) inset; }
+.tracker-table td img, .report-table td img { border-radius: 50%; }
+.tracker-table td.tr-items img { border-radius: 3px; }
+
+/* feed + chat lines */
+.feed li { background: linear-gradient(90deg, #17161b, #121216); border-radius: 4px; }
+.chat-col { border-radius: 8px; }
+.chat-col .msg img, .ts-row img { border-radius: 50%; }
+
+/* time split rows tinted per team */
+.ts-row.team-row-2 { background: linear-gradient(90deg, color-mix(in srgb, var(--amber) 12%, transparent), transparent 40%); }
+.ts-row.team-row-3 { background: linear-gradient(90deg, color-mix(in srgb, var(--sapphire) 12%, transparent), transparent 40%); }
+.ts-row.on { box-shadow: 0 0 0 1px var(--accent) inset; }
+
+/* home cards */
+.match-card { border-radius: 10px; }
+.mc-team { border-left: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--row-team, var(--line)) 22%, #0f0f12), transparent); }
+.mc-team.team-2 { --row-team: var(--amber); }
+.mc-team.team-3 { --row-team: var(--sapphire); }
+.mc-team-name { font-weight: 700; text-transform: uppercase; letter-spacing: .05em; font-size: 12px; color: var(--row-team); }
+.mc-heroes img { border-radius: 50%; }
+
+/* light theme keeps the same structure on light panels */
+:root[data-theme="light"] .chart-card, :root[data-theme="light"] .tile, :root[data-theme="light"] .team, :root[data-theme="light"] .match-card,
+:root[data-theme="light"] .chat-col, :root[data-theme="light"] .drop-card, :root[data-theme="light"] .about .deep { background: var(--panel); border-color: var(--line); }
+:root[data-theme="light"] .top { background: var(--panel); }
+:root[data-theme="light"] .feed li, :root[data-theme="light"] .ab, :root[data-theme="light"] .chip { background: var(--panel); }
+:root[data-theme="light"] .sb-row, :root[data-theme="light"] .mc-team { background: linear-gradient(90deg, color-mix(in srgb, var(--row-team, var(--line)) 20%, #fff), color-mix(in srgb, var(--row-team, var(--line)) 6%, #fff)); }
+:root[data-theme="light"] .tracker-table tr.team-row-2 td { background: color-mix(in srgb, var(--amber) 10%, #fff); }
+:root[data-theme="light"] .tracker-table tr.team-row-3 td { background: color-mix(in srgb, var(--sapphire) 10%, #fff); }
+:root[data-theme="light"] .report-table td { background: var(--panel-2); }
+/* team logos keep their team color everywhere (not just inside the summary) */
+.pg-logo.team-2, .pg-logo-text.team-2 { color: var(--amber); }
+.pg-logo.team-3, .pg-logo-text.team-3 { color: var(--sapphire); }
+/* Barlow's space is very narrow; at small sizes words run together ("State (recast)") */
+body { word-spacing: .08em; }

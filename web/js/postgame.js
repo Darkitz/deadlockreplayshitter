@@ -81,6 +81,13 @@ const AWARD_STYLE = {
   heal: ["icon_heal", "heal"], souls: ["icon_souls", "souls"],
 };
 
+/** the team's brush logo from the game, tinted in team color (text fallback without assets) */
+export function teamLogo(t, cls = "") {
+  return S.assets.ui?.[`logo_team${t}`]
+    ? `<span class="pg-logo team-${t} ${cls}" role="img" aria-label="${esc(TEAM_NAMES[t])}" title="${esc(TEAM_NAMES[t])}">${ui(`logo_team${t}`, "pg-logo-mask")}</span>`
+    : `<span class="pg-logo-text team-${t}">${esc(TEAM_NAMES[t])}</span>`;
+}
+
 function awardList(list, n) {
   return `<ul class="aw-list">${list.slice(0, n).map((a) => {
     const [icon, tone] = AWARD_STYLE[a.key] || ["icon_kill", "kill"];
@@ -114,9 +121,6 @@ export function renderSummary(el, m, { onPick }) {
   const cols = [["souls", "souls", k1], ["k", "k", String], ["d", "d", String], ["a", "a", String],
     ["dmg", "plyr dmg", k1], ["obj", "obj dmg", k1], ["heal", "healing", k1], ["lh", "last hits", String]];
   const tops = Object.fromEntries(cols.map(([k]) => [k, best(k)]));
-  const teamLogo = (t, cls = "") => S.assets.ui?.[`logo_team${t}`]
-    ? `<span class="pg-logo team-${t} ${cls}" role="img" aria-label="${esc(TEAM_NAMES[t])}">${ui(`logo_team${t}`, "pg-logo-mask")}</span>`
-    : `<span class="pg-logo-text team-${t}">${esc(TEAM_NAMES[t])}</span>`;
   const started = model.pg?.start_time ? new Date(model.pg.start_time * 1000) : null;
   const when = started ? started.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" }) : "";
   const teamSouls = (t) => byTeam(t).reduce((s, r) => s + r.souls, 0);
@@ -189,8 +193,8 @@ export function renderSummary(el, m, { onPick }) {
 
 // ------------------------------------------------------------------ graphs
 
-const PALETTE = { 2: ["#e8a33d", "#f6c96f", "#c9781c", "#ffe0a3", "#a95f17", "#e4844a"],
-  3: ["#4f8fe8", "#8ab8ff", "#2d64c8", "#b9d3ff", "#3a9fcf", "#7a83ec"] };
+const PALETTE = { 2: ["#e8962e", "#f6c96f", "#c9781c", "#ffe0a3", "#a95f17", "#e4844a"],
+  3: ["#4f86e8", "#8ab8ff", "#2d64c8", "#b9d3ff", "#3a9fcf", "#7a83ec"] };
 const CATS = ["#e5645a", "#4f8fe8", "#5fd38d", "#e0b25a", "#a98bff", "#3ec7c0", "#ff8ad8", "#c9d36a", "#ff9f5a", "#8b919c", "#6fa8ff", "#d98b5f"];
 
 const GRAPHS = [

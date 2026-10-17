@@ -31,7 +31,7 @@ export const ago = (d) => {
   if (s < 86400 * 60) return rtf.format(-Math.round(s / 86400), "day");
   return rtf.format(-Math.round(s / (86400 * 30)), "month");
 };
-export const k1 = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+export const k1 = (n) => (Math.abs(n) >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
 // ------------------------------------------------------------------ state
 

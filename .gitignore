@@ -16,3 +16,4 @@ __pycache__/
 tools/.vrf/
 # extracted but unused by the site
 web/assets/game/ranked/
+screenshots/

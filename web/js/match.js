@@ -8,7 +8,7 @@ import {
 } from "./analysis.js";
 import { createTimeline, fmtClock } from "./timeline.js";
 import { createMinimap } from "./minimap.js";
-import { renderSummary } from "./postgame.js";
+import { renderSummary, teamLogo } from "./postgame.js";
 import {
   $, esc, S, settings, saveSettings, opts, k1, tile, controlsHTML,
   wireControls, abilityButtons, setParams,
@@ -147,7 +147,7 @@ export async function viewMatch(id, params) {
     <section class="scoreboard">
       ${teams.map((t) => `
         <div class="team team-${t}">
-          <h3>${TEAM_NAMES[t] || `Team ${t}`}${subject?.team === t ? " · " + esc(subject.name) + "'s team" : ""}</h3>
+          <h3>${teamLogo(t, "pg-logo-sm")}${m.winning_team === t ? `<span class="sb-won">Victorious</span>` : ""}${subject?.team === t ? `<span class="sb-yours">${esc(subject.name)}'s team</span>` : ""}</h3>
           <div class="team-head"><span></span><span>player</span><span style="text-align:right">k/d/a</span><span style="text-align:right">skill%</span><span style="text-align:right">souls</span></div>
           ${teamOf(t).map((p) => {
             return `<div class="sb-row ${p.pawn === pawn ? "on" : ""}" data-pawn="${p.pawn}" role="button" tabindex="0" title="${p.pawn === pawn ? "deselect" : `analyze ${esc(p.name)}`}">
