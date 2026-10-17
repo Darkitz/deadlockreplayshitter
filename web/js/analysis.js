@@ -558,7 +558,7 @@ export function timeSplit(m, pawn, assets, from = -Infinity, to = Infinity, tune
   const dashes = [...(ev.moves.dash || [])].sort((a, b) => a - b);
   const slides = [...(ev.moves.slide || [])].sort((a, b) => a - b);
   const dt = m.samples.dt;
-  const r = { total: 0, combat: { hero: 0, npc: 0, neutral: 0, out: 0 }, move: { zip: 0, dash: 0, slide: 0, air: 0, ground: 0 } };
+  const r = { total: 0, combat: { hero: 0, npc: 0, neutral: 0, out: 0 }, move: { zip: 0, dash: 0, slide: 0, air: 0, ground: 0 }, samples: [] };
   for (let i = 0; i < tr.hp.length; i++) {
     const t = m.samples.t0 + i * dt;
     if (t < from || t >= to || tr.hp[i] <= 0 || t < 0) continue;
@@ -567,10 +567,12 @@ export function timeSplit(m, pawn, assets, from = -Infinity, to = Infinity, tune
       : near(ev.npc, t, before, after) || (npcHits && near(ev.npcIn, t, before, after)) ? "npc"
       : near(ev.neutral, t, before, after) || (npcHits && near(ev.neutralIn, t, before, after)) ? "neutral" : "out";
     r.combat[c] += dt;
+    r.samples.push([t, c]);
     const mv = tr.mv?.[i] || 0;
     const k = mv & 2 ? "zip" : near(dashes, t, DASH_S, 0) ? "dash" : (mv & 4 || near(slides, t, SLIDE_S, 0)) && !(mv & 1) ? "slide"
       : mv & 1 ? "air" : "ground";
     r.move[k] += dt;
+    r.samples[r.samples.length - 1].push(k);
   }
   const inWin = (xs) => (xs || []).filter((t) => t >= from && t < to).length;
   r.counts = {
@@ -578,5 +580,8 @@ export function timeSplit(m, pawn, assets, from = -Infinity, to = Infinity, tune
     ziplines: inWin(ev.moves.zip_line), boosts: inWin(ev.moves.zipline_boost), mantles: inWin(ev.moves.mantle), ropes: inWin(ev.moves.climb_rope),
   };
   r.hasMove = !!tr.mv;
+  // movement actions with their times (for graphs)
+  r.actions = { jumps: [...(ev.moves.jump || []), ...(ev.moves.jump_ratking || [])], dashes: ev.moves.dash || [], slides: ev.moves.slide || [],
+    ziplines: ev.moves.zip_line || [], mantles: ev.moves.mantle || [] };
   return r;
 }

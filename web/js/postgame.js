@@ -7,6 +7,7 @@
 import { esc, S, k1 } from "./ui.js";
 import { TEAM_NAMES, statsAt, itemsAt, abilityLevelsAt } from "./data.js";
 import { fmtClock } from "./timeline.js";
+import { timeSplit } from "./analysis.js";
 
 const SLOT_ORDER = { weapon: 0, vitality: 1, spirit: 2 };
 
@@ -214,10 +215,16 @@ const GRAPHS = [
   { id: "heal", label: "Healing (without barriers)", col: 8 },
   { id: "lh", label: "Last hits", col: 5 },
   { id: "teamsouls", label: "Team souls" },
+  { id: "fighttime", label: "Time fighting heroes", time: true },
+  { id: "movetime", label: "Time on ziplines", time: true },
+  { id: "actions", label: "Movement actions (jumps, dashes, slides)" },
   { group: "Player" },
   { id: "bytype", label: "Damage dealt by type", player: true },
   { id: "toplayers", label: "Damage to players", player: true },
   { id: "fromplayers", label: "Damage from players", player: true },
+  { id: "combatsplit", label: "Time split: combat", player: true },
+  { id: "movesplit", label: "Time split: movement", player: true },
+  { id: "actionsplit", label: "Movement actions by type", player: true },
   { id: "sources", label: "Souls by source", player: true, needsPg: true },
   { id: "buffs", label: "Permanent buffs", player: true, needsPg: true },
 ];
@@ -310,6 +317,44 @@ function graphData(g, m, model, pawn) {
       return { name: TEAM_NAMES[t], color: PALETTE[t][0], pts };
     });
     return { series };
+  }
+  // time split (combat / movement state every 0.5 s, rebuilt from the demo)
+  const ts = (pw) => timeSplit(m, pw, S.assets);
+  const cumulativeBy = (samples, idx, key) => {
+    const pts = [[0, 0]]; let sum = 0, last = -1;
+    for (const smp of samples) {
+      if (smp[idx] !== key) continue;
+      sum += m.samples.dt;
+      if (smp[0] - last >= 5) { pts.push([smp[0], sum]); last = smp[0]; }
+    }
+    pts.push([m.end, sum]);
+    return pts;
+  };
+  const countSeries = (times) => { const xs = [...times].sort((a, b) => a - b); return [[0, 0], ...xs.map((t, i) => [t, i + 1]), [m.end, xs.length]]; };
+  if (g.id === "fighttime" || g.id === "movetime") {
+    const [idx, key] = g.id === "fighttime" ? [1, "hero"] : [2, "zip"];
+    return { series: players.map((p) => ({ name: p.name, icon: heroOf(p).icon, color: PALETTE[p.team]?.[teamIdx(p) % 6] || "#999",
+      pts: cumulativeBy(ts(p.pawn)?.samples || [], idx, key) })), fmt: (v) => fmtClock(v), note: "alive time, every 0.5 s, rebuilt from the demo" };
+  }
+  if (g.id === "actions") {
+    return { series: players.map((p) => {
+      const a = ts(p.pawn)?.actions || {};
+      return { name: p.name, icon: heroOf(p).icon, color: PALETTE[p.team]?.[teamIdx(p) % 6] || "#999", pts: countSeries([...(a.jumps || []), ...(a.dashes || []), ...(a.slides || [])]) };
+    }), fmt: String, note: "every jump, dash and slide, from the demo" };
+  }
+  if (g.id === "combatsplit" || g.id === "movesplit") {
+    const combat = g.id === "combatsplit";
+    const cats = combat
+      ? [["hero", "Fighting heroes", "#e5645a"], ["npc", "Fighting troopers / objectives", "#e0b25a"], ["neutral", "Farming neutrals", "#5fd38d"], ["out", "Out of combat", "#6b6f78"]]
+      : [["zip", "Zipline", "#4f86e8"], ["slide", "Slide", "#a98bff"], ["dash", "Dash", "#e8962e"], ["air", "Airborne", "#9b9385"], ["ground", "On foot", "#55525a"]];
+    const smp = ts(pawn)?.samples || [];
+    return { series: cats.map(([key, name, color]) => ({ name, color, pts: cumulativeBy(smp, combat ? 1 : 2, key) })),
+      fmt: (v) => fmtClock(v), note: "alive time, every 0.5 s; combat = dealt / took damage around that moment" };
+  }
+  if (g.id === "actionsplit") {
+    const a = ts(pawn)?.actions || {};
+    const kinds = [["jumps", "Jumps", "#e0b25a"], ["dashes", "Dashes", "#e8962e"], ["slides", "Slides", "#a98bff"], ["ziplines", "Zipline rides", "#4f86e8"], ["mantles", "Mantles", "#5fd38d"]];
+    return { series: kinds.map(([k, name, color]) => ({ name, color, pts: countSeries(a[k] || []) })).filter((s) => s.pts.length > 2), fmt: String };
   }
   const me = m.byPawn.get(pawn);
   if (g.id === "bytype") {
