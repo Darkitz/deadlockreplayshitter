@@ -897,3 +897,34 @@ body { word-spacing: .08em; }
 .state:empty, .state[hidden] { display: none; }
 /* buffs without an icon: short label, full name in the hover text */
 .mod .mod-text { max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle; }
+
+/* ---------------------------------------------------------------- light theme contrast
+   the summary's ink is made for dark panels: dark ink on light backgrounds, light ink only
+   where the panel stays dark (MVP stage, graphs, scoreboard rows, pills) */
+:root[data-theme="light"] .pg { --pg-ink: #1c1a17; }
+:root[data-theme="light"] .pg-mvp-stage, :root[data-theme="light"] .pg-graphs,
+:root[data-theme="light"] .pg-board tr[data-pawn] td, :root[data-theme="light"] .pg-pill,
+:root[data-theme="light"] .pg-divider-time, :root[data-theme="light"] .pg-strip-hero b { --pg-ink: #f2ead8; color: var(--pg-ink); }
+:root[data-theme="light"] .pg-card .aw b, :root[data-theme="light"] .pg-card .aw span { text-shadow: none; }
+:root[data-theme="light"] .pg-card .aw-kill b, :root[data-theme="light"] .pg-card .aw-kill .aw-icon { color: #c62f22; }
+:root[data-theme="light"] .pg-card .aw-heal b, :root[data-theme="light"] .pg-card .aw-heal .aw-icon { color: #198a46; }
+:root[data-theme="light"] .pg-card .aw-souls b, :root[data-theme="light"] .pg-card .aw-souls .aw-icon { color: #0f8a78; }
+:root[data-theme="light"] .pg-team-result, :root[data-theme="light"] .pg-victorious { color: var(--text); }
+:root[data-theme="light"] .pg-team.team-2 .pg-team-result:not(:empty) { color: var(--muted); }
+:root[data-theme="light"] .pg-banner-meta b { color: #6b6457; }
+:root[data-theme="light"] .pg-board th { color: #6b6457; }
+:root[data-theme="light"] .pg-board .pg-total td { color: var(--text); }
+:root[data-theme="light"] .pg-divider-time { background: #1c1a17; border-color: #a8701a; }
+:root[data-theme="light"] .pg-card-hero { color: #6b6457; }
+/* replay: stat badges on ability icons and the dense player strip */
+:root[data-theme="light"] .ab-stat { background: #eef0f2; }
+:root[data-theme="light"] .ab-stat:not(.muted) { color: #167a3e; }
+:root[data-theme="light"] .ab.on { background: color-mix(in srgb, var(--accent) 14%, #fff); }
+:root[data-theme="light"] .sb-strip .sb-nw { color: #4b4f57; }
+:root[data-theme="light"] .sb-strip-mid span, :root[data-theme="light"] .pg-strip-totals span { color: #fff; }
+:root[data-theme="light"] .sb-won, :root[data-theme="light"] .sb-yours { color: var(--text); }
+:root[data-theme="light"] .ab-label, :root[data-theme="light"] .tile .k, :root[data-theme="light"] .team-head,
+:root[data-theme="light"] .report-table th, :root[data-theme="light"] .tracker-table th, :root[data-theme="light"] .section-title { color: #5b5f67; }
+/* award kill red: fixed, not the theme's --kill (purple in light mode) */
+.aw-kill .aw-icon, .aw-kill b { color: #ef5b4c; }
+:root[data-theme="light"] .pg-team .pg-card .aw-kill b, :root[data-theme="light"] .pg-team .pg-card .aw-kill .aw-icon { color: #c62f22; }
