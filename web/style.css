@@ -1125,3 +1125,8 @@ a.btn { display: inline-block; color: var(--text); text-decoration: none; }
   .bp-selbar { gap: 10px; font-size: 13px; padding-left: 12px; }
   .bp-abil-name { width: 130px; }
 }
+.bp-old { margin-top: 6px; }
+.bp-old > summary { cursor: pointer; padding: 8px 10px; color: var(--muted); font-size: 13px; border: 1px dashed var(--line); border-radius: var(--radius); }
+.bp-old > summary:hover { color: var(--text); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.bp-old[open] > summary { margin-bottom: 6px; }
+.bp-old .bp-prow { opacity: .75; }

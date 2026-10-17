@@ -441,21 +441,33 @@ async function showPlayer(account, preloaded) {
       : (y.updated ?? 0) - (x.updated ?? 0));
   };
   let shown = [];
+  // builds nobody touched in over a year (often outdated, or deleted in game: deadlock-api keeps
+  // those) go under a fold
+  const YEAR_AGO = Date.now() / 1000 - 365 * 86400;
+  const isOld = (b) => b.updated != null && b.updated < YEAR_AGO;
+  let oldOpen = false;
+  const row = (b, i) => {
+    const hero = S.assets.hero(b.hero_id);
+    return `<div class="bp-prow">
+      ${hero.icon ? `<img class="bp-p-hero" src="${esc(hero.icon)}" alt="" data-help="${esc(hero.name)}" loading="lazy">` : `<span class="bp-p-hero"></span>`}
+      <div class="bp-p-main">
+        <a class="bp-p-name" href="#/build/${b.id}">${esc(b.name || "Untitled build")}</a>
+        <div class="bp-p-meta">${esc(hero.name)} · #${b.id} v${b.version}${b.updated ? ` · ${new Date(b.updated * 1000).toLocaleDateString()}` : ""}${b.favorites ? ` · ★ ${b.favorites.toLocaleString()}` : ""}</div>
+        ${b.description ? `<div class="bp-p-desc">${esc(b.description)}</div>` : ""}
+      </div>
+      <button type="button" class="btn primary" data-copy="${i}">copy</button>
+    </div>`;
+  };
   const draw = () => {
-    shown = visible();
+    const rows = visible();
+    shown = [...rows.filter((b) => !isOld(b)), ...rows.filter(isOld)];
+    const nOld = rows.filter(isOld).length;
+    const fresh = shown.slice(0, shown.length - nOld);
     root.querySelector(".bp-count").textContent = `${shown.length} build${shown.length === 1 ? "" : "s"}`;
-    root.querySelector(".bp-plist").innerHTML = shown.map((b, i) => {
-      const hero = S.assets.hero(b.hero_id);
-      return `<div class="bp-prow">
-        ${hero.icon ? `<img class="bp-p-hero" src="${esc(hero.icon)}" alt="" data-help="${esc(hero.name)}" loading="lazy">` : `<span class="bp-p-hero"></span>`}
-        <div class="bp-p-main">
-          <a class="bp-p-name" href="#/build/${b.id}">${esc(b.name || "Untitled build")}</a>
-          <div class="bp-p-meta">${esc(hero.name)} · #${b.id} v${b.version}${b.updated ? ` · ${new Date(b.updated * 1000).toLocaleDateString()}` : ""}${b.favorites ? ` · ★ ${b.favorites.toLocaleString()}` : ""}</div>
-          ${b.description ? `<div class="bp-p-desc">${esc(b.description)}</div>` : ""}
-        </div>
-        <button type="button" class="btn primary" data-copy="${i}">copy</button>
-      </div>`;
-    }).join("") || `<p class="muted">No builds match.</p>`;
+    root.querySelector(".bp-plist").innerHTML = (fresh.map(row).join("") || (nOld ? "" : `<p class="muted">No builds match.</p>`))
+      + (nOld ? `<details class="bp-old" ${oldOpen ? "open" : ""}><summary>${nOld} build${nOld === 1 ? "" : "s"} not updated in over a year</summary>
+          <div class="bp-plist">${shown.slice(fresh.length).map((b, j) => row(b, fresh.length + j)).join("")}</div></details>` : "");
+    root.querySelector(".bp-old")?.addEventListener("toggle", (e) => { oldOpen = e.target.open; });
   };
   root.querySelector(".bp-plist").addEventListener("click", (e) => {
     const b = shown[e.target.closest("[data-copy]")?.dataset.copy];
