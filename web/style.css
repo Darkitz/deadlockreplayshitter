@@ -783,3 +783,10 @@ code, .tin { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .pg-logo.team-3, .pg-logo-text.team-3 { color: var(--sapphire); }
 /* Barlow's space is very narrow; at small sizes words run together ("State (recast)") */
 body { word-spacing: .08em; }
+/* replay stage: the feed grows to the bottom of the map + state column instead of leaving a gap */
+.stage { align-items: stretch; }
+.stage-right { min-height: 0; }
+.stage-right .readout { flex: 1 1 auto; min-height: 0; align-items: stretch; }
+.stage-right .feed-wrap { min-height: 0; }
+.stage-right .feed { flex: 1 1 0; height: 0; min-height: 260px; max-height: none; }
+@media (max-width: 1000px) { .stage-right .feed { flex: none; height: auto; max-height: 360px; } }
