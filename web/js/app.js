@@ -11,6 +11,7 @@ import { viewMatch } from "./match.js";
 import { viewHome } from "./home.js";
 import { viewAbout, explain } from "./explain.js";
 import { initDropZone, localList } from "./local.js";
+import { initLang, helpLabel, helpText } from "./lang.js";
 
 async function loadAll() {
   const [assets, local] = await Promise.all([loadJSON("data/assets.json"), localList()]);
@@ -66,7 +67,7 @@ const HELP_SEL = "[data-help], .tile .k, th";
 
 function helpFor(el) {
   if (el.dataset.help) return el.dataset.help;
-  return explain(el.textContent);
+  return explain(helpLabel(el));
 }
 
 function initHelp() {
@@ -95,7 +96,7 @@ function initHelp() {
     cur = el;
     const text = el && helpFor(el);
     if (!text) { tip.hidden = true; return; }
-    tip.textContent = text;
+    tip.textContent = helpText(text);
     tip.hidden = false;
     const r = el.getBoundingClientRect();
     const w = Math.min(340, window.innerWidth - 16);
@@ -139,6 +140,7 @@ async function main() {
   }
   initHelp();
   initDropZone();
+  initLang();
   window.addEventListener("hashchange", route);
   route();
 }

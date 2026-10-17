@@ -63,6 +63,11 @@ Some metrics need explaining:
   - Hero melee accuracy = hero hits ÷ hero melees.
 - **Parries** are paired with the enemy swing they caught (within 8 m, 0.6 s).
 
+**Header toggles:**
+- Light / dark theme.
+- Language: English, or **Gen Z English** (`web/js/lang.js`). That one is a joke mode, you've been warned 💀. It never touches player names or chat.
+- Both are saved per browser.
+
 ## Layout
 
 | path | |

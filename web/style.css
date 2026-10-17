@@ -494,3 +494,4 @@ table.mini td.accent { color: var(--accent); }
 @media (max-width: 760px) { .ts-row { grid-template-columns: 24px 1fr; } .ts-row .ts-bar, .ts-row .ts-counts { grid-column: 1 / -1; } }
 /* hero ability icons are white glyphs made for the dark HUD: give them a dark tile in light mode */
 :root[data-theme="light"] img[src*="/hud/abilities/"] { background: #2b2f37; border-radius: 6px; }
+.lang-toggle { min-width: 46px; font-size: 12px; font-weight: 600; }
