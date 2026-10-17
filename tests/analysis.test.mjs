@@ -56,7 +56,10 @@ test("damage after the window or after the next cast is not credited to the earl
 
 test("ally damage / buffs never count as hits", () => {
   const m = fixture({ casts: [cast(10)], damage: [dmg(10.1, 3)], notify: [[10.1, 1, 3, AB.id, 1]] });
-  assert.equal(analyzeAbility(m, 1, AB, { window: 3 }).casts[0].result, "miss");
+  const casts = analyzeAbility(m, 1, AB, { window: 3 }).casts;
+  assert.equal(casts[0].result, "ally"); // used on a teammate: not a hit, and not an attempt either
+  const c = counts(casts);
+  assert.deepEqual([c.hit, c.allyOnly, c.acc], [0, 1, 0]);
 });
 
 test("status notify on an enemy counts as a hit", () => {
@@ -282,7 +285,7 @@ test("ability kinds: debuffs hit, heals reach allies, self buffs count fight usa
     [50.1, 55, 1, 1, 779, AB.id, 1], // buff on self only
   ];
   const off = analyzeAbility(m, 1, { ...AB, kind: "offensive" }, { window: 3 }).casts.map((c) => c.result);
-  assert.deepEqual(off, ["hit", "miss", "miss"]);
+  assert.deepEqual(off, ["hit", "ally", "miss"]);
   m._analysis = null;
   const sup = analyzeAbility(m, 1, { ...AB, kind: "support" }, { window: 3 }).casts;
   assert.deepEqual(sup.map((c) => c.result), ["hit", "ally", "self"]);
@@ -290,6 +293,24 @@ test("ability kinds: debuffs hit, heals reach allies, self buffs count fight usa
   assert.deepEqual([c.ally, c.allyHeroes, c.selfOnly], [1, 1, 1]);
   m._analysis = null;
   const self = analyzeAbility(m, 1, { ...AB, kind: "self" }, { window: 3 }).casts;
-  assert.deepEqual(self.map((x) => x.result), ["hit", "miss", "self"]);
+  assert.deepEqual(self.map((x) => x.result), ["hit", "ally", "self"]);
   assert.ok(self.every((x) => x.inFight)); // the enemy stands 2.5 m away the whole time
+});
+
+test("recasts count for the parent; channels count damage for their whole duration; modes", () => {
+  const m = fixture({
+    casts: [cast(10)],
+    damage: [
+      [10.5, 1, 2, 2, AB.id, 30, 1, 0, 0, 0, 0],   // first tick
+      [16.0, 1, 2, 2, AB.id, 30, 1, 0, 0, 0, 0],   // later tick of an 8 s channel
+      [11.0, 1, 2, 2, 4242, 50, 1, 0, 0, 0, 0],    // the recast (child ability id)
+    ],
+  });
+  const ch = analyzeAbility(m, 1, { ...AB, effect: 8, childIds: [4242] }, { window: 3 }).casts[0];
+  assert.equal(ch.result, "hit");
+  assert.equal(ch.dmg, 110);
+  m._analysis = null;
+  m.damage.push([12, 1, 2, 2, 999, 200, 1, 0, 0, 0, 0]); // gun damage during the mode
+  const mode = analyzeAbility(m, 1, { ...AB, id: 7777, kind: "mode", effect: 5 }, { window: 3 }).casts[0];
+  assert.deepEqual([mode.result, mode.modeDmg, mode.modeHeroes], ["hit", 280, [2]]); // the 16 s tick is after the 5 s mode
 });

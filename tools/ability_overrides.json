@@ -1,0 +1,33 @@
+{
+  "_comment": "Hand-reviewed scoring for abilities whose measured profile (tools/ability_profiles.json) doesn't capture what they are for. Reviewed against each ability's in-game description. kind: offensive | support | self | proc | mode (empowers your other attacks for a while: scored by what you dealt during it). shots: empowered shots per cast.",
+
+  "ability_power_jump": { "kind": "mode", "note": "Rain of Arrows: glide with weapon damage + multishot" },
+  "ability_werewolf_transformation": { "kind": "mode", "note": "Lycan Curse: transformation, replaces weapon and abilities" },
+  "ability_baba_bench_run": { "kind": "mode", "note": "Granny Long Legs: movement + empowered melee for the duration" },
+  "citadel_ability_infinity_slash": { "kind": "mode", "note": "Shadow Transformation: faster abilities, resists" },
+  "citadel_ability_hornet_leap": { "kind": "mode", "note": "Flight: weapon deals bonus spirit damage while flying" },
+  "citadel_ability_wraith_rapidfire": { "kind": "mode", "note": "Full Auto: fire rate + bonus spirit damage" },
+  "ability_power_surge": { "kind": "mode", "note": "Power Surge: bullets proc shock damage for the duration" },
+  "upgrade_colossus": { "kind": "mode", "note": "Colossus: bigger, resists, melee damage, slow aura" },
+  "upgrade_split_shot": { "kind": "mode", "note": "Split Shot: weapon multishot" },
+  "upgrade_infinitemagazine": { "kind": "mode", "note": "Endless Magazine: infinite ammo + fire rate" },
+  "upgrade_unstable_concoction": { "kind": "mode", "note": "Unstable Concoction: empowered, then explode" },
+  "ability_priest_weaponswap": { "kind": "offensive", "shots": 3, "shot_window": 15, "note": "Ira Domini: loads 3 stakes" },
+
+  "ability_ratking_ratarmor": { "kind": "self", "note": "Royal Pestments: barrier (deflects are a side effect)" },
+  "ability_unicorn_prismaticguard": { "kind": "self", "note": "Dazzling Trick: barrier, silences only when broken" },
+  "ability_bounce_pad": { "kind": "self", "note": "Bounce Pad: mobility (landing explosion is a side effect)" },
+  "citadel_ability_void_sphere": { "kind": "self", "note": "Quantum Entanglement: teleport (alt-cast brings allies)" },
+  "upgrade_shadow_step": { "kind": "self", "note": "Shadow Step: teleport" },
+  "upgrade_rocket_boots": { "kind": "self" },
+
+  "ability_familiar_helpinghands": { "kind": "support", "note": "Lil Helpers: helpers follow allies / troopers" },
+  "ability_ratking_standard_bearer": { "kind": "support", "note": "Rule, Ratannia!: banner buffs nearby allies" },
+  "upgrade_discord": { "kind": "support", "note": "Scourge: aura on a friendly target (can self-cast)" },
+
+  "upgrade_mystical_piano": { "kind": "offensive", "window": 3 },
+
+  "citadel_ability_melee_parry": { "kind": "self", "note": "Parry: defensive reaction; scored in the melee view (parries made / got parried)" },
+  "ability_deadpack_zip_line": { "kind": "self", "hidden": true, "note": "Deadman Danny's zipline movement" },
+  "cosmetic_ability_voting_poster": { "kind": "self", "hidden": true, "note": "cosmetic" }
+}

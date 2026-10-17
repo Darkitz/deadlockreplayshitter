@@ -255,6 +255,10 @@ try:
     PROFILES = json.loads((ROOT / "tools" / "ability_profiles.json").read_text())
 except (OSError, ValueError):
     PROFILES = {}
+try:
+    OVERRIDES = {k: v for k, v in json.loads((ROOT / "tools" / "ability_overrides.json").read_text()).items() if not k.startswith("_")}
+except (OSError, ValueError):
+    OVERRIDES = {}
 
 
 # ---------------------------------------------------------------- chat wheel
@@ -445,6 +449,22 @@ def build_assets(previous=None):
             if entry["name"] == key and entry["hero"] in heroes:
                 # some guns are localized under an older hero codename; name them after the hero
                 entry["name"] = f"{heroes[entry['hero']]['name']}'s gun"
+        # how long its effects last (channels, durations): damage is summed over this
+        def numv(k):
+            v = props_all.get(k)
+            v = v.get("m_strValue") if isinstance(v, dict) else v
+            try:
+                x = float(str(v).rstrip("sm"))
+            except (TypeError, ValueError):
+                return 0.0
+            return 0.0 if x >= 999 else x
+        effect = numv("AbilityCastDelay") + max(numv("AbilityDuration"), numv("AbilityChannelTime"))
+        if effect > 0:
+            entry["effect"] = round(min(effect, 20.0), 2)
+        # hand-reviewed scoring (tools/ability_overrides.json) wins over measured / guessed
+        for k, v in (OVERRIDES.get(key) or {}).items():
+            if k != "note":
+                entry[k] = v
         if img:
             entry["image"] = site_icon(img)
         items[token_id(key)] = entry
@@ -462,6 +482,7 @@ def build_assets(previous=None):
             if parent and parent["name"] != parent["class_name"]:
                 extra = " ".join(nice_suffix.get(w, w) for w in parts[cut:])
                 e["name"] = f"{parent['name']} ({extra})"
+                e["parent"] = parent["class_name"]
                 break
 
     modifiers = {token_id(k): k for k in modifiers_kv if isinstance(modifiers_kv[k], dict) and not k.startswith("_")}

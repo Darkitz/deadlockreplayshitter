@@ -34,7 +34,9 @@ export async function viewMatch(id, params) {
   // the hero's own melee ability rows are replaced by the light / heavy melee pseudo-abilities
   const isMeleeAb = (c) => /ability_melee_(?!parry)|hold_melee/.test(c || "");
   const fullTable = subject ? abilityTable(m, pawn, S.assets, opts()) : [];
-  const table = fullTable.filter((r) => !isMeleeAb(r.ability.class_name));
+  // recast / trigger rows are folded into their parent ability
+  const parents = new Set(fullTable.map((r) => r.ability.class_name));
+  const table = fullTable.filter((r) => !isMeleeAb(r.ability.class_name) && !r.ability.hidden && !(r.ability.parent && parents.has(r.ability.parent)));
   const wanted = params.get("ability");
   const row = table.find((r) => r.ability.class_name === wanted) || table.find((r) => r.thrown) || table[0];
   const gunMode = !!subject && wanted === GUN.class_name;
@@ -78,9 +80,16 @@ export async function viewMatch(id, params) {
       } else if (r?.thrown && ab.kind === "self") {
         lines.push(`×${r.thrown}: uses. A self buff, mobility or utility ability, so there's nothing to hit.`,
           `${r.inFight} of ${r.thrown} were used in a fight (enemy hero within 25 m, or hero damage within 3 s).`);
+      } else if (r?.thrown && ab.kind === "mode") {
+        lines.push(`${k1(r.modeDmg || 0)}: hero damage you dealt (any source) while it was active, ${r.thrown} use${r.thrown > 1 ? "s" : ""}.`,
+          `It empowers your other attacks for ~${ab.effect || 6} s, so it has no accuracy of its own. ${r.modeKills} kills / assists during it.`);
+      } else if (!r?.thrown && ab.kind === "proc") {
+        lines.push("Passive: always on, nothing to cast.");
       } else if (r?.thrown && ab.kind === "proc") {
         lines.push(`×${r.thrown}: times it triggered (passive with a cooldown).`, `${r.hit} of those dealt damage to an enemy hero.`);
-      } else if (r?.thrown) lines.push(`${r.scored} / ${r.thrown}: casts that ${settings.heroesOnly ? "hit an enemy hero" : "hit anything"} (damage or debuff) / all casts (hit window ${Math.max(settings.window, ab.window || 0)} s${ab.window > settings.window ? ", longer for this ability: its effects land late" : ""}).`);
+      } else if (r?.thrown) lines.push(`${r.scored} / ${r.thrown - r.allyOnly}: casts that ${settings.heroesOnly ? "hit an enemy hero" : "hit anything"} (damage or debuff) / all casts (hit window ${Math.max(settings.window, ab.window || 0)} s${ab.window > settings.window ? ", longer for this ability: its effects land late" : ""}).`,
+        ...(r.allyOnly ? [`${r.allyOnly} uses on teammates are left out of accuracy.`] : []),
+        ...(r.heroesPerHit ? [`${r.heroesPerHit.toFixed(2)} heroes hit per hitting cast.`] : []));
       else lines.push("Not used this match.");
       if (r?.item) lines.push("Active item.");
     }
@@ -102,7 +111,9 @@ export async function viewMatch(id, params) {
     const kind = ab.kind || "offensive";
     if (r?.thrown && kind === "support") return `<span class="ab-stat ab-support">${r.ally}/${r.thrown}</span>`;
     if (r?.thrown && (kind === "self" || kind === "proc")) return `<span class="ab-stat ab-uses">×${r.thrown}</span>`;
-    return r && r.thrown ? `<span class="ab-stat">${r.scored}/${r.thrown}</span>` : `<span class="ab-stat muted">–</span>`;
+    if (r?.thrown && kind === "mode") return `<span class="ab-stat">${k1(r.modeDmg || 0)}</span>`;
+    if (!r?.thrown && kind === "proc") return `<span class="ab-stat muted">passive</span>`;
+    return r && r.thrown ? `<span class="ab-stat">${r.scored}/${r.thrown - (r.allyOnly || 0)}</span>` : `<span class="ab-stat muted">–</span>`;
   }
   // signature-ability accuracy of every player (who hits their skills best this match)
   const skillAcc = new Map(m.players.map((p) => {
@@ -998,6 +1009,12 @@ export async function viewMatch(id, params) {
       tile("Used in a fight", c.thrown ? `${pct(c.inFight / c.thrown)}<small> ${c.inFight}</small>` : "–", "accent") +
       tile("Out of fights", c.thrown - c.inFight) + common +
       tile("Level", st ? st[1] : "–");
+    else if (akind === "mode" && c.projectiles == null) $(".tiles", app).innerHTML =
+      tile("Uses", c.thrown) +
+      tile("Hero damage during it", k1(c.modeDmg || 0), "good") +
+      tile("Per use", c.thrown ? k1(Math.round((c.modeDmg || 0) / c.thrown)) : "–", "accent") +
+      tile("Kills / assists during it", c.modeKills) +
+      tile("Used in a fight", c.thrown ? `${pct(c.inFight / c.thrown)}<small> ${c.inFight}</small>` : "–") + common;
     else if (akind === "proc" && c.projectiles == null) $(".tiles", app).innerHTML =
       tile("Triggers", c.thrown) +
       tile("Damaged an enemy hero", `${c.hit}<small> / ${c.thrown}</small>`, "good") +
@@ -1024,6 +1041,8 @@ export async function viewMatch(id, params) {
       tile("Souls", st ? k1(st[0]) : "–") +
       tile("Level", st ? st[1] : "–") +
       tile("Hit non-hero", c.other) +
+      (c.heroesPerHit ? tile("Heroes per hit", c.heroesPerHit.toFixed(2)) : "") +
+      (c.allyOnly ? tile("Used on allies", `${c.allyOnly}<small> not counted</small>`) : "") +
       tile("Hits → kills", c.hit ? `${c.kills}<small> / ${c.hit}</small>` : "–") +
       tile("Ready → recast", c.idle != null ? `${c.idle.toFixed(1)}<small> s</small>` : "–");
 
@@ -1046,7 +1065,8 @@ export async function viewMatch(id, params) {
           return p ? `<img src="${esc(S.assets.hero(p.hero_id).icon)}" title="${esc(p.name)}">` : "";
         }).join("");
         const dist = k.dist != null ? ` · ${Math.round(k.dist)} m` : "";
-        const label = k.result === "hit" ? `hit${k.delay != null ? ` +${k.delay.toFixed(2)}s` : ""}${dist} · ${k.dmg} dmg`
+        const label = ability.kind === "mode" && k.modeDmg != null ? `${k1(k.modeDmg)} hero dmg during it${k.modeKills ? ` · ${k.modeKills} kill${k.modeKills > 1 ? "s" : ""}` : ""}${k.inFight ? "" : " · out of fights"}`
+          : k.result === "hit" ? `hit${k.delay != null ? ` +${k.delay.toFixed(2)}s` : ""}${dist} · ${k.dmg} dmg`
           : k.result === "other" ? `hit non-hero${dist} · ${k.dmg} dmg`
           : k.result === "ally" ? `on ${k.allies.map((a) => esc(m.byPawn.get(a)?.name || "ally")).join(", ")}${k.onSelf ? " + self" : ""}`
           : k.result === "self" ? `used${k.inFight ? " · in a fight" : ""}`

@@ -21,6 +21,10 @@ export class Assets {
     this.ui = raw.ui || {};
     this.byClass = new Map();
     for (const [id, it] of Object.entries(raw.items)) this.byClass.set(it.class_name, { id: Number(id), ...it });
+    // recast / trigger abilities ("Flow State (recast)") count toward their parent ability
+    for (const it of this.byClass.values()) {
+      if (it.parent && it.type === "ability" && this.byClass.has(it.parent)) (this.byClass.get(it.parent).childIds ??= []).push(it.id);
+    }
   }
   hero(id) { return this.heroes[id] || { name: `hero ${id}`, icon: "", signatures: [] }; }
   item(id) { return this.items[id]; }
