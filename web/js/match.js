@@ -4,7 +4,7 @@ import {
   loadMatch, statsAt, hpAt, itemsAt, abilityLevelsAt, modifiersAt, TEAM_NAMES,
 } from "./data.js";
 import {
-  analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt, damageTaken, detectFights, surroundings, MELEE, MELEE_LIGHT, MELEE_HEAVY, MELEE_REACH_M, meleeStats, meleeModel,
+  analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt, damageTaken, detectFights, surroundings, MELEE, MELEE_LIGHT, MELEE_HEAVY, MELEE_REACH_M, meleeStats, meleeModel, timeSplit,
 } from "./analysis.js";
 import { createTimeline, fmtClock } from "./timeline.js";
 import { createMinimap } from "./minimap.js";
@@ -89,6 +89,7 @@ export async function viewMatch(id, params) {
   const TABS = [
     ["tracker", "Players"],
     ["incoming", "Incoming"],
+    ["time", "Time split"],
     ["laning", "Laning"],
     ["chat", `Chat <small>${chatLines.filter((l) => l.kind === "chat").length}</small>`],
   ];
@@ -188,6 +189,7 @@ export async function viewMatch(id, params) {
     </nav>
     <section class="chart-card tracker tab-panel" id="tracker"></section>
     <section class="chart-card incoming tab-panel" id="incoming"></section>
+    <section class="chart-card time tab-panel" id="time"></section>
     <section class="chart-card laning tab-panel" id="laning"></section>
     <section class="chart-card chat tab-panel" id="chat"></section>
 `;
@@ -479,11 +481,47 @@ export async function viewMatch(id, params) {
     for (const el of app.querySelectorAll(".tab-panel")) el.classList.toggle("active", el.id === id);
     if (id === "chat") renderChat(t);
     if (id === "tracker") renderTracker(t);
+    if (id === "time") renderTime(t);
   }
   if ($("#laning", app).hidden) $('[data-tab="laning"]', app).hidden = true;
   for (const b of app.querySelectorAll("[data-tab]")) {
     b.addEventListener("click", () => { settings.matchTab = b.dataset.tab; saveSettings(); showTab(b.dataset.tab); syncUrl(); });
   }
+
+  // time split: combat state and movement per player over the point / span
+  const COMBAT = [["hero", "fighting heroes", "c-hero"], ["npc", "fighting troopers / objectives", "c-npc"],
+    ["neutral", "farming neutrals", "c-neutral"], ["out", "out of combat", "c-out"]];
+  const MOVES = [["zip", "zipline", "m-zip"], ["slide", "slide", "m-slide"], ["dash", "dash", "m-dash"], ["air", "airborne", "m-air"]];
+  function renderTime(t) {
+    const from = t0 ?? -Infinity;
+    const rows = teams.flatMap((tm) => teamOf(tm)).map((p) => ({ p, ts: timeSplit(m, p.pawn, S.assets, from, t) })).filter((r) => r.ts?.total);
+    const bar = (parts, group, ts) => parts.map(([k, label, cls]) => {
+      const v = ts[group][k];
+      return v ? `<span class="${cls}" style="width:${(v / ts.total) * 100}%" data-help="${esc(`${label}: ${fmtClock(v)} (${Math.round((v / ts.total) * 100)}%)`)}"></span>` : "";
+    }).join("");
+    const legend = (parts) => parts.map(([, label, cls]) => `<span><i class="sw ${cls}"></i>${label}</span>`).join("");
+    $("#time", app).innerHTML = `
+      <h3>How each player spent ${t0 != null ? `${fmtClock(t0)}–${fmtClock(t)}` : `the match up to ${fmtClock(t)}`}
+        <span class="muted">· alive time, from the demo every 0.5 s</span></h3>
+      <div class="legend-row small">${legend(COMBAT)}<span class="muted">· right: movement</span>${legend(MOVES)}<span><i class="sw m-ground"></i>on foot</span></div>
+      ${rows.map(({ p, ts }) => {
+        const c = ts.counts;
+        const counts = `jumps ${c.jumps} · dashes ${c.dashes} · slides ${c.slides} · ziplines ${c.ziplines} (boosts ${c.boosts}) · mantles ${c.mantles}`;
+        return `<div class="ts-row team-row-${p.team} ${p.pawn === pawn ? "on" : ""}" data-pawn="${p.pawn}" role="button">
+          <img src="${esc(S.assets.hero(p.hero_id).icon)}" alt=""><span class="ts-name">${esc(p.name)}</span>
+          <span class="ts-bar">${bar(COMBAT, "combat", ts)}</span>
+          <span class="ts-bar">${ts.hasMove ? bar(MOVES, "move", ts) : ""}</span>
+          <span class="ts-counts small muted" data-help="${esc(counts)}">${c.jumps}↑ ${c.dashes}» ${c.slides}↘ ${c.ziplines}⇢</span>
+        </div>`;
+      }).join("")}
+      ${rows.some((r) => !r.ts.hasMove) ? `<p class="small muted">Movement needs a demo parsed with the current parser; drop it again.</p>` : ""}
+      <p class="small muted">Rebuilt from the demo; lands within a few points of Valve's own numbers.
+        <a href="#/about?s=time">How it's measured →</a> · Counts: ↑ jumps · » dashes · ↘ slides · ⇢ zipline rides.</p>`;
+  }
+  $("#time", app).addEventListener("click", (ev) => {
+    const row = ev.target.closest(".ts-row[data-pawn]");
+    if (row) setParams({ pawn: row.dataset.pawn });
+  });
 
   // chat: team chat of each side and all chat, with chat-wheel pings; future lines are dimmed
   function renderChat(t) {
@@ -684,6 +722,7 @@ export async function viewMatch(id, params) {
     renderReadout(t);
     if (tab === "tracker") renderTracker(t);
     if (tab === "chat") renderChat(t);
+    if (tab === "time") renderTime(t);
     renderState(t);
   }
 

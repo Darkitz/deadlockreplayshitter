@@ -446,3 +446,18 @@ table.mini td.accent { color: var(--accent); }
 .ping-chip { font-size: 10px; border: 1px solid var(--line); border-radius: 999px; padding: 0 5px; color: var(--muted); }
 .chat-now { display: flex; align-items: center; gap: 6px; color: var(--accent); font-size: 11px; margin: 4px 0; }
 .chat-now::before, .chat-now::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--accent) 50%, transparent); }
+
+/* time split (Time tab) */
+.legend-row { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0 10px; color: var(--muted); }
+.legend-row span { display: inline-flex; align-items: center; gap: 5px; }
+.m-ground { background: var(--panel-3); }
+.ts-row { display: grid; grid-template-columns: 24px 150px minmax(0, 3fr) minmax(0, 1fr) 120px; gap: 10px; align-items: center;
+  padding: 3px 6px; margin: 2px 0; font-size: 12.5px; border-radius: 6px; cursor: pointer; }
+.ts-row:hover { background: var(--panel-2); }
+.ts-row.on { background: var(--panel-3); }
+.ts-row img { width: 24px; height: 24px; border-radius: 4px; }
+.ts-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ts-bar { display: flex; height: 12px; border-radius: 3px; overflow: hidden; background: var(--panel-3); }
+.ts-bar span { display: block; height: 100%; }
+.ts-counts { white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) { .ts-row { grid-template-columns: 24px 1fr; } .ts-row .ts-bar, .ts-row .ts-counts { grid-column: 1 / -1; } }

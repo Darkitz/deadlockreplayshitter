@@ -24,7 +24,7 @@ use haste::valveprotos::deadlock::{
 use prost::Message;
 use serde::Serialize;
 
-pub const FORMAT_VERSION: u32 = 13;
+pub const FORMAT_VERSION: u32 = 14;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`.
 /// sync.py passes the current ids (resolved by class name) via `--ignore-ids`; this list is only
 /// the fallback.
@@ -95,6 +95,10 @@ const HEALTH: u64 = fkey_from_path(&["m_iHealth"]);
 const CTRL_HEALTH_MAX: u64 = fkey_from_path(&["m_PlayerDataGlobal", "m_iHealthMax"]);
 const MAX_HEALTH: u64 = fkey_from_path(&["m_iMaxHealth"]);
 const LIFE_STATE: u64 = fkey_from_path(&["m_lifeState"]);
+// movement state (found by probing pawn fields in real demos)
+const FLAGS: u64 = fkey_from_path(&["m_fFlags"]); // bit 0 = FL_ONGROUND
+const ZIPLINE_COLOR: u64 = fkey_from_path(&["m_eZipLineLaneColor"]); // non-zero while on a zipline
+const DUCKED: u64 = fkey_from_path(&["m_pMovementServices", "m_bDucked"]); // crouch / slide
 const EYE_ANGLES: u64 = fkey_from_path(&["m_angEyeAngles"]);
 const CELL_X: u64 = fkey_from_path(&["CBodyComponent", "m_cellX"]);
 const CELL_Y: u64 = fkey_from_path(&["CBodyComponent", "m_cellY"]);
@@ -187,6 +191,8 @@ struct Track {
     /// health per sample (0 when dead)
     hp: Vec<i32>,
     max_hp: Vec<i32>,
+    /// movement bits per sample: 1 = airborne, 2 = on a zipline, 4 = ducked (crouch / slide)
+    mv: Vec<u8>,
 }
 
 #[derive(Default, Serialize)]
@@ -253,6 +259,11 @@ pub struct Output {
     modifiers: Vec<(f32, f32, i32, i32, u32, u32, i32)>,
     /// [t, victim_pawn, attacker_pawn, killer_ability_id, [assister pawns]]
     kills: Vec<(f32, i32, i32, u32, Vec<i32>)>,
+    /// movement abilities (kept out of `uses`): [t, pawn, ability_id] for dash, jump, mantle,
+    /// slide, zipline boost, ...
+    moves: Vec<(f32, i32, u32)>,
+    /// damage heroes took from non-heroes: [t, victim pawn, damage, attacker_class]
+    npc_hits: Vec<(f32, i32, i32, u32)>,
     /// typed chat: [t, pawn, 1 = all chat / 0 = team chat, text]
     chat: Vec<(f32, i32, u8, String)>,
     /// chat wheel: [t, pawn, wheel message id, voice line ("haze_ping_retreat_01_ping_2d", may be empty)]
@@ -442,7 +453,14 @@ impl V {
             a.parried = ok;
         }
         let cd_start: f32 = e.get_value(&COOLDOWN_START).unwrap_or(0.0);
-        if cd_start > 0.0 && (cd_start - a.cooldown_start).abs() > 1e-3 && !self.noisy.contains(&a.id) {
+        if cd_start > 0.0 && (cd_start - a.cooldown_start).abs() > 1e-3 && self.noisy.contains(&a.id) {
+            // movement ability: keep it apart from `uses` (they fire constantly)
+            a.cooldown_start = cd_start;
+            let (owner, id) = (a.owner_pawn, a.id);
+            if t > 0.0 {
+                self.out.moves.push((t, owner, id));
+            }
+        } else if cd_start > 0.0 && (cd_start - a.cooldown_start).abs() > 1e-3 {
             a.cooldown_start = cd_start;
             let cd_end: f32 = e.get_value(&COOLDOWN_END).unwrap_or(cd_start);
             let charges: i32 = e.get_value(&CHARGES).unwrap_or(0);
@@ -477,6 +495,7 @@ impl V {
                     pos: vec![0; missing * 2],
                     hp: vec![0; missing],
                     max_hp: vec![0; missing],
+                    mv: vec![0; missing],
                 });
             }
             let ctrl_max: Option<i32> = self
@@ -484,21 +503,26 @@ impl V {
                 .get(&pawn)
                 .and_then(|c| entities.get(c))
                 .and_then(|c| c.get_value(&CTRL_HEALTH_MAX));
-            let (x, y, hp, mhp) = match entities.get(&pawn) {
+            let (x, y, hp, mhp, mv) = match entities.get(&pawn) {
                 Some(e) => {
                     let p = position(ctx, e).unwrap_or_default();
                     let alive = e.get_value::<u64>(&LIFE_STATE).unwrap_or(0) == 0;
                     let hp: i32 = if alive { e.get_value(&HEALTH).unwrap_or(0) } else { 0 };
                     let max = ctrl_max.unwrap_or_else(|| e.get_value(&MAX_HEALTH).unwrap_or(0));
-                    (p[0].round() as i32, p[1].round() as i32, hp, max.max(hp))
+                    let flags = e.get_value::<u64>(&FLAGS).unwrap_or(1);
+                    let zip = e.get_value::<u64>(&ZIPLINE_COLOR).unwrap_or(0) != 0;
+                    let ducked = e.get_value::<bool>(&DUCKED).unwrap_or(false);
+                    let mv = u8::from(flags & 1 == 0) | (u8::from(zip) << 1) | (u8::from(ducked) << 2);
+                    (p[0].round() as i32, p[1].round() as i32, hp, max.max(hp), if alive { mv } else { 0 })
                 }
-                None => (0, 0, 0, 0),
+                None => (0, 0, 0, 0, 0),
             };
             let tr = &mut self.out.samples.tracks[ti];
             tr.pos.push(x);
             tr.pos.push(y);
             tr.hp.push(hp);
             tr.max_hp.push(mhp);
+            tr.mv.push(mv);
         }
     }
 
@@ -689,7 +713,16 @@ impl Visitor for V {
             DAMAGE => {
                 let m: CCitadelUserMessageDamage = decode(data)?;
                 let att = m.entindex_attacker();
-                if !self.is_hero_pawn(att) || m.ability_id() == 0 {
+                if !self.is_hero_pawn(att) {
+                    // troopers, neutrals, objectives hitting a hero: tells "fighting troopers"
+                    // apart from "out of combat" for the time-split chart
+                    let vic = m.entindex_victim();
+                    if self.is_hero_pawn(vic) && m.damage() > 0 {
+                        self.out.npc_hits.push((self.time(ctx), vic, m.damage(), m.attacker_class()));
+                    }
+                    return Ok(());
+                }
+                if m.ability_id() == 0 {
                     return Ok(());
                 }
                 let vic = m.entindex_victim();

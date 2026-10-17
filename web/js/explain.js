@@ -161,6 +161,33 @@ export const DEEP_DIVES = [
       <p>Hover a swing in the melee feed of a match for its own step-by-step breakdown.</p>`,
   },
   {
+    id: "time",
+    title: "Time split: combat and movement",
+    body: `
+      <p>For every player, each 0.5 s they were alive gets one combat state and one movement state.
+      Valve keeps the same kind of data in its match metadata (once per second). Here it is rebuilt from the demo
+      alone, and on five test matches it lands within about 3–5 points of Valve's numbers for combat and within
+      0–3 points for movement.</p>
+      <h4>Combat (first match wins)</h4>
+      <ol>
+        <li><b>Fighting heroes</b>: dealt damage to an enemy hero, or took damage from one, from 1 s before to 0.5 s after.</li>
+        <li><b>Fighting troopers / objectives</b>: dealt damage to troopers, guardians, walkers, the patron, shrines,
+        the mid boss or soul orbs in that window.</li>
+        <li><b>Farming neutrals</b>: dealt damage to neutral camps (and Sinner's Sacrifice).</li>
+        <li><b>Out of combat</b>: none of that.</li>
+      </ol>
+      <h4>Movement</h4>
+      <ul>
+        <li><b>Zipline</b>: the hero's zipline lane color is set (<code>m_eZipLineLaneColor</code>). Matches Valve's number almost exactly.</li>
+        <li><b>Dash</b> / <b>slide</b>: up to 0.4 s / 0.75 s after the dash or slide ability fired (or ducked while moving on the ground).</li>
+        <li><b>Airborne</b>: not on the ground (<code>m_fFlags</code>), not on a zipline.</li>
+        <li><b>On foot</b>: everything else. Valve also tracks "ability movement" (dashing abilities like
+        Flame Dash), which this doesn't separate yet.</li>
+      </ul>
+      <p>The counts at the end of each row are movement actions in the point / span: jumps (including double jumps),
+      dashes, slides and zipline rides. Hover them for boosts and mantles.</p>`,
+  },
+  {
     id: "gun",
     title: "Gun accuracy in depth",
     body: `

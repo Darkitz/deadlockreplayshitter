@@ -500,3 +500,83 @@ export function meleeModel(ms, kind) {
   return kind ? { ...ms, events: ms.events.filter((e) => e.melee === kind), swings: ms.swings.filter((x) => x.kind === kind) } : ms;
 }
 
+
+// ------------------------------------------------------------------ time split
+
+/** victim / attacker classes from the Damage message that count as neutral camps */
+const NEUTRAL_CLASSES = new Set([6, 110]);
+/**
+ * combat state sticks this long around a damage event (seconds before / after). Tuned against
+ * Valve's own per-second combat types on 5 matches: about 3-5 points off per category.
+ */
+const COMBAT_BEFORE = 1, COMBAT_AFTER = 0.5;
+/** samples this long after a dash / slide ability use count as dashing / sliding */
+const DASH_S = 0.4, SLIDE_S = 0.75;
+
+/**
+ * How a player spent [from, to]: combat state and movement per 0.5 s sample while alive,
+ * like Valve's per-second combat/move types but rebuilt from the demo.
+ *   combat: hero (dealt/took enemy-hero damage) > npc (dealt to troopers, objectives, orbs) >
+ *           neutral (dealt to neutral camps) > out, each within -1 s / +0.5 s of a damage event
+ *   move:   zipline > dash > slide > airborne > ground
+ * Returns seconds per category plus counts of movement actions.
+ */
+export function timeSplit(m, pawn, assets, from = -Infinity, to = Infinity, tune = {}) {
+  // npcHits: also count being hit by troopers / neutrals (Valve doesn't, it seems)
+  const { before = COMBAT_BEFORE, after = COMBAT_AFTER, npcHits = false } = tune;
+  m._timeSplitEv ??= new Map();
+  const me = m.byPawn.get(pawn);
+  const tr = m.tracks.get(pawn);
+  if (!me || !tr) return null;
+  if (!m._timeSplitEv.has(pawn)) {
+    const hero = [], npc = [], neutral = [];
+    for (const d of m.damage) {
+      if (d[1] === pawn) {
+        const v = d[3] >= 0 ? m.byPawn.get(d[3]) : null;
+        if (v) { if (v.team !== me.team) hero.push(d[0]); } else (NEUTRAL_CLASSES.has(d[6]) ? neutral : npc).push(d[0]);
+      } else if (d[3] === pawn && m.byPawn.get(d[1])?.team !== me.team) hero.push(d[0]);
+    }
+    const npcIn = [], neutralIn = [];
+    for (const h of m.npc_hits || []) if (h[1] === pawn) (NEUTRAL_CLASSES.has(h[3]) ? neutralIn : npcIn).push(h[0]);
+    const cls = (id) => assets?.item(id)?.class_name || "";
+    const moves = {};
+    for (const [t, p, id] of m.moves || []) {
+      if (p !== pawn) continue;
+      const k = cls(id).replace(/^citadel_ability_/, "");
+      (moves[k] ??= []).push(t);
+    }
+    for (const xs of [hero, npc, neutral, npcIn, neutralIn]) xs.sort((a, b) => a - b);
+    m._timeSplitEv.set(pawn, { hero, npc, neutral, npcIn, neutralIn, moves });
+  }
+  const ev = m._timeSplitEv.get(pawn);
+  // is there an event in [t - before, t + after]? (sorted arrays, binary search)
+  const near = (xs, t, before, after) => {
+    let lo = 0, hi = xs.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (xs[mid] < t - before) lo = mid + 1; else hi = mid; }
+    return lo < xs.length && xs[lo] <= t + after;
+  };
+  const dashes = [...(ev.moves.dash || [])].sort((a, b) => a - b);
+  const slides = [...(ev.moves.slide || [])].sort((a, b) => a - b);
+  const dt = m.samples.dt;
+  const r = { total: 0, combat: { hero: 0, npc: 0, neutral: 0, out: 0 }, move: { zip: 0, dash: 0, slide: 0, air: 0, ground: 0 } };
+  for (let i = 0; i < tr.hp.length; i++) {
+    const t = m.samples.t0 + i * dt;
+    if (t < from || t >= to || tr.hp[i] <= 0 || t < 0) continue;
+    r.total += dt;
+    const c = near(ev.hero, t, before, after) ? "hero"
+      : near(ev.npc, t, before, after) || (npcHits && near(ev.npcIn, t, before, after)) ? "npc"
+      : near(ev.neutral, t, before, after) || (npcHits && near(ev.neutralIn, t, before, after)) ? "neutral" : "out";
+    r.combat[c] += dt;
+    const mv = tr.mv?.[i] || 0;
+    const k = mv & 2 ? "zip" : near(dashes, t, DASH_S, 0) ? "dash" : (mv & 4 || near(slides, t, SLIDE_S, 0)) && !(mv & 1) ? "slide"
+      : mv & 1 ? "air" : "ground";
+    r.move[k] += dt;
+  }
+  const inWin = (xs) => (xs || []).filter((t) => t >= from && t < to).length;
+  r.counts = {
+    jumps: inWin(ev.moves.jump) + inWin(ev.moves.jump_ratking), dashes: inWin(ev.moves.dash), slides: inWin(ev.moves.slide),
+    ziplines: inWin(ev.moves.zip_line), boosts: inWin(ev.moves.zipline_boost), mantles: inWin(ev.moves.mantle), ropes: inWin(ev.moves.climb_rope),
+  };
+  r.hasMove = !!tr.mv;
+  return r;
+}

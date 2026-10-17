@@ -227,3 +227,23 @@ test("chat log: team / all split and ping placeholders from the voice line", asy
     [30, false, "Defend the Broadway Walker"], [40, true, "Good Game!"],
   ]);
 });
+
+test("time split: combat priority and movement bits", async () => {
+  const { timeSplit } = await import("../web/js/analysis.js");
+  const m = fixture({
+    damage: [
+      [10, 1, 2, 2, 555, 50, 1, 0, 0, 0, 0],      // hero fight at 10 s
+      [20, 1, 70, -1, 555, 50, 4, 0, 0, 0, 0],    // trooper at 20 s
+      [30, 1, 71, -1, 555, 50, 6, 0, 0, 0, 0],    // neutral camp at 30 s
+    ],
+  });
+  const tr = m.tracks.get(1);
+  tr.mv = tr.hp.map((_, i) => (i === 80 ? 2 : i === 81 ? 1 : 0)); // 40 s zipline, 40.5 s airborne
+  m.moves = [[50, 1, 999]];
+  const ts = timeSplit(m, 1, { item: (id) => (id === 999 ? { class_name: "citadel_ability_dash" } : null) }, 0, 60);
+  // -1 s / +0.5 s around each event = 4 samples of 0.5 s
+  assert.deepEqual([ts.combat.hero, ts.combat.npc, ts.combat.neutral], [2, 2, 2]);
+  assert.equal(ts.total, 60);
+  assert.deepEqual([ts.move.zip, ts.move.air, ts.move.dash], [0.5, 0.5, 0.5]);
+  assert.equal(ts.counts.dashes, 1);
+});

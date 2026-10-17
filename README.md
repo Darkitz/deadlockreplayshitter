@@ -37,8 +37,12 @@ The home page lists them; × removes one.
 - **Accuracy tracker** (Players tab):
   - Skills, gun hero accuracy, headshot %, and light / heavy / parried melee for every player.
   - The chart follows the selected mode.
-- Below the replay, tabs: **Players** (accuracy tracker), **Incoming** (skillshots aimed at
-  the player: hit or dodged), **Laning** (first 10 minutes) and **Chat**.
+- Below the replay, tabs:
+  - **Players**: accuracy tracker.
+  - **Incoming**: skillshots aimed at the player, hit or dodged.
+  - **Time split**: how each player spent the match or span (fighting heroes / troopers / neutrals / out of combat), how they moved (zipline, slide, dash, airborne), and counts of jumps, dashes, slides and zipline rides. Rebuilt from the demo; within a few points of Valve's own numbers.
+  - **Laning**: the first 10 minutes.
+  - **Chat**.
 - **Chat:**
   - Three columns: each team's chat and all chat.
   - Hero icons, plus chat-wheel pings with the hero or lane they refer to ("Kelvin is missing", "Defend the Broadway Walker").
@@ -70,6 +74,7 @@ Some metrics need explaining:
 | `parser/vendor/` | deadlock-api's haste fork and protos |
 | `tools/game_assets.py` | extracts `assets.json` + icons from a local Deadlock install |
 | `tests/` | `node --test tests/*.test.mjs` |
+| `tools/smoke.mjs` | browser smoke test: drops a demo into the running site and screenshots it |
 
 ## Running locally
 
