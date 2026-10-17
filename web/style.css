@@ -273,9 +273,10 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
 .tracker-table tr.team-row-3 td:first-child { box-shadow: inset 3px 0 var(--sapphire); }
 .timeline .span { fill: var(--accent); opacity: .12; pointer-events: none; }
 .span-info { font-size: 12px; color: var(--accent); }
-.logo { width: 40px; height: 40px; border-radius: 10px; flex: none;
-  background: radial-gradient(circle at 50% 50%, var(--hit) 0 4px, transparent 5px),
-    radial-gradient(circle at 50% 50%, transparent 0 11px, var(--accent) 12px 14px, transparent 15px), var(--panel-2); }
+.logo { width: 44px; height: 44px; flex: none; display: block; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .35)); }
+/* deco wordmark: spaced capitals in brass */
+.brand h1 { letter-spacing: .22em; font-weight: 800; background: linear-gradient(180deg, #f3d58a, #d9a441 55%, #a8701a);
+  -webkit-background-clip: text; background-clip: text; color: transparent; }
 .top-nav { display: flex; gap: 14px; align-items: center; margin-right: auto; margin-left: 24px; }
 .top-nav a { color: var(--muted); font-weight: 600; padding: 6px 2px; border-bottom: 2px solid transparent; }
 .top-nav a.on, .top-nav a:hover { color: var(--text); border-color: var(--accent); text-decoration: none; }
@@ -433,14 +434,21 @@ table.mini td.accent { color: var(--accent); }
 .drop-close { justify-self: end; }
 .chip-s.forget { cursor: pointer; background: none; border-color: var(--line); color: var(--muted); font: inherit; font-size: 11px; }
 
-/* home: the drop field */
-.drop-field { display: grid; gap: 10px; justify-items: center; text-align: center; margin: 24px 0 32px; padding: 72px 24px;
+/* home: the drop field fills the window; demos opened before are listed below it */
+.drop-field { display: grid; gap: 14px; justify-items: center; align-content: center; text-align: center;
+  min-height: calc(100dvh - 79px - 40px); margin: 0 0 24px; padding: 40px 24px;
   border: 2px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 16px; cursor: pointer;
   background: color-mix(in srgb, var(--accent) 4%, transparent); transition: background .15s, border-color .15s; }
 .drop-field:hover, .drop-field:focus-visible { background: color-mix(in srgb, var(--accent) 9%, transparent); border-color: var(--accent); outline: none; }
-.drop-field b { font-size: 24px; }
-.drop-field span { color: var(--muted); max-width: 640px; line-height: 1.6; }
-@media (max-width: 640px) { .drop-field { padding: 44px 16px; } .drop-field b { font-size: 19px; } }
+.drop-field b { font-size: 28px; }
+.drop-field > span { color: var(--muted); max-width: 640px; line-height: 1.6; }
+.drop-icon { width: 96px; height: 96px; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, .4)); }
+.offline { margin-top: 18px; max-width: 560px; text-align: left; padding: 14px 18px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--hit) 45%, var(--line)); background: color-mix(in srgb, var(--hit) 7%, transparent); }
+.offline strong { display: block; text-align: center; color: var(--hit); font-size: 20px; letter-spacing: .14em; margin-bottom: 8px; }
+.offline ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--text); line-height: 1.5; }
+.offline b { font-size: inherit; }
+@media (max-width: 640px) { .drop-field { padding: 28px 16px; } .drop-field b { font-size: 21px; } .offline strong { font-size: 17px; } }
 
 /* match: tabs under the replay */
 .tabs { display: flex; gap: 4px; margin: 22px 0 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
@@ -495,3 +503,4 @@ table.mini td.accent { color: var(--accent); }
 /* hero ability icons are white glyphs made for the dark HUD: give them a dark tile in light mode */
 :root[data-theme="light"] img[src*="/hud/abilities/"] { background: #2b2f37; border-radius: 6px; }
 .lang-toggle { min-width: 46px; font-size: 12px; font-weight: 600; }
+:root[data-theme="light"] .brand h1 { background: linear-gradient(180deg, #c48a24, #94600f 60%, #6b4310); -webkit-background-clip: text; background-clip: text; }

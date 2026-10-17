@@ -247,3 +247,11 @@ test("time split: combat priority and movement bits", async () => {
   assert.deepEqual([ts.move.zip, ts.move.air, ts.move.dash], [0.5, 0.5, 0.5]);
   assert.equal(ts.counts.dashes, 1);
 });
+
+test("service worker precaches every script the site loads", async () => {
+  const fs = await import("node:fs");
+  const sw = fs.readFileSync(new URL("../web/sw.js", import.meta.url), "utf8");
+  for (const f of fs.readdirSync(new URL("../web/js/", import.meta.url))) {
+    if (f.endsWith(".js")) assert.ok(sw.includes(`"js/${f}"`), `web/sw.js CORE is missing js/${f}`);
+  }
+});

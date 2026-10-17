@@ -1,4 +1,4 @@
-// Skill Hitter: a static site. Drop a Deadlock demo, it is parsed in the browser
+// DLDI (Deadlock Demo Insight): a static site. Drop a Deadlock demo, it is parsed in the browser
 // (WebAssembly build of parser/dlparse) and analyzed right there. No server, no accounts.
 //
 //   #/                                    drop a demo · demos opened in this browser
@@ -132,6 +132,10 @@ function initTheme() {
 
 async function main() {
   initTheme();
+  // offline support (web/sw.js); not available on file:// or in some private modes
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
   try {
     await loadAll();
   } catch (err) {

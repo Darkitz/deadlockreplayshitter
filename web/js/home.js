@@ -10,10 +10,18 @@ export function viewHome() {
   const list = [...(S.localMatches || [])].sort((a, b) => b.parsed_at - a.parsed_at);
   app.innerHTML = `
     <section class="drop-field" role="button" tabindex="0" data-pick>
+      <img class="drop-icon" src="icon.svg" alt="" width="96" height="96">
       <b>Drop a Deadlock demo here</b>
       <span>or click to pick a file · <code>.dem</code> from <code>Deadlock/game/citadel/replays</code>
         (in-game: match history → <i>Download Replay</i>) or <code>.dem.bz2</code></span>
-      <small class="muted">Parsed right here in your browser. Nothing is uploaded.</small>
+      <div class="offline">
+        <strong>100% OFFLINE</strong>
+        <ul>
+          <li>Your demo is read and analyzed <b>on your computer</b>. It is never uploaded.</li>
+          <li>No server, no account, no tracking, no cookies. Nothing gets sent anywhere.</li>
+          <li>The website is just files. After your first visit it works without internet at all.</li>
+        </ul>
+      </div>
     </section>
     ${list.length ? `
       <h2 class="section-title">Opened in this browser</h2>

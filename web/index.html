@@ -8,8 +8,9 @@
 <meta name="darkreader-lock">
 <meta name="theme-color" content="#0a0b0d">
 <meta name="description" content="Drop a Deadlock demo and see every skillshot, gun and melee hit on a scrubbable timeline. Runs entirely in your browser.">
-<title>Skill Hitter</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='none' stroke='%23e0b25a' stroke-width='2'/%3E%3Ccircle cx='8' cy='8' r='2' fill='%236fd08c'/%3E%3C/svg%3E">
+<title>DLDI · Deadlock Demo Insight</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
 <script>
   // apply the saved theme before the first paint (no dark flash for light-mode users)
   try { if (localStorage.getItem("skillhitter.theme") === "light") document.documentElement.dataset.theme = "light"; } catch {}
@@ -19,10 +20,10 @@
 <body>
 <header class="top">
   <a class="brand" href="#/">
-    <span class="logo" aria-hidden="true"></span>
+    <img class="logo" src="icon.svg" alt="" width="44" height="44">
     <div>
-      <h1>Skill Hitter</h1>
-      <p id="subtitle" class="muted">Deadlock demo analysis, in your browser</p>
+      <h1>DLDI</h1>
+      <p id="subtitle" class="muted">Deadlock Demo Insight · in your browser</p>
     </div>
   </a>
   <nav class="top-nav">
@@ -38,7 +39,7 @@
 <main id="app"></main>
 
 <footer class="muted small">
-  Skill Hitter · demos are parsed in your browser (haste compiled to WebAssembly) and never leave it ·
+  DLDI · Deadlock Demo Insight · demos are parsed in your browser (haste compiled to WebAssembly) and never leave it ·
   game data from Deadlock's files · not affiliated with Valve
 </footer>
 <script type="module" src="js/app.js"></script>

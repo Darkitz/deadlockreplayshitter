@@ -10,11 +10,14 @@ export let lang = (() => { try { return localStorage.getItem(KEY) || "en"; } cat
 /** exact labels (whole text node, trimmed) */
 const PHRASES = {
   // header / home
-  "Deadlock demo analysis, in your browser": "Deadlock demo analysis but make it bussin 💅",
+  "Deadlock Demo Insight · in your browser": "Deadlock Demo Insight but make it bussin 💅",
+  "DLDI": "DLDI 😩",
   "How it works": "How it works (nerd stuff) 🤓",
   "open demo": "drop a demo 📂",
   "Drop a Deadlock demo here": "Yeet a Deadlock demo in here fr 📂✨",
   "Parsed right here in your browser. Nothing is uploaded.": "Parsed in your browser, nothing gets uploaded. We're not the feds 🕵️",
+  "100% OFFLINE": "100% OFFLINE, NO CAP 🔒🧢",
+  "on your computer": "on your own machine 💻",
   "Opened in this browser": "Your demo lore 📜",
   "← home": "← back to the crib 🏠",
   "How the numbers are made": "How the numbers get cooked 👨‍🍳",
