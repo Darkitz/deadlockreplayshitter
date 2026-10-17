@@ -895,3 +895,5 @@ body { word-spacing: .08em; }
    (scrolling inside) keeps the stage and everything below it from jumping */
 .state { height: 330px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .state:empty, .state[hidden] { display: none; }
+/* buffs without an icon: short label, full name in the hover text */
+.mod .mod-text { max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle; }

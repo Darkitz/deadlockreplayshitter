@@ -297,7 +297,7 @@ export async function viewMatch(id, params) {
     const ab = S.assets.item(x[5]);
     if (raw && HIDDEN_MODS.test(raw)) return null;
     if (ab) return ab.name;
-    if (raw) return raw.replace(/^modifier_(citadel_)?/, "").replace(/_/g, " ");
+    if (raw) return raw.replace(/^modifier_(citadel_)?/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     return null; // unnamed internal modifier
   }
   function renderState(t) {
@@ -365,7 +365,7 @@ export async function viewMatch(id, params) {
       <div class="st-abs">${abil}</div>
       <div class="st-items">${items.map((it) => `<img class="slot-${esc(it.slot || "x")}" src="${esc(S.assets.itemIcon(it.id))}" data-help="${esc(itemHelp(it))}" alt="${esc(it.name)}">`).join("") || `<span class="muted small">no items yet</span>`}</div>
       ${`<div class="st-mods">${mods.map((x) => `<span class="mod ${x.enemy ? "debuff" : ""} ${x.icon ? "mod-icon" : ""}" data-help="${esc(`${x.name}\n${x.enemy ? "Debuff from an enemy" : "Buff"}${x.left < 9999 ? ` · ${x.left.toFixed(1)} s left` : ""}${x.stacks > 1 ? ` · ${x.stacks} stacks` : x.n > 1 ? ` · ×${x.n}` : ""}`)}">
-        ${x.icon ? `<img src="${esc(x.icon)}" alt="${esc(x.name)}">` : `<span>${esc(x.name)}</span>`}${x.stacks > 1 ? `<b>×${x.stacks}</b>` : x.n > 1 ? `<b>×${x.n}</b>` : ""}${x.left < 600 ? `<small>${x.left.toFixed(0)}s</small>` : ""}</span>`).join("") || `<span class="muted small">no buffs or debuffs</span>`}</div>`}`;
+        ${x.icon ? `<img src="${esc(x.icon)}" alt="${esc(x.name)}">` : `<span class="mod-text">${esc(x.name)}</span>`}${x.stacks > 1 ? `<b>×${x.stacks}</b>` : x.n > 1 ? `<b>×${x.n}</b>` : ""}${x.left < 600 ? `<small>${x.left.toFixed(0)}s</small>` : ""}</span>`).join("") || `<span class="muted small">no buffs or debuffs</span>`}</div>`}`;
   }
 
   /** [souls, level, k, d, a, lh] at t, or gained inside the span (level stays absolute) */
