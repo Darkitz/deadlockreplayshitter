@@ -891,3 +891,7 @@ body { word-spacing: .08em; }
 .ab-group { display: grid; gap: 4px; align-content: end; }
 .ab-label { text-transform: uppercase; letter-spacing: .07em; font-weight: 700; font-size: 10.5px; color: color-mix(in srgb, var(--text) 50%, transparent); }
 .ab-bar .controls { margin-left: auto; }
+/* the player state panel changes with every buff / item / death while playing; a fixed height
+   (scrolling inside) keeps the stage and everything below it from jumping */
+.state { height: 330px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.state:empty, .state[hidden] { display: none; }
