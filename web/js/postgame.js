@@ -358,14 +358,19 @@ function lineChart(el, series, { end, fmt }) {
   const y = (v) => H - padB - (v / maxY) * (H - padT - padB);
   const at = (s, t) => { let v = 0; for (const [tt, vv] of s.pts) { if (tt > t) break; v = vv; } return v; };
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * maxY);
+  // the SVG stretches to the box (preserveAspectRatio none), so axis labels are HTML on top
+  const pct = (v, total) => `${(v / total) * 100}%`;
   el.innerHTML = `<div class="pg-chart">
+    <div class="pg-plot">
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      ${ticks.map((v) => `<line class="grid" x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${padL - 6}" y="${y(v) + 4}" text-anchor="end">${fmt(Math.round(v))}</text>`).join("")}
-      ${[0, 600, 1200, 1800, 2400, 3000].filter((t) => t <= end).map((t) => `<text class="axis" x="${x(t)}" y="${H - 6}" text-anchor="middle">${fmtClock(t)}</text>`).join("")}
+      ${ticks.map((v) => `<line class="grid" x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}"/>`).join("")}
       ${series.map((s) => `<path class="pg-line" d="${s.pts.map(([t, v], i) => `${i ? "L" : "M"}${x(t).toFixed(1)},${y(v).toFixed(1)}`).join("")}" stroke="${s.color}"/>`).join("")}
       <line class="pg-cursor" x1="0" x2="0" y1="${padT}" y2="${H - padB}" visibility="hidden"/>
       <rect class="pg-hover" x="${padL}" y="0" width="${W - padL - padR}" height="${H}" fill="transparent"/>
     </svg>
+    ${ticks.map((v) => `<span class="pg-ax pg-ax-y" style="top:${pct(y(v), H)};right:${pct(W - padL + 6, W)}">${fmt(Math.round(v))}</span>`).join("")}
+    ${[0, 600, 1200, 1800, 2400, 3000].filter((t) => t <= end).map((t) => `<span class="pg-ax pg-ax-x" style="left:${pct(x(t), W)};top:${pct(H - padB + 4, H)}">${fmtClock(t)}</span>`).join("")}
+    </div>
     <ol class="pg-legend"></ol>
   </div>`;
   const svg = el.querySelector("svg"), legend = el.querySelector(".pg-legend"), cursor = el.querySelector(".pg-cursor");

@@ -664,7 +664,7 @@ table.mini td.accent { color: var(--accent); }
 .pg-chart { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; }
 .pg-chart > * { min-width: 0; }
 @media (max-width: 900px) { .pg-chart { grid-template-columns: 1fr; } }
-.pg-chart svg { width: 100%; height: 340px; }
+.pg-chart svg { width: 100%; height: 300px; }
 .pg-chart .grid { stroke: rgba(255, 255, 255, .06); stroke-width: 1; }
 .pg-chart .axis { fill: #8f877a; font-size: 12px; font-family: "Barlow", system-ui, sans-serif; }
 .pg-line { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
@@ -837,3 +837,13 @@ body { word-spacing: .08em; }
 .pg-mvp-stage { grid-template-columns: 1fr minmax(150px, 180px) 1.1fr; }
 .pg-mvp-hero img { max-width: 180px; }
 .pg-mvp-heroname { margin-top: -30px; font-size: 26px; }
+.pg-plot { position: relative; min-width: 0; }
+.pg-plot svg { display: block; }
+.pg-ax { position: absolute; font-size: 12px; color: #8f877a; font-variant-numeric: tabular-nums; pointer-events: none; white-space: nowrap; }
+.pg-ax-y { transform: translateY(-50%); }
+.pg-ax-x { transform: translateX(-50%); }
+/* MVP portrait: a taller crop (head + torso) instead of just the head */
+.pg-mvp-stage { grid-template-columns: 1fr minmax(200px, 250px) 1.1fr; }
+.pg-mvp-hero img { max-width: 250px; aspect-ratio: 280 / 380; object-position: top; }
+.pg-mvp-heroname { margin-top: -44px; font-size: 32px; }
+.pg-plot { align-self: start; }

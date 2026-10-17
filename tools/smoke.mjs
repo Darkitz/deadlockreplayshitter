@@ -17,7 +17,7 @@ const pw = process.env.PLAYWRIGHT ? await import(pathToFileURL(process.env.PLAYW
 const BASE = process.env.BASE || "http://localhost:8767";
 
 const browser = await pw.chromium.launch({ executablePath: process.env.CHROME, args: ["--no-sandbox", "--disable-gpu"] });
-const page = await browser.newPage({ viewport: { width: 1500, height: +(process.env.VH || 1300) } });
+const page = await browser.newPage({ viewport: { width: +(process.env.VW || 1500), height: +(process.env.VH || 1300) } });
 const problems = [];
 page.on("pageerror", (e) => problems.push(`page error: ${e.message}`));
 page.on("console", (m) => { if (m.type() === "error") problems.push(`console: ${m.text()}`); });
@@ -41,6 +41,7 @@ if (scrollTo) {
   await page.waitForTimeout(300);
 }
 await page.waitForLoadState("networkidle").catch(() => {});
+await page.waitForTimeout(+(process.env.WAIT || 0));
 await page.screenshot({ path: out });
 await browser.close();
 for (const p of problems) console.log(p);
