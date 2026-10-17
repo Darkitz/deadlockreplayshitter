@@ -7,6 +7,7 @@ parser/.protoc/
 # leftovers from the old server-side sync; the site only ships game assets
 web/data/*
 !web/data/assets.json
+!web/data/tips.json
 web/assets/*
 !web/assets/game/
 !web/assets/fonts/

@@ -6,7 +6,7 @@
 //   #/about                               how every number is derived
 
 import { loadJSON, Assets, TEAM_NAMES } from "./data.js";
-import { $, S } from "./ui.js";
+import { $, S, loadTips, hasTip, tipHTML } from "./ui.js";
 import { viewMatch } from "./match.js";
 import { viewHome } from "./home.js";
 import { viewAbout, explain } from "./explain.js";
@@ -92,21 +92,32 @@ function initHelp() {
   }).observe(document.body, { childList: true, subtree: true });
   let cur = null;
   document.addEventListener("mouseover", (ev) => {
-    const el = ev.target.closest?.(".has-help, [data-help]");
+    const el = ev.target.closest?.(".has-help, [data-help], [data-tip]");
     if (el === cur) return;
     cur = el;
+    show(el);
+  });
+  // abilities and items: the in-game tooltip (description, stats, scaling, upgrade tiers), with
+  // our own numbers under it. The tips file loads on the first such hover.
+  function show(el) {
     const text = el && helpFor(el);
-    if (!text) { tip.hidden = true; return; }
-    tip.textContent = helpText(text);
+    const cls = el?.dataset.tip;
+    if (cls && !hasTip(cls)) loadTips().then(() => { if (cur === el && hasTip(cls)) show(el); });
+    const rich = cls && hasTip(cls)
+      && tipHTML(cls, el.dataset.tier != null ? Number(el.dataset.tier) : S.tipTier?.(cls) ?? null,
+        text ? helpText(text).split("\n").slice(1).filter(Boolean) : [], !!el.closest(".ab"));
+    if (!text && !rich) { tip.hidden = true; return; }
+    tip.classList.toggle("rich", !!rich);
+    if (rich) tip.innerHTML = rich; else tip.textContent = helpText(text);
     tip.hidden = false;
     const r = el.getBoundingClientRect();
-    const w = Math.min(340, window.innerWidth - 16);
+    const w = Math.min(rich ? 400 : 340, window.innerWidth - 16);
     tip.style.maxWidth = `${w}px`;
     const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
     tip.style.left = `${left + window.scrollX}px`;
     const below = r.bottom + 6 + tip.offsetHeight < window.innerHeight;
-    tip.style.top = `${(below ? r.bottom + 6 : r.top - 6 - tip.offsetHeight) + window.scrollY}px`;
-  });
+    tip.style.top = `${(below ? r.bottom + 6 : Math.max(8, r.top - 6 - tip.offsetHeight)) + window.scrollY}px`;
+  }
   window.addEventListener("scroll", () => { tip.hidden = true; cur = null; }, { passive: true });
 }
 

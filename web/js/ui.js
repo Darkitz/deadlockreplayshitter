@@ -73,10 +73,49 @@ export function itemHelp(it) {
   return meta ? `${it.name}\n${meta}` : it.name;
 }
 
+// ------------------------------------------------------------------ in-game style tooltips
+
+// data/tips.json (tools/ability_tips.py): description, stats, spirit scaling and upgrade tiers
+// for every ability and item. Loaded on the first hover; the markup in it is generated at build
+// time from the game's localization (only <b class>, <i> and <br>).
+let TIPS = null;
+let tipsLoading = null;
+export function loadTips() {
+  tipsLoading ??= fetch("data/tips.json").then((r) => r.json()).then((j) => (TIPS = j)).catch(() => { tipsLoading = null; });
+  return tipsLoading;
+}
+export const hasTip = (cls) => !!TIPS?.[cls];
+const AREA = { active: "Active", passive: "Passive", innate: null };
+const TIER_COST = [1, 2, 5];
+
+/** the tooltip body for one ability / item: `tier` = upgrades unlocked (null: unknown),
+ *  `ours` = extra lines under it (`stats`: they are this match's numbers) */
+export function tipHTML(cls, tier, ours = [], stats = false) {
+  const tp = TIPS?.[cls];
+  const it = S.assets?.byClass?.get(cls);
+  if (!tp) return null;
+  const chips = tp.head.map(([k, v]) => `<span class="gt-chip"><small>${esc(k)}</small>${esc(v)}</span>`).join("");
+  const sec = tp.sections.map((x) => `
+    <div class="gt-sec">
+      ${AREA[x.area] ? `<div class="gt-area gt-${x.area}">${AREA[x.area]}</div>` : ""}
+      ${x.desc ? `<p class="gt-desc">${x.desc}</p>` : ""}
+      ${x.main.length ? `<div class="gt-main">${x.main.map(([k, v, sc]) => `
+        <div class="gt-box"><b>${esc(v)}</b><span>${esc(k)}</span>${sc ? `<em class="gt-scale gt-${esc(sc[1].split(" ")[0])}">×${sc[0]} ${esc(sc[1])}</em>` : ""}</div>`).join("")}</div>` : ""}
+      ${x.basic.length ? `<div class="gt-basic">${x.basic.map(([k, v]) => `<span>${esc(k)}</span><b>${esc(v)}</b>`).join("")}</div>` : ""}
+    </div>`).join("");
+  const tiers = tp.tiers ? `<div class="gt-tiers">${tp.tiers.map((d, i) => `
+    <div class="gt-tier ${tier == null ? "" : i < tier ? "on" : "off"}"><span class="gt-cost" title="ability points">${TIER_COST[i]}</span><p>${d || "—"}</p></div>`).join("")}</div>` : "";
+  return `<div class="gt">
+    <div class="gt-head"><b class="gt-name">${esc(it?.name || cls)}</b>${chips ? `<div class="gt-chips">${chips}</div>` : ""}</div>
+    ${sec}${tiers}
+    ${ours.length ? `<div class="gt-ours ${stats ? "stats" : ""}">${ours.map((l) => `<div>${esc(l)}</div>`).join("")}</div>` : ""}
+  </div>`;
+}
+
 /** icon buttons; `extra` adds the stat badge, `help` the hover text (name, then what the numbers mean) */
 export function abilityButtons(list, selected, extra = () => "", help = (ab) => ab.name) {
   return list.map((ab) => `
-    <button class="ab ${ab.class_name === selected ? "on" : ""}" data-ability="${esc(ab.class_name)}" aria-label="${esc(ab.name)}" data-help="${esc(help(ab))}">
+    <button class="ab ${ab.class_name === selected ? "on" : ""}" data-ability="${esc(ab.class_name)}" data-tip="${esc(ab.class_name)}" aria-label="${esc(ab.name)}" data-help="${esc(help(ab))}">
       ${ab.image ? `<img src="${esc(ab.image)}" alt="">` : `<span class="ab-ph">${esc((ab.name || "?")[0])}</span>`}
       <span class="ab-name">${esc(ab.name)}</span>${extra(ab)}
     </button>`).join("");

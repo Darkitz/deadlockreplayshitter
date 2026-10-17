@@ -145,10 +145,10 @@ export function renderSummary(el, m, { onPick }) {
             const top = k !== "d" && r[k] && r[k] === tops[k];
             return `<td class="${top ? "pg-top" : ""} ${k === "d" ? "pg-dim" : ""}">${top ? `${ui("starburst", "pg-burst")}` : ""}<span>${fmt(r[k] || 0)}</span></td>`;
           }).join("")}
-          <td class="pg-items">${items.map((it) => `<img class="slot-${esc(it.slot || "x")}" src="${esc(S.assets.itemIcon(it.id))}" data-help="${esc(itemHelp(it))}" alt="${esc(it.name)}">`).join("")}</td>
+          <td class="pg-items">${items.map((it) => `<img class="slot-${esc(it.slot || "x")}" src="${esc(S.assets.itemIcon(it.id))}" data-help="${esc(itemHelp(it))}" data-tip="${esc(it.class_name)}" alt="${esc(it.name)}">`).join("")}</td>
           <td class="pg-abs">${S.assets.signatures(r.p.hero_id).map((ab) => {
             const n = lv.get(ab.id) ?? 0, tier = Math.max(0, n - 1);
-            return `<span title="${esc(ab.name)} · ${n ? `upgrades ${tier}/3` : "not unlocked"}">${ab.image ? `<img src="${esc(ab.image)}" alt="">` : ""}<i>${[1, 2, 3].map((i) => `<em class="${i <= tier ? "on" : ""}"></em>`).join("")}</i></span>`;
+            return `<span data-tip="${esc(ab.class_name)}" data-tier="${tier}" data-help="${esc(ab.name)}&#10;${n ? `upgrades ${tier}/3` : "not unlocked"}">${ab.image ? `<img src="${esc(ab.image)}" alt="">` : ""}<i>${[1, 2, 3].map((i) => `<em class="${i <= tier ? "on" : ""}"></em>`).join("")}</i></span>`;
           }).join("")}</td>
         </tr>`;
       }).join("")}

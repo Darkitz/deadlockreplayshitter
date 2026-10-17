@@ -337,7 +337,7 @@ export async function viewMatch(id, params) {
     const abil = S.assets.signatures(subject.hero_id).map((ab) => {
       const n = lv.get(ab.id) ?? 0;
       const tier = Math.max(0, n - 1);
-      return `<span class="st-ab ${n ? "" : "locked"}" title="${esc(ab.name)}${n ? ` · upgrades ${tier}/3` : " · not unlocked"}">
+      return `<span class="st-ab ${n ? "" : "locked"}" data-tip="${esc(ab.class_name)}" data-tier="${tier}" data-help="${esc(ab.name)}&#10;${n ? `upgrades ${tier}/3` : "not unlocked yet"}">
         ${ab.image ? `<img src="${esc(ab.image)}" alt="">` : ""}<span class="pips">${[1, 2, 3].map((i) => `<i class="${i <= tier ? "on" : ""}"></i>`).join("")}</span></span>`;
     }).join("");
     const slotOrder = { weapon: 0, vitality: 1, spirit: 2 };
@@ -390,7 +390,7 @@ export async function viewMatch(id, params) {
         <div class="st-num"><b>${st ? st[1] : "–"}</b><small>level</small></div>
       </div>
       <div class="st-abs">${abil}</div>
-      <div class="st-items">${items.map((it) => `<img class="slot-${esc(it.slot || "x")}" src="${esc(S.assets.itemIcon(it.id))}" data-help="${esc(itemHelp(it))}" alt="${esc(it.name)}">`).join("") || `<span class="muted small">no items yet</span>`}</div>
+      <div class="st-items">${items.map((it) => `<img class="slot-${esc(it.slot || "x")}" src="${esc(S.assets.itemIcon(it.id))}" data-help="${esc(itemHelp(it))}" data-tip="${esc(it.class_name)}" alt="${esc(it.name)}">`).join("") || `<span class="muted small">no items yet</span>`}</div>
       ${`<div class="st-mods">${mods.map((x) => `<span class="mod ${x.enemy ? "debuff" : ""} ${x.icon ? "mod-icon" : ""}" data-help="${esc(`${x.name}\n${x.enemy ? "Debuff from an enemy" : "Buff"}${x.left < 9999 ? ` · ${x.left.toFixed(1)} s left` : ""}${x.stacks > 1 ? ` · ${x.stacks} stacks` : x.n > 1 ? ` · ×${x.n}` : ""}`)}">
         ${x.icon ? `<img src="${esc(x.icon)}" alt="${esc(x.name)}">` : `<span class="mod-text">${esc(x.name)}</span>`}${x.stacks > 1 ? `<b>×${x.stacks}</b>` : x.n > 1 ? `<b>×${x.n}</b>` : ""}${x.left < 600 ? `<small>${x.left.toFixed(0)}s</small>` : ""}</span>`).join("") || `<span class="muted small">no buffs or debuffs</span>`}</div>`}`;
   }
@@ -501,7 +501,7 @@ export async function viewMatch(id, params) {
               return `<small>${fr(l)} · ${fr(h)} · ${sw.filter((x) => x.result === "parried").length}</small>`;
             })()}</td>
             <td class="tr-items">${itemsAt(m, r.p.pawn, t).filter((id) => S.assets.item(id)?.type === "upgrade")
-              .map((id) => `<img class="slot-${esc(S.assets.item(id)?.slot || "x")}" src="${esc(S.assets.itemIcon(id))}" data-help="${esc(itemHelp(S.assets.item(id)))}" alt="${esc(S.assets.item(id)?.name)}">`).join("")}</td>
+              .map((id) => `<img class="slot-${esc(S.assets.item(id)?.slot || "x")}" src="${esc(S.assets.itemIcon(id))}" data-help="${esc(itemHelp(S.assets.item(id)))}" data-tip="${esc(S.assets.item(id)?.class_name || "")}" alt="${esc(S.assets.item(id)?.name)}">`).join("")}</td>
           </tr>`).join("")).join("")}
       </table>`;
   }
@@ -703,6 +703,12 @@ export async function viewMatch(id, params) {
   $(".show-heat", app).checked = !!settings.showHeat;
   $(".show-deaths", app).checked = !!settings.showDeaths;
   let t = Number(params.get("t")) || m.end;
+  // ability tooltips mark the upgrades the selected player has at the playhead
+  S.tipTier = (cls) => {
+    const ab = subject && S.assets.byClass.get(cls);
+    if (!ab || !S.assets.signatures(subject.hero_id).some((x) => x.id === ab.id)) return null;
+    return Math.max(0, (abilityLevelsAt(m, pawn, t).get(ab.id) ?? 0) - 1);
+  };
   // optional span start: stats then cover [t0, t] instead of [start, t]
   let t0 = params.has("from") ? Number(params.get("from")) : null;
   const inSpan = (tt) => tt <= t && (t0 == null || tt >= t0);

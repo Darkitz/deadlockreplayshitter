@@ -955,3 +955,51 @@ body { word-spacing: .08em; }
 .ab-stat.ab-support { color: #5fd3c0; }
 .ab-stat.ab-uses { color: var(--text); }
 :root[data-theme="light"] .ab-stat.ab-support { color: #0f8a78; }
+/* in-game style ability / item tooltip (data/tips.json) */
+.help-tip { --gt-spirit: #c38dff; --gt-weapon: #f0a33c; --gt-vit: #7ccb6a; --gt-hl: #fff3d6; }
+:root[data-theme="light"] .help-tip { --gt-spirit: #7a3fc4; --gt-weapon: #a85e00; --gt-vit: #2f7d22; --gt-hl: #1c1e22; }
+.help-tip.rich { white-space: normal; padding: 0; overflow: hidden; }
+.help-tip.rich::first-line { font-weight: inherit; font-size: inherit; }
+.gt-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; padding: 9px 12px 8px;
+  background: color-mix(in srgb, var(--text) 6%, transparent); border-bottom: 1px solid var(--line); }
+.gt-name { font-size: 15px; font-weight: 800; letter-spacing: .01em; margin-right: auto; }
+.gt-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.gt-chip { display: inline-flex; align-items: baseline; gap: 4px; padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 12px;
+  background: color-mix(in srgb, var(--text) 9%, transparent); font-variant-numeric: tabular-nums; }
+.gt-chip small { font-weight: 500; font-size: 10.5px; color: var(--muted); }
+.gt-sec { padding: 8px 12px; }
+.gt-sec + .gt-sec { border-top: 1px solid var(--line); }
+.gt-area { text-transform: uppercase; letter-spacing: .08em; font-size: 10px; font-weight: 800; color: var(--muted); margin-bottom: 3px; }
+.gt-area.gt-active { color: var(--gt-hl); }
+.gt-desc { margin: 0 0 6px; color: color-mix(in srgb, var(--text) 82%, transparent); }
+.gt-desc b, .gt-tier b { font-weight: 700; color: var(--gt-hl); }
+.gt-desc b.spirit, .gt-tier b.spirit { color: var(--gt-spirit); }
+.gt-desc b.weapon, .gt-tier b.weapon { color: var(--gt-weapon); }
+.gt-desc b.vit, .gt-tier b.vit { color: var(--gt-vit); }
+.gt-desc b.dim, .gt-tier b.dim { font-weight: 500; color: var(--muted); }
+.gt-main { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 4px; margin: 6px 0; }
+.gt-box { display: grid; justify-items: center; text-align: center; gap: 1px; padding: 6px 4px;
+  border-radius: 5px; background: color-mix(in srgb, var(--text) 7%, transparent); }
+.gt-box b { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.gt-box span { font-size: 11px; color: var(--muted); line-height: 1.25; }
+.gt-scale { font-style: normal; font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 3px; margin-top: 2px;
+  color: var(--gt-spirit); background: color-mix(in srgb, var(--gt-spirit) 14%, transparent); }
+.gt-scale.gt-weapon, .gt-scale.gt-bullet, .gt-scale.gt-light, .gt-scale.gt-heavy { color: var(--gt-weapon); background: color-mix(in srgb, var(--gt-weapon) 14%, transparent); }
+.gt-scale.gt-healing, .gt-scale.gt-boon { color: var(--gt-vit); background: color-mix(in srgb, var(--gt-vit) 14%, transparent); }
+.gt-basic { display: grid; grid-template-columns: 1fr auto; gap: 1px 12px; font-size: 12px; }
+.gt-basic span { color: var(--muted); }
+.gt-basic b { text-align: right; font-variant-numeric: tabular-nums; }
+.gt-tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; border-top: 1px solid var(--line); background: var(--line); }
+.gt-tier { display: grid; align-content: start; justify-items: center; gap: 4px; padding: 7px 6px 8px; text-align: center; font-size: 11.5px; line-height: 1.35;
+  background: color-mix(in srgb, var(--text) 4%, #1b1e24); }
+:root[data-theme="light"] .gt-tier { background: var(--panel); }
+.gt-tier p { margin: 0; }
+.gt-tier.off { opacity: .45; }
+.gt-tier.on { background: color-mix(in srgb, var(--accent) 16%, #1b1e24); }
+:root[data-theme="light"] .gt-tier.on { background: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
+.gt-cost { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-weight: 800; font-size: 11px;
+  color: #1b1e24; background: var(--accent); }
+.gt-tier.off .gt-cost { background: var(--muted); }
+.gt-ours { padding: 7px 12px 9px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted);
+  background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.gt-ours.stats::before { content: "This match"; display: block; text-transform: uppercase; letter-spacing: .08em; font-size: 10px; font-weight: 800; color: var(--accent); margin-bottom: 2px; }

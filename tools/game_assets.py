@@ -552,5 +552,10 @@ if __name__ == "__main__":
         prev = None
     a = build_assets(prev)
     out.write_text(json.dumps(a))
+    # in-game style tooltips (loaded by the site on first hover)
+    from ability_tips import build_tips
+    keep = {e["class_name"] for e in a["items"].values() if e.get("hero") or e.get("tier") or e.get("parent")}
+    tips = build_tips(load_script("abilities"), load_localization(), keep)
+    (out.parent / "tips.json").write_text(json.dumps(tips, separators=(",", ":")))
     print(f"{len(a['heroes'])} heroes, {len(a['items'])} abilities/items, {len(a['modifiers'])} modifiers, "
           f"{len(a['accolades'])} accolades -> {out}")
