@@ -17,7 +17,7 @@ const pw = process.env.PLAYWRIGHT ? await import(pathToFileURL(process.env.PLAYW
 const BASE = process.env.BASE || "http://localhost:8767";
 
 const browser = await pw.chromium.launch({ executablePath: process.env.CHROME, args: ["--no-sandbox", "--disable-gpu"] });
-const page = await browser.newPage({ viewport: { width: 1500, height: 1300 } });
+const page = await browser.newPage({ viewport: { width: 1500, height: +(process.env.VH || 1300) } });
 const problems = [];
 page.on("pageerror", (e) => problems.push(`page error: ${e.message}`));
 page.on("console", (m) => { if (m.type() === "error") problems.push(`console: ${m.text()}`); });
@@ -30,7 +30,7 @@ await page.waitForSelector(".drop-field");
 const t0 = Date.now();
 await page.setInputFiles("input[type=file]", demo);
 await page.waitForFunction(() => location.hash.startsWith("#/match/"), null, { timeout: 240000 });
-await page.waitForSelector(".tiles .tile", { timeout: 30000 });
+await page.waitForSelector("#summary:not([hidden]) .pg-board, #replay-view:not([hidden]) .tiles .tile", { timeout: 30000 });
 console.log(`parsed + opened in ${Date.now() - t0} ms: ${await page.evaluate(() => location.hash)}`);
 if (after) {
   await page.evaluate((h) => { location.hash = location.hash.split("?")[0] + h; }, after);
@@ -40,6 +40,7 @@ if (scrollTo) {
   await page.evaluate((sel) => { document.querySelector(sel)?.scrollIntoView(); window.scrollBy(0, -100); }, scrollTo);
   await page.waitForTimeout(300);
 }
+await page.waitForLoadState("networkidle").catch(() => {});
 await page.screenshot({ path: out });
 await browser.close();
 for (const p of problems) console.log(p);

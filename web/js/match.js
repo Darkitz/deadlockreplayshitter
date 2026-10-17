@@ -8,6 +8,7 @@ import {
 } from "./analysis.js";
 import { createTimeline, fmtClock } from "./timeline.js";
 import { createMinimap } from "./minimap.js";
+import { renderSummary } from "./postgame.js";
 import {
   $, esc, S, settings, saveSettings, opts, k1, tile, controlsHTML,
   wireControls, abilityButtons, setParams,
@@ -111,6 +112,9 @@ export async function viewMatch(id, params) {
     .sort((a, b) => (a.kind === "item") - (b.kind === "item") || a.kind.localeCompare(b.kind) || b.pts.length - a.pts.length);
   if (params.has("castheat")) settings.castHeat = params.get("castheat");
 
+  // Summary (post-game screen) by default; Replay & analysis once a player is picked
+  const view = ["summary", "replay"].includes(params.get("view")) ? params.get("view") : subject ? "replay" : "summary";
+
   // the long per-match sections live in tabs under the replay
   const chatLines = chatLog(m);
   const TABS = [
@@ -134,6 +138,12 @@ export async function viewMatch(id, params) {
         ${id < 900000000000 ? `<a class="muted small" target="_blank" rel="noopener" href="https://statlocker.gg/match/${id}">statlocker ↗</a>` : `<span class="chip-s" title="file name has no match id">dropped demo</span>`}
       </div>
     </div>
+    <nav class="view-switch" role="tablist">
+      <button class="tab ${view === "summary" ? "on" : ""}" data-view="summary">Summary</button>
+      <button class="tab ${view === "replay" ? "on" : ""}" data-view="replay">Replay &amp; analysis</button>
+    </nav>
+    <section id="summary" class="pg" ${view === "summary" ? "" : "hidden"}></section>
+    <div id="replay-view" ${view === "replay" ? "" : "hidden"}>
     <section class="scoreboard">
       ${teams.map((t) => `
         <div class="team team-${t}">
@@ -228,9 +238,12 @@ export async function viewMatch(id, params) {
     <section class="chart-card time tab-panel" id="time"></section>
     <section class="chart-card laning tab-panel" id="laning"></section>
     <section class="chart-card chat tab-panel" id="chat"></section>
+    </div>
 `;
 
   // wiring
+  renderSummary($("#summary", app), m, { onPick: (pw) => setParams({ pawn: pw, view: "replay", ability: null }) });
+  for (const b of app.querySelectorAll("[data-view]")) b.addEventListener("click", () => setParams({ view: b.dataset.view }));
   for (const b of app.querySelectorAll(".sb-row")) {
     b.addEventListener("click", (ev) => {
       setParams({ pawn: Number(b.dataset.pawn) === pawn ? null : b.dataset.pawn, ability: null });
@@ -741,7 +754,7 @@ export async function viewMatch(id, params) {
     const won = subject && f.byTeam[side] > f.byTeam[other];
     const lost = subject && f.byTeam[side] < f.byTeam[other];
     return `<button class="fight ${won ? "won" : lost ? "lost" : ""} ${mine ? "mine" : ""}" data-fight="${i}"
-      title="${fmtClock(f.t0)}–${fmtClock(f.t1)} · ${f.kills.length} kills${subject ? (mine ? ` · ${esc(subject.name)} was involved` : "") : " · Amber–Sapphire"}">
+      title="${fmtClock(f.t0)}–${fmtClock(f.t1)} · ${f.kills.length} kills${subject ? (mine ? ` · ${esc(subject.name)} was involved` : "") : ` · ${TEAM_NAMES[2]}–${TEAM_NAMES[3]}`}">
       ${fmtClock(f.t0)} <b>${f.byTeam[side]}–${f.byTeam[other]}</b></button>`;
   }).join("") : "";
   $(".fights", app).addEventListener("click", (ev) => {
@@ -904,9 +917,9 @@ export async function viewMatch(id, params) {
     const lead = souls(2) - souls(3);
     const fightsIn = fights.filter((f) => inSpan(f.t0)).length;
     $(".tiles", app).innerHTML =
-      tile("Kills <small>Amber – Sapphire</small>", `<span class="amber-txt">${teamKills(2)}</span>–<span class="sapphire-txt">${teamKills(3)}</span>`) +
-      tile("Souls <small>Amber – Sapphire</small>", `<span class="amber-txt">${k1(souls(2))}</span>–<span class="sapphire-txt">${k1(souls(3))}</span>`, "tight") +
-      tile("Souls lead", lead ? `${k1(Math.abs(lead))}<small> ${lead > 0 ? "Amber" : "Sapphire"}</small>` : "even") +
+      tile(`Kills <small>${TEAM_NAMES[2]} – ${TEAM_NAMES[3]}</small>`, `<span class="amber-txt">${teamKills(2)}</span>–<span class="sapphire-txt">${teamKills(3)}</span>`) +
+      tile(`Souls <small>${TEAM_NAMES[2]} – ${TEAM_NAMES[3]}</small>`, `<span class="amber-txt">${k1(souls(2))}</span>–<span class="sapphire-txt">${k1(souls(3))}</span>`, "tight") +
+      tile("Souls lead", lead ? `${k1(Math.abs(lead))}<small> ${lead > 0 ? TEAM_NAMES[2] : TEAM_NAMES[3]}</small>` : "even") +
       tile("Fights", fightsIn) +
       tile("Game time", fmtClock(t)) +
       tile("Winner", m.winning_team ? TEAM_NAMES[m.winning_team] : "–");

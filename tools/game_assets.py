@@ -408,7 +408,10 @@ def build_assets(previous=None):
                 r[k] = None
 
     return {"heroes": heroes, "items": items, "map": game_map, "ranks": ranks,
-            "accolades": accolades, "modifiers": modifiers, "pings": build_pings(loc), "lanes": lane_names(loc), "source": "game files"}
+            "accolades": accolades, "modifiers": modifiers, "pings": build_pings(loc), "lanes": lane_names(loc),
+            # team 2 / 3 in demos; the in-game names (the post-game graphs use these short forms)
+            "teams": {"2": loc.get("citadel_graph_team1", "Amber"), "3": loc.get("citadel_graph_team2", "Sapphire")},
+            "source": "game files"}
 
 
 if __name__ == "__main__":

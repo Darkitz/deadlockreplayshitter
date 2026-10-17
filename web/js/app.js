@@ -5,7 +5,7 @@
 //   #/match/<id>?pawn=&ability=&from=&t=   one match: minimap + timeline + tracker
 //   #/about                               how every number is derived
 
-import { loadJSON, Assets } from "./data.js";
+import { loadJSON, Assets, TEAM_NAMES } from "./data.js";
 import { $, S } from "./ui.js";
 import { viewMatch } from "./match.js";
 import { viewHome } from "./home.js";
@@ -16,6 +16,7 @@ import { initLang, helpLabel, helpText } from "./lang.js";
 async function loadAll() {
   const [assets, local] = await Promise.all([loadJSON("data/assets.json"), localList()]);
   S.assets = new Assets(assets);
+  Object.assign(TEAM_NAMES, assets.teams || {});
   S.localMatches = local;
 }
 

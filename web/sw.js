@@ -3,11 +3,11 @@
 // through this; they are read straight from disk.
 // Strategy: serve from cache, refresh the cache in the background (stale-while-revalidate),
 // so a new version shows up on the next visit.
-const CACHE = "dldi-v1";  // bump to force every visitor to refetch everything
+const CACHE = "dldi-v2";  // bump to force every visitor to refetch everything
 const CORE = [
   "./", "index.html", "style.css", "icon.svg", "data/assets.json", "parser/dlparse.wasm",
   "js/analysis.js", "js/app.js", "js/data.js", "js/explain.js", "js/home.js", "js/lang.js",
-  "js/local.js", "js/match.js", "js/minimap.js", "js/parse-worker.js", "js/timeline.js", "js/ui.js",
+  "js/local.js", "js/match.js", "js/minimap.js", "js/parse-worker.js", "js/postgame.js", "js/timeline.js", "js/ui.js",
 ];
 
 self.addEventListener("install", (ev) => {

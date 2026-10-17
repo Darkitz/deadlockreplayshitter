@@ -9,7 +9,7 @@ prost = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = "1"
-valveprotos = { workspace = true }
+valveprotos = { workspace = true, features = ["serde"] }
 
 [[bin]]
 name = "dlparse"

@@ -28,6 +28,17 @@ The home page lists them; × removes one.
 
 ## What's on a match
 
+**Summary** (opens first): Deadlock's post-game screen, without the 3D art.
+- **Winner, MVP and key players:** picked by the game; read from Valve's post-game summary, which the server writes into the demo at game end.
+- **Award cards for all 12 players** ("Most ability kills", "Second most player dmg", … computed like the game: ties share a place).
+- **Full scoreboard:** souls, K/D/A, player and objective damage, healing incl. barriers, last hits, final build, ability upgrades.
+- **Graphs**, much finer than the game's (which has ~11 points per player):
+  - every 10 s: souls, souls/min, kills, deaths, assists, player and objective damage, healing, last hits, team souls
+  - every hit: damage dealt by type, damage to and from players
+  - from Valve's snapshots: souls by source, permanent buffs
+
+**Replay & analysis:**
+
 - **Scoreboard:** every player's signature-skill accuracy. Click a row to analyze that player.
 - **Ability picker:**
   - **Gun**, **Light melee**, **Heavy melee** and the four signature abilities.

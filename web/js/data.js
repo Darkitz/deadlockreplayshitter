@@ -93,6 +93,7 @@ export function statsAt(m, pawn, t) {
   return tr.rows[i];
 }
 
+/** team 2 / 3; replaced by the game's names ("Hidden King", "Archmother") once assets load */
 export const TEAM_NAMES = { 2: "Amber", 3: "Sapphire" };
 
 /** items a pawn owns at time t (demo item events: +1 bought, -1 sold/consumed) */

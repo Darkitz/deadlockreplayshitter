@@ -23,7 +23,7 @@ use haste::valveprotos::deadlock::{
 use prost::Message;
 use serde::Serialize;
 
-pub const FORMAT_VERSION: u32 = 14;
+pub const FORMAT_VERSION: u32 = 15;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`.
 /// They are string tokens of the class names, so they survive patches. The CLI can override them
 /// with `--ignore-ids`; the browser build always uses this list.
@@ -86,6 +86,21 @@ const DEATHS: u64 = fkey_from_path(&["m_PlayerDataGlobal", "m_iDeaths"]);
 const ASSISTS: u64 = fkey_from_path(&["m_PlayerDataGlobal", "m_iPlayerAssists"]);
 const LAST_HITS: u64 = fkey_from_path(&["m_PlayerDataGlobal", "m_iLastHits"]);
 const DENIES: u64 = fkey_from_path(&["m_PlayerDataGlobal", "m_iDenies"]);
+// post-game scoreboard numbers (what the in-game scoreboard shows)
+const HERO_DAMAGE: u64 = fkey_from_path(&["m_PlayerDataGlobal", "m_iHeroDamage"]);
+const OBJECTIVE_DAMAGE: u64 = fkey_from_path(&["m_PlayerDataGlobal", "m_iObjectiveDamage"]);
+const HERO_HEALING: u64 = fkey_from_path(&["m_PlayerDataGlobal", "m_iHeroHealing"]);
+const SELF_HEALING: u64 = fkey_from_path(&["m_PlayerDataGlobal", "m_iSelfHealing"]);
+const KILL_STREAK: u64 = fkey_from_path(&["m_PlayerDataGlobal", "m_iKillStreak"]);
+const GOLD: u64 = fkey_from_path(&["m_PlayerDataGlobal", "m_iGold"]);
+const GOLD_SOURCES: [(&str, u64); 6] = [
+    ("troopers", fkey_from_path(&["m_PlayerDataGlobal", "m_iCreepGoldKill"])),
+    ("ground_orbs", fkey_from_path(&["m_PlayerDataGlobal", "m_iCreepGoldGroundOrb"])),
+    ("air_orbs", fkey_from_path(&["m_PlayerDataGlobal", "m_iCreepGoldAirOrb"])),
+    ("neutrals", fkey_from_path(&["m_PlayerDataGlobal", "m_iCreepGoldNeutral"])),
+    ("denies", fkey_from_path(&["m_PlayerDataGlobal", "m_iCreepGoldDeny"])),
+    ("solo_bonus", fkey_from_path(&["m_PlayerDataGlobal", "m_iCreepGoldSoloBonus"])),
+];
 const PAWN_CONTROLLER: u64 = fkey_from_path(&["m_hController"]);
 const PAWN_HERO_ID: u64 =
     fkey_from_path(&["m_CCitadelHeroComponent", "m_spawnedHero", "m_nHeroID"]);
@@ -179,6 +194,17 @@ struct Player {
     assists: i32,
     last_hits: i32,
     denies: i32,
+    /// damage to enemy heroes, to objectives, healing done (others / self)
+    hero_damage: i32,
+    objective_damage: i32,
+    hero_healing: i32,
+    self_healing: i32,
+    /// longest kill streak (max of the live m_iKillStreak)
+    max_streak: i32,
+    /// unspent souls at the end
+    gold: i32,
+    /// souls by source, where the demo has them
+    gold_sources: std::collections::BTreeMap<String, i32>,
 }
 
 /// Per-pawn time series, index i = time `samples.t0 + i * samples.dt`.
@@ -205,8 +231,9 @@ struct Samples {
 #[derive(Default, Serialize)]
 struct StatTrack {
     pawn: i32,
-    /// [net_worth, level, kills, deaths, assists, last_hits] per sample
-    rows: Vec<[i32; 6]>,
+    /// [net_worth, level, kills, deaths, assists, last_hits, hero_damage, objective_damage,
+    ///  hero_healing, self_healing, denies, unspent gold] per sample
+    rows: Vec<[i32; 12]>,
 }
 
 #[derive(Default, Serialize)]
@@ -265,6 +292,10 @@ pub struct Output {
     npc_hits: Vec<(f32, i32, i32, u32)>,
     /// typed chat: [t, pawn, 1 = all chat / 0 = team chat, text]
     chat: Vec<(f32, i32, u8, String)>,
+    /// Valve's post-game summary, embedded in the demo at game end (the same data as the match
+    /// metadata the in-game post-game screen shows: MVP, accolades, stats snapshots, items, ...)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    postgame: Option<haste::valveprotos::deadlock::CMsgMatchMetaDataContents>,
     /// chat wheel: [t, pawn, wheel message id, voice line ("haze_ping_retreat_01_ping_2d", may be empty)]
     wheel: Vec<(f32, i32, u32, String)>,
     samples: Samples,
@@ -600,11 +631,12 @@ impl V {
             let si = *self.stat_idx.entry(pawn).or_insert(n);
             if si == n {
                 let missing = ((t - self.out.stats.t0) / STATS_DT).round() as usize;
-                self.out.stats.tracks.push(StatTrack { pawn, rows: vec![[0; 6]; missing] });
+                self.out.stats.tracks.push(StatTrack { pawn, rows: vec![[0; 12]; missing] });
             }
             let row = entities.get(&ctrl).map(|e| {
                 let g = |k: &u64| e.get_value::<i32>(k).unwrap_or(0);
-                [g(&NET_WORTH), g(&LEVEL), g(&KILLS), g(&DEATHS), g(&ASSISTS), g(&LAST_HITS)]
+                [g(&NET_WORTH), g(&LEVEL), g(&KILLS), g(&DEATHS), g(&ASSISTS), g(&LAST_HITS),
+                 g(&HERO_DAMAGE), g(&OBJECTIVE_DAMAGE), g(&HERO_HEALING), g(&SELF_HEALING), g(&DENIES), g(&GOLD)]
             }).unwrap_or_default();
             self.out.stats.tracks[si].rows.push(row);
         }
@@ -656,6 +688,15 @@ impl Visitor for V {
             if let Some(v) = g(&ASSISTS) { p.assists = v; }
             if let Some(v) = g(&LAST_HITS) { p.last_hits = v; }
             if let Some(v) = g(&DENIES) { p.denies = v; }
+            if let Some(v) = g(&HERO_DAMAGE) { p.hero_damage = v; }
+            if let Some(v) = g(&OBJECTIVE_DAMAGE) { p.objective_damage = v; }
+            if let Some(v) = g(&HERO_HEALING) { p.hero_healing = v; }
+            if let Some(v) = g(&SELF_HEALING) { p.self_healing = v; }
+            if let Some(v) = g(&KILL_STREAK) { p.max_streak = p.max_streak.max(v); }
+            if let Some(v) = g(&GOLD) { p.gold = v; }
+            for (name, key) in GOLD_SOURCES {
+                if let Some(v) = g(&key) { p.gold_sources.insert(name.to_string(), v); }
+            }
         } else if e.serializer_name_heq(PAWN) {
             if let Some(h) = e.get_value::<u32>(&PAWN_CONTROLLER) {
                 if is_ehandle_valid(h) {
@@ -685,6 +726,7 @@ impl Visitor for V {
         const KILLED: u32 = CitadelUserMessageIds::KEUserMsgHeroKilled as u32;
         const CHAT: u32 = CitadelUserMessageIds::KEUserMsgChatMsg as u32;
         const WHEEL: u32 = CitadelUserMessageIds::KEUserMsgChatWheel as u32;
+        const POST_MATCH: u32 = CitadelUserMessageIds::KEUserMsgPostMatchDetails as u32;
         const GAME_OVER: u32 = CitadelUserMessageIds::KEUserMsgGameOver as u32;
         const NET_TICK: u32 = NetMessages::NetTick as u32;
         match ty {
@@ -764,6 +806,15 @@ impl Visitor for V {
                 // controller index (slot + 1), resolved to a pawn at the end
                 let ctrl = l.player_slot.unwrap_or(-1) + 1;
                 self.out.wheel.push((self.time(ctx), ctrl, l.message_id.unwrap_or(0), l.voice_line.unwrap_or_default()));
+            }
+            POST_MATCH => {
+                // optional: a format change here must not fail the parse
+                use haste::valveprotos::deadlock::{CCitadelUserMsgPostMatchDetails, CMsgMatchMetaDataContents};
+                let details = CCitadelUserMsgPostMatchDetails::decode(data).ok()
+                    .and_then(|m| CMsgMatchMetaDataContents::decode(m.match_details()).ok());
+                if details.is_some() {
+                    self.out.postgame = details;
+                }
             }
             KILLED => {
                 let m: CCitadelUserMsgHeroKilled = decode(data)?;

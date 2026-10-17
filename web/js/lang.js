@@ -104,6 +104,12 @@ const PHRASES = {
   "dash": "dashin' 💨",
   "airborne": "air time 🦅",
   "on foot": "walking (NPC behavior) 🚶",
+  "Summary": "The tea ☕",
+  "Replay & analysis": "Replay & analysis (lore drop) 🔍",
+  "victorious": "ate and left no crumbs 💅",
+  "Victorious": "W 🏆",
+  "Defeated": "L 💀",
+  "Key player": "Key player (real one) 🫡",
   // more replay bits
   "follow ×2": "stalk ×2 👀",
   "follow ×3": "stalk ×3 👀👀",
