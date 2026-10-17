@@ -15,6 +15,7 @@ export function viewHome() {
       <b>Drop a Deadlock demo here</b>
       <span>or click to pick a file · <code>.dem</code> from <code>Deadlock/game/citadel/replays</code>
         (in-game: match history → <i>Download Replay</i>) or <code>.dem.bz2</code></span>
+      <p class="slop-note" data-help="This site was written almost entirely by an AI (Claude), steered by one human.\nMany numbers are checked against the game's own post-game screens (see How it works), but expect bugs and weird edge cases.\nIf something looks wrong, it probably is.">⚠ Heads up: this is <b>AI slop</b>. Almost all of it was written by an AI. It's checked against the game where possible, but trust it like you'd trust a stranger's spreadsheet.</p>
       <div class="offline">
         <strong>REPLAY ANALYSIS IS 100% OFFLINE</strong>
         <ul>

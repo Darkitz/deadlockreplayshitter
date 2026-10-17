@@ -2,6 +2,10 @@
 
 <img src="web/icon.svg" width="96" alt="">
 
+> ⚠ **This is AI slop.** DLDI was written almost entirely by an AI (Claude), steered by one human.
+> Many numbers are checked against Deadlock's own post-game screens and Valve's match data, but that's spot
+> checks, not proof. Expect bugs.
+
 **Live: [darkitz.github.io/deadlockreplayshitter/](https://darkitz.github.io/deadlockreplayshitter/)**
 
 Drop a Deadlock demo onto the page and see, for every player in the match, how many skillshots,

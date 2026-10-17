@@ -133,6 +133,7 @@ function initTheme() {
 
 async function main() {
   initTheme();
+  console.info("%cDLDI is AI slop", "font-weight:bold;color:#e2b34f", "— written almost entirely by an AI. Found a bug? It's probably real.");
   // offline support (web/sw.js); not available on file:// or in some private modes
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
     // a new version took over (old tabs were served by the previous worker): reload once

@@ -159,6 +159,7 @@ export function renderSummary(el, m, { onPick }) {
   el.innerHTML = `
     ${!m.postgame ? `<p class="note">No MVP, awards or kill types for this match: Valve's post-game summary isn't in this parse.
       If you opened the demo with an older DLDI version, drop it again; otherwise the demo doesn't contain one (cut off before the end).</p>` : ""}
+    <p class="slop-note slop-inline">⚠ AI slop: these screens are rebuilt by an AI-written parser. They match the game on the matches we checked, but double-check before you flame your teammate.</p>
     <section class="pg-banner">
       <div class="pg-banner-team">${model.winner ? `${teamLogo(model.winner, "pg-logo-lg")}<span class="pg-victorious">Victorious</span>` : "<h2>Match over</h2>"}</div>
       <div class="pg-banner-meta"><b>Standard match</b><span>Match ${m.match_id || ""}</span><span>${esc(when)} · ${fmtClock(m.end)}</span></div>

@@ -216,6 +216,10 @@ export function viewAbout(app, params) {
   app.innerHTML = `
     <section class="about">
       <h2>How the numbers are made</h2>
+      <div class="slop-note"><b>⚠ This is AI slop.</b> DLDI was written almost entirely by an AI (Claude), with one human pointing at
+        things and saying "no, like in the game". The numbers below explain what the code does, and many were checked against
+        Deadlock's own post-game screens and Valve's match data. That's spot checks, not proof. Expect bugs, especially after
+        patches and in unusual matches.</div>
       <p class="muted">Everything is computed in your browser from the demo alone. Hover any underlined label on the site for the same text.</p>
       <nav class="about-toc">${[...DEEP_DIVES.map((d) => [d.id, d.title]), ...SECTIONS.map((x, i) => [`s${i}`, x.title])]
         .map(([id, t]) => `<a href="#/about?s=${id}" data-jump="${id}">${t}</a>`).join("")}</nav>

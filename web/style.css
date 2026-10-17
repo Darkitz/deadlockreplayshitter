@@ -928,3 +928,13 @@ body { word-spacing: .08em; }
 /* award kill red: fixed, not the theme's --kill (purple in light mode) */
 .aw-kill .aw-icon, .aw-kill b { color: #ef5b4c; }
 :root[data-theme="light"] .pg-team .pg-card .aw-kill b, :root[data-theme="light"] .pg-team .pg-card .aw-kill .aw-icon { color: #c62f22; }
+
+/* "AI slop" disclaimers */
+.slop-badge { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 1px 6px; border-radius: 3px; font: 700 10px/1.4 "Barlow", system-ui, sans-serif;
+  letter-spacing: .08em; color: #1a1205; background: #e2b34f; -webkit-text-fill-color: #1a1205; cursor: help; }
+.slop { color: #e2b34f; font-weight: 700; cursor: help; }
+.slop-note { margin: 0; padding: 8px 12px; border-radius: 6px; font-size: 13px; line-height: 1.5; color: var(--text);
+  background: color-mix(in srgb, #e2b34f 12%, transparent); border: 1px dashed color-mix(in srgb, #e2b34f 55%, transparent); }
+.drop-field .slop-note { max-width: 560px; }
+.about .slop-note { margin: 12px 0; }
+.drop-field .slop-note b { font-size: inherit; }

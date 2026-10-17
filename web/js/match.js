@@ -154,6 +154,7 @@ export async function viewMatch(id, params) {
           : m.winning_team ? `<span class="result team-won team-${m.winning_team}">${TEAM_NAMES[m.winning_team]} won</span>` : ""}
         <h2>#${id}</h2>
         <span class="muted">${fmtClock(m.end)}</span>
+        <span class="slop-badge" data-help="AI slop: this analysis is computed by AI-written code. Spot-checked against the game, not guaranteed.">AI SLOP</span>
         ${info ? `<span class="muted small" title="dropped ${esc(new Date(info.parsed_at).toString())}">${esc(info.file)}</span>` : ""}
         ${id < 900000000000 ? `<a class="muted small" target="_blank" rel="noopener" href="https://statlocker.gg/match/${id}">statlocker ↗</a>` : `<span class="chip-s" title="file name has no match id">dropped demo</span>`}
       </div>
