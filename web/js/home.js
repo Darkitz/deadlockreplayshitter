@@ -15,11 +15,11 @@ export function viewHome() {
       <span>or click to pick a file · <code>.dem</code> from <code>Deadlock/game/citadel/replays</code>
         (in-game: match history → <i>Download Replay</i>) or <code>.dem.bz2</code></span>
       <div class="offline">
-        <strong>100% OFFLINE</strong>
+        <strong>REPLAY ANALYSIS IS 100% OFFLINE</strong>
         <ul>
-          <li>Your demo is read and analyzed <b>on your computer</b>. It is never uploaded.</li>
-          <li>No server, no account, no tracking, no cookies. Nothing gets sent anywhere.</li>
-          <li>The website is just files. After your first visit it works without internet at all.</li>
+          <li>Your demo is read and analyzed <b>on your computer</b>, right in this browser tab.</li>
+          <li>It is never uploaded. No server, no account, no tracking.</li>
+          <li>Only the website itself loads from the internet, including hero and item icons as you need them.</li>
         </ul>
       </div>
     </section>

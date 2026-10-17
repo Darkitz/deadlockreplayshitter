@@ -6,7 +6,7 @@ Drop a Deadlock demo onto the page and see, for every player in the match, how m
 gun shots and melee swings were **thrown vs hit**. The match plays back on a minimap with timelines
 you can scrub or select a span on.
 
-**100% offline:** the demo is read and analyzed on your computer and never uploaded. There is no server, account or tracking. After the first visit, a service worker (`web/sw.js`) has cached the whole site including every icon, so it works with no internet at all.
+**Replay analysis is 100% offline:** the demo is read and analyzed on your computer and never uploaded. There is no server, account or tracking. Only the website itself, icons included, loads from the internet. A service worker (`web/sw.js`) keeps the core files, so analysis keeps working without a connection after the first visit.
 
 Everything runs in the browser. The demo parser ([haste](https://github.com/deadlock-api/haste),
 in `parser/`) is compiled to WebAssembly and parses the file locally. Nothing is uploaded and there

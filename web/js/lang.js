@@ -16,7 +16,7 @@ const PHRASES = {
   "open demo": "drop a demo 📂",
   "Drop a Deadlock demo here": "Yeet a Deadlock demo in here fr 📂✨",
   "Parsed right here in your browser. Nothing is uploaded.": "Parsed in your browser, nothing gets uploaded. We're not the feds 🕵️",
-  "100% OFFLINE": "100% OFFLINE, NO CAP 🔒🧢",
+  "REPLAY ANALYSIS IS 100% OFFLINE": "REPLAY ANALYSIS IS 100% OFFLINE, NO CAP 🔒🧢",
   "on your computer": "on your own machine 💻",
   "Opened in this browser": "Your demo lore 📜",
   "← home": "← back to the crib 🏠",
