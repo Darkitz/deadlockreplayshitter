@@ -1,7 +1,7 @@
 // Match detail: scoreboard, ability picker, minimap + timeline replay, incoming skillshots.
 
 import {
-  loadMatch, statsAt, hpAt, itemsAt, abilityLevelsAt, modifiersAt, TEAM_NAMES,
+  loadMatch, statsAt, posAt, hpAt, itemsAt, abilityLevelsAt, modifiersAt, TEAM_NAMES,
 } from "./data.js";
 import {
   analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt, damageTaken, detectFights, surroundings, MELEE, MELEE_LIGHT, MELEE_HEAVY, MELEE_REACH_M, meleeStats, meleeModel, timeSplit,
@@ -83,6 +83,34 @@ export async function viewMatch(id, params) {
   const teamOf = (t) => m.players.filter((p) => p.team === t).sort((a, b) => b.net_worth - a.net_worth);
   const teams = [...new Set(m.players.map((p) => p.team))].sort();
 
+  // cast heatmap sources: every ability / active item cast in the match, with positions.
+  // ImportantAbilityUsed casts carry the caster's position; abilities that only show up as
+  // cooldown starts use the caster's position at that moment.
+  const castSources = new Map();
+  for (const c of m.casts) {
+    const e = castSources.get(c[2]) || { cls: c[2], pts: [] };
+    e.pts.push([c[0], c[3], c[4], c[1]]);
+    castSources.set(c[2], e);
+  }
+  for (const u of m.uses) {
+    const cls = S.assets.item(u[2])?.class_name;
+    if (!cls || (castSources.has(cls) && !castSources.get(cls).fromUses)) continue;
+    const p = posAt(m, u[1], u[0]);
+    if (!p) continue;
+    const e = castSources.get(cls) || { cls, pts: [], fromUses: true };
+    e.pts.push([u[0], p[0], p[1], u[1]]);
+    castSources.set(cls, e);
+  }
+  const heatChoices = [...castSources.values()].map((e) => {
+    const it = S.assets.itemByClass(e.cls);
+    const casters = new Set(e.pts.map((x) => x[3]));
+    const heroes = [...new Set([...casters].map((pw) => S.assets.hero(m.byPawn.get(pw)?.hero_id).name))];
+    const kind = it?.type === "upgrade" ? "item" : heroes.length === 1 ? heroes[0] : "ability";
+    return { ...e, name: it?.name || e.cls, kind };
+  }).filter((e) => e.name !== e.cls || !/^upgrade_|_trigger$/.test(e.cls))
+    .sort((a, b) => (a.kind === "item") - (b.kind === "item") || a.kind.localeCompare(b.kind) || b.pts.length - a.pts.length);
+  if (params.has("castheat")) settings.castHeat = params.get("castheat");
+
   // the long per-match sections live in tabs under the replay
   const chatLines = chatLog(m);
   const TABS = [
@@ -141,6 +169,13 @@ export async function viewMatch(id, params) {
           <label class="check"><input type="checkbox" class="show-all" ${settings.showAll ? "checked" : ""}> all casts</label>
           <label class="check"><input type="checkbox" class="show-heat" ${settings.showHeat ? "checked" : ""}> heat</label>
           <label class="check"><input type="checkbox" class="show-deaths" ${settings.showDeaths ? "checked" : ""}> deaths</label>
+          <select class="cast-heat" title="glow where one ability or item was cast (${subject ? "by the selected player" : "by everyone"})">
+            <option value="">cast heatmap…</option>
+            ${heatChoices.filter((e) => !subject || e.pts.some((x) => x[3] === pawn)).map((e) => {
+              const n = subject ? e.pts.filter((x) => x[3] === pawn).length : e.pts.length;
+              return `<option value="${esc(e.cls)}" ${settings.castHeat === e.cls ? "selected" : ""}>${esc(e.name)} · ${esc(e.kind)} (${n})</option>`;
+            }).join("")}
+          </select>
           <span class="zoom-btns" ${subject ? "" : "hidden"}>${[1, 2, 3].map((z) => `<button class="chip ${(settings.mapZoom || 1) === z ? "on" : ""}" data-zoom="${z}">${z === 1 ? "full map" : `follow ×${z}`}</button>`).join("")}</span>
           <span>click a hero to analyze them · rays = aim at cast</span>
         </div>
@@ -642,6 +677,7 @@ export async function viewMatch(id, params) {
       p.set("t", Math.round(t));
       if (t0 != null) p.set("from", Math.round(t0)); else p.delete("from");
       p.set("tab", tab);
+      if (settings.castHeat && castSources.has(settings.castHeat)) p.set("castheat", settings.castHeat); else p.delete("castheat");
       p.delete("section");
       history.replaceState(null, "", `#${path}?${p}`);
     }, 300);
@@ -662,6 +698,11 @@ export async function viewMatch(id, params) {
   for (const [cls, key] of [[".show-heat", "showHeat"], [".show-deaths", "showDeaths"]]) {
     $(cls, app).addEventListener("change", (ev) => { settings[key] = ev.target.checked; saveSettings(); seek(t); });
   }
+  $(".cast-heat", app).addEventListener("change", (ev) => {
+    settings.castHeat = ev.target.value;
+    saveSettings();
+    seek(t);
+  });
   $(".show-all", app).addEventListener("change", (ev) => {
     settings.showAll = ev.target.checked;
     saveSettings();
@@ -727,8 +768,10 @@ export async function viewMatch(id, params) {
     $(".span-info", app).innerHTML = t0 != null
       ? `span ${fmtClock(t0)}–${fmtClock(t)} <button class="chip span-clear" title="clear span (Esc)">×</button>` : "";
     syncUrl();
+    const ch = castSources.get(settings.castHeat);
     minimap.update({ t, from: t0 ?? 0, subject: pawn, casts, showAll: settings.showAll, zoom: settings.mapZoom || 1,
-      heat: settings.showHeat, deaths: settings.showDeaths });
+      heat: settings.showHeat, deaths: settings.showDeaths,
+      castHeat: ch ? (subject ? ch.pts.filter((x) => x[3] === pawn) : ch.pts) : null });
     renderReadout(t);
     if (tab === "tracker") renderTracker(t);
     if (tab === "chat") renderChat(t);
@@ -863,7 +906,7 @@ export async function viewMatch(id, params) {
     const fightsIn = fights.filter((f) => inSpan(f.t0)).length;
     $(".tiles", app).innerHTML =
       tile("Kills <small>Amber – Sapphire</small>", `<span class="amber-txt">${teamKills(2)}</span>–<span class="sapphire-txt">${teamKills(3)}</span>`) +
-      tile("Souls <small>Amber – Sapphire</small>", `<span class="amber-txt">${k1(souls(2))}</span>–<span class="sapphire-txt">${k1(souls(3))}</span>`) +
+      tile("Souls <small>Amber – Sapphire</small>", `<span class="amber-txt">${k1(souls(2))}</span>–<span class="sapphire-txt">${k1(souls(3))}</span>`, "tight") +
       tile("Souls lead", lead ? `${k1(Math.abs(lead))}<small> ${lead > 0 ? "Amber" : "Sapphire"}</small>` : "even") +
       tile("Fights", fightsIn) +
       tile("Game time", fmtClock(t)) +

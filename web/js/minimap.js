@@ -120,6 +120,33 @@ export function createMinimap(canvas, { match, assets, profiles, onPick }) {
         }
       }
     }
+    // cast heat: where one ability / item was cast inside [from, t]; soft glows add up where
+    // casts pile up (casts are sparse, a grid would look blocky)
+    if (state.castHeat?.length) {
+      const rad = S * 0.035 * Math.sqrt(z);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (const [ct, x, y] of state.castHeat) {
+        if (ct < from || ct > t || (!x && !y)) continue;
+        const [px, py] = w2p(x, y);
+        const g = ctx.createRadialGradient(px, py, 0, px, py, rad);
+        g.addColorStop(0, "rgba(176, 124, 240, .55)");
+        g.addColorStop(0.45, "rgba(150, 90, 230, .22)");
+        g.addColorStop(1, "rgba(120, 60, 220, 0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(px - rad, py - rad, rad * 2, rad * 2);
+      }
+      ctx.restore();
+      // the casts themselves as small dots on top
+      ctx.fillStyle = "rgba(235, 220, 255, .9)";
+      for (const [ct, x, y] of state.castHeat) {
+        if (ct < from || ct > t || (!x && !y)) continue;
+        const [px, py] = w2p(x, y);
+        ctx.beginPath();
+        ctx.arc(px, py, 1.6 * dpr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
     // deaths of everyone inside [from, t]
     if (state.deaths) {
       for (const k of match.kills) {

@@ -77,6 +77,7 @@ export const SECTIONS = [
       ["fights", "Fights", "Kills grouped together when less than 15 s apart. The score is kills per team."],
       ["team souls lead", "Team souls lead", "Amber's total net worth minus Sapphire's, every 10 s."],
       ["heat", "Heat (map)", "Where the selected player spent time while alive in the current point or span (positions every 0.5 s)."],
+      ["cast heatmap", "Cast heatmap (map)", "Pick an ability or active item under the map: it glows wherever it was cast in the current point or span, brighter where casts pile up. With no player selected it shows everyone's casts, otherwise only the selected player's. Positions are where the caster stood when casting (for abilities without a cast event: when the cooldown started)."],
       ["deaths", "Deaths (map)", "Every hero death in the current point or span, crossed in team color."],
       ["incoming", "Incoming", `Enemy casts aimed at this player (within ${AIMED_AT_DEG}° of them): how many hit them and how many they dodged.`],
       ["hp", "HP", "Health and max health at the playhead (max includes items and buffs)."],

@@ -516,3 +516,5 @@ table.mini td.accent { color: var(--accent); }
 .result.team-won.team-3 { background: color-mix(in srgb, var(--sapphire) 18%, transparent); color: var(--sapphire); border-top: 0; }
 .amber-txt { color: var(--amber); }
 .sapphire-txt { color: var(--sapphire); }
+.map-legend .cast-heat { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font: inherit; max-width: 220px; }
+.readout .tile.tight .v { font-size: 15px; white-space: nowrap; }
