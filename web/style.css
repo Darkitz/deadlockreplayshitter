@@ -847,3 +847,25 @@ body { word-spacing: .08em; }
 .pg-mvp-hero img { max-width: 250px; aspect-ratio: 280 / 380; object-position: top; }
 .pg-mvp-heroname { margin-top: -44px; font-size: 32px; }
 .pg-plot { align-self: start; }
+
+/* replay: dense player picker, like the Simple Graphs portrait strip */
+.scoreboard.sb-strip { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: end; }
+.sb-strip .team { padding: 8px 10px; background: none; border: 0; }
+.sb-strip-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; min-height: 26px; }
+.sb-strip .team-3 .sb-strip-head { justify-content: flex-end; flex-direction: row-reverse; }
+.pg-logo-xs .pg-logo-mask { width: 140px; height: 24px; }
+.sb-strip .team-3 .pg-logo-xs .pg-logo-mask { -webkit-mask-position: right center; mask-position: right center; }
+.sb-strip-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.sb-strip .sb-row { display: grid; grid-template-columns: 1fr; justify-items: center; gap: 1px; padding: 6px 4px 5px; margin: 0; border-radius: 6px; width: auto; text-align: center; }
+.sb-strip .sb-hero { width: 46px; height: 46px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--row-team) 70%, transparent); }
+.sb-strip .sb-row.on .sb-hero { box-shadow: 0 0 0 3px var(--accent); }
+.sb-strip .sb-name { font-size: 12.5px; max-width: 100%; margin-top: 3px; }
+.sb-strip .sb-line { display: flex; gap: 6px; justify-content: center; font-size: 12px; line-height: 1.25; }
+.sb-strip .sb-kda, .sb-strip .sb-nw, .sb-strip .sb-acc { font-size: 12px; text-align: center; }
+.sb-strip .sb-nw { color: color-mix(in srgb, var(--text) 70%, transparent); }
+.sb-strip-mid { display: flex; padding-bottom: 32px; }
+.sb-strip-mid span { padding: 4px 10px; font-weight: 700; font-size: 16px; color: var(--text); }
+.sb-strip-mid .team-2 { background: #c97a1c; border-radius: 4px 0 0 4px; }
+.sb-strip-mid .team-3 { background: #3a6fd0; border-radius: 0 4px 4px 0; }
+@media (max-width: 1100px) { .scoreboard.sb-strip { grid-template-columns: 1fr; } .sb-strip-mid { justify-content: center; padding: 0; } .sb-strip .team-3 .sb-strip-head { flex-direction: row; justify-content: flex-start; } }
+@media (max-width: 640px) { .sb-strip-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

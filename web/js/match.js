@@ -146,22 +146,22 @@ export async function viewMatch(id, params) {
     <section id="summary" class="pg" ${view === "summary" ? "" : "hidden"}></section>
     <section id="simple-graphs" class="pg" ${view === "graphs" ? "" : "hidden"}></section>
     <div id="replay-view" ${view === "replay" ? "" : "hidden"}>
-    <section class="scoreboard">
-      ${teams.map((t) => `
+    <section class="scoreboard sb-strip">
+      ${teams.map((t, ti) => `
         <div class="team team-${t}">
-          <h3>${teamLogo(t, "pg-logo-sm")}${m.winning_team === t ? `<span class="sb-won">Victorious</span>` : ""}${subject?.team === t ? `<span class="sb-yours">${esc(subject.name)}'s team</span>` : ""}</h3>
-          <div class="team-head"><span></span><span>player</span><span style="text-align:right">k/d/a</span><span style="text-align:right">skill%</span><span style="text-align:right">souls</span></div>
-          ${teamOf(t).map((p) => {
-            return `<div class="sb-row ${p.pawn === pawn ? "on" : ""}" data-pawn="${p.pawn}" role="button" tabindex="0" title="${p.pawn === pawn ? "deselect" : `analyze ${esc(p.name)}`}">
+          <div class="sb-strip-head">${teamLogo(t, "pg-logo-xs")}${m.winning_team === t ? `<span class="sb-won">Victorious</span>` : ""}</div>
+          <div class="sb-strip-row">${(ti ? teamOf(t) : [...teamOf(t)].reverse()).map((p) => {
+            const a = skillAcc.get(p.pawn); const v = a.thrown ? a.scored / a.thrown : 0;
+            return `<div class="sb-row ${p.pawn === pawn ? "on" : ""}" data-pawn="${p.pawn}" role="button" tabindex="0"
+              title="${esc(p.name)} · ${esc(S.assets.hero(p.hero_id).name)} · ${p.pawn === pawn ? "click to deselect" : "click to analyze"}">
               <img class="sb-hero" src="${esc(S.assets.hero(p.hero_id).icon)}" alt="">
               <span class="sb-name">${esc(p.name || S.assets.hero(p.hero_id).name)}</span>
-              <span class="sb-kda">${p.kills}/${p.deaths}/${p.assists}</span>
-              ${(() => { const a = skillAcc.get(p.pawn); const v = a.thrown ? a.scored / a.thrown : 0;
-                return `<span class="sb-acc ${a.thrown >= 5 && v === bestAcc ? "best" : ""}" title="signature abilities: ${a.scored}/${a.thrown} hit heroes">${a.thrown ? pct(v) : "–"}</span>`; })()}
-              <span class="sb-nw">${k1(p.net_worth)}</span>
+              <span class="sb-line"><span class="sb-kda" title="kills / deaths / assists">${p.kills}/${p.deaths}/${p.assists}</span></span>
+              <span class="sb-line"><span class="sb-acc ${a.thrown >= 5 && v === bestAcc ? "best" : ""}" title="signature-skill accuracy: ${a.scored}/${a.thrown} hit heroes">${a.thrown ? pct(v) : "–"}</span>
+                <span class="sb-nw" title="souls">${k1(p.net_worth)}</span></span>
             </div>`;
-          }).join("")}
-        </div>`).join("")}
+          }).join("")}</div>
+        </div>${ti === 0 ? `<div class="sb-strip-mid"><span class="team-2">${k1(teamOf(2).reduce((s2, p) => s2 + p.net_worth, 0))}</span><span class="team-3">${k1(teamOf(3).reduce((s2, p) => s2 + p.net_worth, 0))}</span></div>` : ""}`).join("")}
     </section>
     ${subject ? `<section class="toolbar">
       <div class="abilities">${abilityButtons([gunAbility, ...meleeAbilities, ...table.filter((r) => !r.kind).map((r) => r.ability)], ability.class_name, abStat)}</div>
