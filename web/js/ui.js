@@ -65,9 +65,18 @@ export function wireControls(root, onChange) {
   }
 }
 
-export function abilityButtons(list, selected, extra = () => "") {
+const SLOT_NAME = { weapon: "Weapon", vitality: "Vitality", spirit: "Spirit" };
+/** hover text for an item icon: name, then slot / tier */
+export function itemHelp(it) {
+  if (!it) return "";
+  const meta = [it.slot && `${SLOT_NAME[it.slot] || it.slot} item`, it.tier && `tier ${it.tier}`].filter(Boolean).join(" · ");
+  return meta ? `${it.name}\n${meta}` : it.name;
+}
+
+/** icon buttons; `extra` adds the stat badge, `help` the hover text (name, then what the numbers mean) */
+export function abilityButtons(list, selected, extra = () => "", help = (ab) => ab.name) {
   return list.map((ab) => `
-    <button class="ab ${ab.class_name === selected ? "on" : ""}" data-ability="${esc(ab.class_name)}" title="${esc(ab.name)}">
+    <button class="ab ${ab.class_name === selected ? "on" : ""}" data-ability="${esc(ab.class_name)}" aria-label="${esc(ab.name)}" data-help="${esc(help(ab))}">
       ${ab.image ? `<img src="${esc(ab.image)}" alt="">` : `<span class="ab-ph">${esc((ab.name || "?")[0])}</span>`}
       <span class="ab-name">${esc(ab.name)}</span>${extra(ab)}
     </button>`).join("");

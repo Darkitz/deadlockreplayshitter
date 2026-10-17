@@ -11,7 +11,7 @@ import { createMinimap } from "./minimap.js";
 import { renderSummary, renderSimpleGraphs, teamLogo } from "./postgame.js";
 import {
   $, esc, S, settings, saveSettings, opts, k1, tile, controlsHTML,
-  wireControls, abilityButtons, setParams,
+  wireControls, abilityButtons, setParams, itemHelp,
 } from "./ui.js";
 
 export async function viewMatch(id, params) {
@@ -57,10 +57,30 @@ export async function viewMatch(id, params) {
   const casts = analysis.casts;
   const won = subject && m.winning_team ? m.winning_team === subject.team : null;
 
+  /** hover text for an ability button: name, then what its numbers mean */
+  function abHelp(ab) {
+    const lines = [ab.name];
+    if (ab.melee) {
+      const k = meleeAll[ab.melee];
+      lines.push(`${k.hero} / ${k.near}: ${ab.melee} melees that hit an enemy hero / swings with an enemy hero within ${MELEE_REACH_M} m.`,
+        `${k.n} swings in total (the rest were at troopers or for movement).`);
+    } else if (ab.class_name === GUN.class_name) {
+      lines.push(`${gun.heroHits} / ${gun.shots}: shots that hit an enemy hero / all shots fired.`,
+        `${gun.npcHits} shots hit only troopers or objectives; hero accuracy leaves those out.`);
+    } else {
+      const r = table.find((x) => x.ability.class_name === ab.class_name);
+      if (r?.thrown) lines.push(`${r.scored} / ${r.thrown}: casts that ${settings.heroesOnly ? "hit an enemy hero" : "hit anything"} / all casts (hit window ${settings.window} s).`);
+      else lines.push("Not used this match.");
+      if (r?.item) lines.push("Active item.");
+    }
+    lines.push(ab.class_name === ability?.class_name ? "Selected." : "Click to analyze.");
+    return lines.join("\n");
+  }
+
   function abStat(ab) {
     if (ab.melee) {
       const k = meleeAll[ab.melee];
-      return k.n ? `<span class="ab-stat" title="hero hits / hero melees (enemy hero within ${MELEE_REACH_M} m) · ${k.n} swings">${k.hero}/${k.near}</span>`
+      return k.n ? `<span class="ab-stat">${k.hero}/${k.near}</span>`
         : `<span class="ab-stat muted">–</span>`;
     }
     if (ab.class_name === GUN.class_name) {
@@ -163,14 +183,15 @@ export async function viewMatch(id, params) {
           }).join("")}</div>
         </div>${ti === 0 ? `<div class="sb-strip-mid"><span class="team-2">${k1(teamOf(2).reduce((s2, p) => s2 + p.net_worth, 0))}</span><span class="team-3">${k1(teamOf(3).reduce((s2, p) => s2 + p.net_worth, 0))}</span></div>` : ""}`).join("")}
     </section>
-    ${subject ? `<section class="toolbar">
-      <div class="abilities">${abilityButtons([gunAbility, ...meleeAbilities, ...table.filter((r) => !r.kind).map((r) => r.ability)], ability.class_name, abStat)}</div>
+    ${subject ? `<section class="toolbar ab-bar">
+      <div class="ab-group"><span class="ab-label">abilities</span>
+        <div class="abilities">${abilityButtons([gunAbility, ...meleeAbilities, ...table.filter((r) => !r.kind).map((r) => r.ability)], ability.class_name, abStat, abHelp)}</div></div>
+      ${table.some((r) => r.kind === "extra") ? `<div class="ab-group"><span class="ab-label">other abilities</span>
+        <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.kind === "extra").map((r) => r.ability), ability.class_name, abStat, abHelp)}</div></div>` : ""}
+      ${table.some((r) => r.item) ? `<div class="ab-group"><span class="ab-label">active items</span>
+        <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.item).map((r) => r.ability), ability.class_name, abStat, abHelp)}</div></div>` : ""}
       <div class="controls">${controlsHTML(false)}</div>
-    </section>
-    ${table.some((r) => r.kind === "extra") ? `<section class="items-row"><span class="muted small">other abilities</span>
-      <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.kind === "extra").map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}
-    ${table.some((r) => r.item) ? `<section class="items-row"><span class="muted small">active items</span>
-      <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.item).map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}`
+    </section>`
     : `<section class="pick-hint"><b>Match overview.</b> Pick a player in the scoreboard, on the map or in the tables below to see their abilities, gun, melee and state.</section>`}
     ${subject && analysis.source === "cooldown" ? `<p class="note">No cast events for ${esc(ability.name)} in this demo; casts are taken from the ability going on cooldown, so there is no aim direction or aim error.</p>` : ""}
     ${m.warnings?.length ? `<p class="note warn">Parser warnings for this demo: ${m.warnings.map(esc).join(" · ")}</p>` : ""}
@@ -342,9 +363,9 @@ export async function viewMatch(id, params) {
         <div class="st-num"><b>${st ? st[1] : "–"}</b><small>level</small></div>
       </div>
       <div class="st-abs">${abil}</div>
-      <div class="st-items">${items.map((it) => `<img class="slot-${esc(it.slot || "x")}" src="${esc(S.assets.itemIcon(it.id))}" title="${esc(it.name)}${it.tier ? ` · tier ${it.tier}` : ""}" alt="">`).join("") || `<span class="muted small">no items yet</span>`}</div>
-      ${`<div class="st-mods">${mods.map((x) => `<span class="mod ${x.enemy ? "debuff" : ""}" title="${esc(x.name)}${x.enemy ? " (from enemy)" : ""}${x.left < 9999 ? ` · ${x.left.toFixed(1)} s left` : ""}">
-        ${x.icon ? `<img src="${esc(x.icon)}" alt="">` : ""}<span>${esc(x.name)}</span>${x.stacks > 1 ? `<b>×${x.stacks}</b>` : x.n > 1 ? `<b>×${x.n}</b>` : ""}${x.left < 600 ? `<small>${x.left.toFixed(0)}s</small>` : ""}</span>`).join("") || `<span class="muted small">no buffs or debuffs</span>`}</div>`}`;
+      <div class="st-items">${items.map((it) => `<img class="slot-${esc(it.slot || "x")}" src="${esc(S.assets.itemIcon(it.id))}" data-help="${esc(itemHelp(it))}" alt="${esc(it.name)}">`).join("") || `<span class="muted small">no items yet</span>`}</div>
+      ${`<div class="st-mods">${mods.map((x) => `<span class="mod ${x.enemy ? "debuff" : ""} ${x.icon ? "mod-icon" : ""}" data-help="${esc(`${x.name}\n${x.enemy ? "Debuff from an enemy" : "Buff"}${x.left < 9999 ? ` · ${x.left.toFixed(1)} s left` : ""}${x.stacks > 1 ? ` · ${x.stacks} stacks` : x.n > 1 ? ` · ×${x.n}` : ""}`)}">
+        ${x.icon ? `<img src="${esc(x.icon)}" alt="${esc(x.name)}">` : `<span>${esc(x.name)}</span>`}${x.stacks > 1 ? `<b>×${x.stacks}</b>` : x.n > 1 ? `<b>×${x.n}</b>` : ""}${x.left < 600 ? `<small>${x.left.toFixed(0)}s</small>` : ""}</span>`).join("") || `<span class="muted small">no buffs or debuffs</span>`}</div>`}`;
   }
 
   /** [souls, level, k, d, a, lh] at t, or gained inside the span (level stays absolute) */
@@ -453,7 +474,7 @@ export async function viewMatch(id, params) {
               return `<small>${fr(l)} · ${fr(h)} · ${sw.filter((x) => x.result === "parried").length}</small>`;
             })()}</td>
             <td class="tr-items">${itemsAt(m, r.p.pawn, t).filter((id) => S.assets.item(id)?.type === "upgrade")
-              .map((id) => `<img class="slot-${esc(S.assets.item(id)?.slot || "x")}" src="${esc(S.assets.itemIcon(id))}" title="${esc(S.assets.item(id)?.name)}" alt="">`).join("")}</td>
+              .map((id) => `<img class="slot-${esc(S.assets.item(id)?.slot || "x")}" src="${esc(S.assets.itemIcon(id))}" data-help="${esc(itemHelp(S.assets.item(id)))}" alt="${esc(S.assets.item(id)?.name)}">`).join("")}</td>
           </tr>`).join("")).join("")}
       </table>`;
   }

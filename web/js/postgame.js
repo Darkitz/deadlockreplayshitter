@@ -4,7 +4,7 @@
 // barriers and souls by source come from Valve's post-game summary, which the server embeds in
 // the demo at game end (absent in some demos; those parts then stay hidden).
 
-import { esc, S, k1 } from "./ui.js";
+import { esc, S, k1, itemHelp } from "./ui.js";
 import { TEAM_NAMES, statsAt, itemsAt, abilityLevelsAt } from "./data.js";
 import { fmtClock } from "./timeline.js";
 import { timeSplit } from "./analysis.js";
@@ -145,7 +145,7 @@ export function renderSummary(el, m, { onPick }) {
             const top = k !== "d" && r[k] && r[k] === tops[k];
             return `<td class="${top ? "pg-top" : ""} ${k === "d" ? "pg-dim" : ""}">${top ? `${ui("starburst", "pg-burst")}` : ""}<span>${fmt(r[k] || 0)}</span></td>`;
           }).join("")}
-          <td class="pg-items">${items.map((it) => `<img class="slot-${esc(it.slot || "x")}" src="${esc(S.assets.itemIcon(it.id))}" title="${esc(it.name)}" alt="">`).join("")}</td>
+          <td class="pg-items">${items.map((it) => `<img class="slot-${esc(it.slot || "x")}" src="${esc(S.assets.itemIcon(it.id))}" data-help="${esc(itemHelp(it))}" alt="${esc(it.name)}">`).join("")}</td>
           <td class="pg-abs">${S.assets.signatures(r.p.hero_id).map((ab) => {
             const n = lv.get(ab.id) ?? 0, tier = Math.max(0, n - 1);
             return `<span title="${esc(ab.name)} · ${n ? `upgrades ${tier}/3` : "not unlocked"}">${ab.image ? `<img src="${esc(ab.image)}" alt="">` : ""}<i>${[1, 2, 3].map((i) => `<em class="${i <= tier ? "on" : ""}"></em>`).join("")}</i></span>`;
@@ -272,7 +272,7 @@ function renderGraphs(el, m, model) {
   const data = graphData(g, m, model, graphState.pawn);
   note.textContent = data.note || "";
   if (data.table) { body.innerHTML = data.table; return; }
-  lineChart(body, data.series, { end: m.end, fmt: data.fmt || k1 });
+  lineChart(body, data.series, { end: m.end, fmt: data.fmt || k1, keepOrder: data.keepOrder });
 }
 
 /** step series of a stat column (every 10 s) */
@@ -384,25 +384,48 @@ function graphData(g, m, model, pawn) {
     return { series, note: `Valve's summary: only ${stats.length} snapshots per player, so this one is coarse` };
   }
   if (g.id === "buffs") {
-    const buffs = (v?.power_up_buffs || []).filter((b) => b.is_permanent);
-    const label = (t) => String(t).replace(/^k_E|^EBuff_|^MODIFIER_/i, "").replace(/_/g, " ").toLowerCase();
-    return {
-      table: buffs.length ? `<table class="report-table"><tr><th>buff</th><th>value</th></tr>${buffs.map((b) =>
-        `<tr><td>${esc(label(b.type))}</td><td>${b.value}</td></tr>`).join("")}</table>` : `<p class="muted">No permanent buffs.</p>`,
-      note: "permanent buffs from Valve's summary (Sinner's Sacrifice, golden statues, ...)",
-    };
+    // like the game's graph: one line per stat counting pickups (all levels), legend = summed bonus
+    const STATS = [["hp", "Bonus Health", "flat"], ["bulletresist", "Bullet Resist", "%"], ["wp", "Weapon Damage", "%"],
+      ["firerate", "Fire Rate", "%"], ["ammo", "Max Ammo", "%"], ["spirit", "Spirit Power", "flat"], ["cd", "Cooldown Reduction", "%"],
+      ["spiritresist", "Spirit Resist", "%"], ["range", "Ability Range", "%"], ["movespeed", "Move Speed", "m"]];
+    const picks = new Map();
+    for (const b of v?.power_up_buffs || []) {
+      if (!b.is_permanent) continue;
+      const key = String(b.type).replace(/_permanent_pickup(_lv\d)?$/, "");
+      const list = picks.get(key) || [];
+      (b.pickup_times_s || []).forEach((t, i) => list.push([t, b.pickup_stat_values?.[i] ?? 0]));
+      picks.set(key, list);
+    }
+    const nice = (x) => String(Math.round(x * 100) / 100);
+    const series = STATS.filter(([k]) => picks.get(k)?.length).map(([k, name, unit], i) => {
+      const list = picks.get(k).sort((a2, b2) => a2[0] - b2[0]);
+      let n = 0, sum = 0;
+      const pts = [[0, 0]], vals = [0];
+      // steps: flat until a pickup, then up by one
+      for (const [t, val] of list) { pts.push([t, n]); vals.push(sum); n++; sum += unit === "m" ? val * 0.0254 : val; pts.push([t, n]); vals.push(sum); }
+      pts.push([m.end, n]); vals.push(sum);
+      const fmtVal = (x) => unit === "flat" ? `+${nice(x)}` : unit === "m" ? `+${x.toFixed(2)}m` : `+${nice(x)}%`;
+      return { name, color: CATS[i % CATS.length], pts, vals, fmtVal };
+    });
+    return { series, keepOrder: true, fmt: String,
+      note: series.length ? "pickups per stat (Sinner's Sacrifice, golden statues, …); legend: total bonus · from Valve's summary" : "no permanent buffs picked up" };
   }
   return { series: [] };
 }
 
 /** SVG line chart with a hover readout (values at the cursor, sorted, like the game's) */
-function lineChart(el, series, { end, fmt }) {
+function lineChart(el, series, { end, fmt, keepOrder = false }) {
   const W = 1000, H = 300, padL = 54, padR = 12, padT = 10, padB = 24;
   const maxY = Math.max(1, ...series.flatMap((s) => s.pts.map((p) => p[1])));
   const x = (t) => padL + (Math.max(0, t) / end) * (W - padL - padR);
   const y = (v) => H - padB - (v / maxY) * (H - padT - padB);
   const at = (s, t) => { let v = 0; for (const [tt, vv] of s.pts) { if (tt > t) break; v = vv; } return v; };
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * maxY);
+  // series may carry their own legend value (e.g. summed buff bonus next to the pickup count)
+  const label = (s, t) => { if (!s.vals) return fmt(Math.round(at(s, t))); let i = 0; s.pts.forEach(([tt], j) => { if (tt <= t) i = j; }); return s.fmtVal(s.vals[i]); };
+  // counts get whole-number ticks; everything else quarters of the max
+  const counting = fmt === String;
+  const step = counting ? Math.max(1, Math.ceil(maxY / 5)) : 0;
+  const ticks = counting ? Array.from({ length: Math.floor(maxY / step) + 1 }, (_, i) => i * step) : [0, 0.25, 0.5, 0.75, 1].map((f) => f * maxY);
   // the SVG stretches to the box (preserveAspectRatio none), so axis labels are HTML on top
   const pct = (v, total) => `${(v / total) * 100}%`;
   el.innerHTML = `<div class="pg-chart">
@@ -420,11 +443,12 @@ function lineChart(el, series, { end, fmt }) {
   </div>`;
   const svg = el.querySelector("svg"), legend = el.querySelector(".pg-legend"), cursor = el.querySelector(".pg-cursor");
   const show = (t) => {
-    const rows = series.map((s) => ({ s, v: at(s, t) })).sort((a, b) => b.v - a.v);
+    const rows = series.map((s) => ({ s, v: at(s, t) }));
+    if (!keepOrder) rows.sort((a, b) => b.v - a.v);
     const total = rows.reduce((a, r) => a + r.v, 0);
-    const share = series.length > 2 && !series.some((s) => s.icon);
+    const share = series.length > 2 && !series.some((s) => s.icon || s.vals);
     legend.innerHTML = `<li class="pg-legend-t">${fmtClock(t)}</li>` + rows.map(({ s, v }) => `<li>
-      <i style="background:${s.color}"></i>${s.icon ? `<img src="${esc(s.icon)}" alt="">` : ""}<span>${esc(s.name)}</span><b>${fmt(Math.round(v))}</b>${share ? `<small>(${total ? Math.round((v / total) * 100) : 0}%)</small>` : ""}</li>`).join("")
+      <i style="background:${s.color}"></i>${s.icon ? `<img src="${esc(s.icon)}" alt="">` : ""}<span>${esc(s.name)}</span><b>${label(s, t)}</b>${share && !s.vals ? `<small>(${total ? Math.round((v / total) * 100) : 0}%)</small>` : ""}</li>`).join("")
       + (share ? `<li class="pg-legend-total"><span></span><b>${fmt(Math.round(total))}</b></li>` : "");
   };
   svg.addEventListener("mousemove", (ev) => {
