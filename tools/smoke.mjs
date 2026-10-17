@@ -4,7 +4,7 @@
 //   python3 -m http.server -d web 8767 &
 //   node tools/smoke.mjs <demo.dem> <out.png> [hash suffix, e.g. "?tab=chat&t=900"] [selector to scroll to]
 //
-// env: BASE (default http://localhost:8767), CHROME (chrome / chrome-headless-shell binary),
+// env: BASE (default http://localhost:8767), THEME (light / dark), CHROME (chrome / chrome-headless-shell binary),
 //      PLAYWRIGHT (path to playwright-core's index.mjs if it isn't resolvable as a package)
 import { pathToFileURL } from "node:url";
 
@@ -23,6 +23,7 @@ page.on("pageerror", (e) => problems.push(`page error: ${e.message}`));
 page.on("console", (m) => { if (m.type() === "error") problems.push(`console: ${m.text()}`); });
 page.on("response", (r) => { if (r.status() >= 400) problems.push(`http ${r.status()} ${r.url()}`); });
 
+if (process.env.THEME) await page.addInitScript((t) => localStorage.setItem("skillhitter.theme", t), process.env.THEME);
 await page.goto(`${BASE}/#/`);
 await page.waitForSelector(".drop-field");
 const t0 = Date.now();

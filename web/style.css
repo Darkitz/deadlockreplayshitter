@@ -20,6 +20,37 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html { color-scheme: dark; }
+
+/* light theme (header toggle; the choice is stored per browser). The minimap stays dark: it is
+   the game's own map art. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --panel-2: #f0f2f5;
+  --panel-3: #e5e8ed;
+  --line: #d9dde3;
+  --text: #16181c;
+  --muted: #5d6470;
+  --accent: #a8701a;
+  --hit: #1c8f4d;
+  --other: #a8701a;
+  --miss: #cc3f35;
+  --thrown: #6b7280;
+  --death: #d23c31;
+  --kill: #6d4fd1;
+  --amber: #c27c12;
+  --sapphire: #2a66cc;
+}
+:root[data-theme="light"] .result.win { background: #dcf2e4; }
+:root[data-theme="light"] .result.loss { background: #f8dedb; }
+:root[data-theme="light"] .mod.debuff { color: #b3261e; }
+:root[data-theme="light"] .c-out { background: #cfd4db; }
+:root[data-theme="light"] .help-tip { background: var(--panel); box-shadow: 0 6px 24px rgba(20, 24, 32, .18); }
+:root[data-theme="light"] .about code { background: var(--panel-3); }
+:root[data-theme="light"] #drop-zone { background: rgba(244, 245, 247, .9); }
+:root[data-theme="light"] #drop-status { background: rgba(244, 245, 247, .75); }
+.theme-toggle { width: 34px; padding: 0; display: grid; place-items: center; font-size: 16px; line-height: 1; }
 body {
   margin: 0;
   background: var(--bg);
@@ -461,3 +492,5 @@ table.mini td.accent { color: var(--accent); }
 .ts-bar span { display: block; height: 100%; }
 .ts-counts { white-space: nowrap; font-variant-numeric: tabular-nums; }
 @media (max-width: 760px) { .ts-row { grid-template-columns: 24px 1fr; } .ts-row .ts-bar, .ts-row .ts-counts { grid-column: 1 / -1; } }
+/* hero ability icons are white glyphs made for the dark HUD: give them a dark tile in light mode */
+:root[data-theme="light"] img[src*="/hud/abilities/"] { background: #2b2f37; border-radius: 6px; }

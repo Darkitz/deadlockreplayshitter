@@ -108,7 +108,29 @@ function initHelp() {
   window.addEventListener("scroll", () => { tip.hidden = true; cur = null; }, { passive: true });
 }
 
+// ------------------------------------------------------------------ light / dark
+
+function initTheme() {
+  const btn = $("#theme-toggle");
+  const apply = (theme) => {
+    const light = theme === "light";
+    if (light) document.documentElement.dataset.theme = "light";
+    else delete document.documentElement.dataset.theme;
+    document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", light ? "light" : "dark");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", light ? "#f4f5f7" : "#0a0b0d");
+    btn.textContent = light ? "☾" : "☀";
+    btn.title = light ? "switch to dark" : "switch to light";
+  };
+  apply(document.documentElement.dataset.theme);
+  btn.addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+    try { localStorage.setItem("skillhitter.theme", next); } catch { /* private mode: this page only */ }
+    apply(next);
+  });
+}
+
 async function main() {
+  initTheme();
   try {
     await loadAll();
   } catch (err) {
