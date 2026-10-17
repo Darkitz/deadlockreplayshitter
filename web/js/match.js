@@ -25,37 +25,36 @@ export async function viewMatch(id, params) {
     return;
   }
   const info = (S.localMatches || []).find((x) => x.match_id === id);
-  // point of view: whoever was analyzed last (usually yourself), else the first player
-  const me = m.player(settings.lastAccount);
-  const pawn = Number(params.get("pawn")) || me?.pawn || m.players[0].pawn;
-  const subject = m.byPawn.get(pawn);
-  if (params.get("pawn") && subject.account_id !== settings.lastAccount) { settings.lastAccount = subject.account_id; saveSettings(); }
-  const sigs = S.assets.signatures(subject.hero_id);
+  // nobody is selected until the viewer picks a player (scoreboard, map or tables): the match
+  // overview stays neutral, the per-player parts appear once someone is picked
+  const subject = m.byPawn.get(Number(params.get("pawn"))) || null;
+  const pawn = subject?.pawn ?? null;
+  const sigs = subject ? S.assets.signatures(subject.hero_id) : [];
   // the hero's own melee ability rows are replaced by the light / heavy melee pseudo-abilities
   const isMeleeAb = (c) => /ability_melee_(?!parry)|hold_melee/.test(c || "");
-  const fullTable = abilityTable(m, pawn, S.assets, opts());
+  const fullTable = subject ? abilityTable(m, pawn, S.assets, opts()) : [];
   const table = fullTable.filter((r) => !isMeleeAb(r.ability.class_name));
   const wanted = params.get("ability");
-  const row = table.find((r) => r.ability.class_name === wanted)
-    || table.find((r) => r.ability.class_name === "drifter_shadow_mark")
-    || table.find((r) => r.thrown) || table[0];
-  const gunMode = wanted === GUN.class_name;
+  const row = table.find((r) => r.ability.class_name === wanted) || table.find((r) => r.thrown) || table[0];
+  const gunMode = !!subject && wanted === GUN.class_name;
   const MELEES = [MELEE_LIGHT, MELEE_HEAVY];
-  const meleeMode = wanted === MELEE.class_name || MELEES.some((x) => x.class_name === wanted);
+  const meleeMode = !!subject && (wanted === MELEE.class_name || MELEES.some((x) => x.class_name === wanted));
   const meleeKind = MELEES.find((x) => x.class_name === wanted)?.melee ?? null;
-  const meleeAll = meleeStats(m, pawn);
-  const melee = meleeModel(meleeAll, meleeKind);
+  const meleeAll = subject ? meleeStats(m, pawn) : null;
+  const melee = subject ? meleeModel(meleeAll, meleeKind) : null;
+  const heroWeapon = subject ? S.assets.hero(subject.hero_id).weapon : null;
   const meleeItem = fullTable.find((r) => isMeleeAb(r.ability.class_name) && r.ability.image)?.ability
-    || S.assets.itemByClass(S.assets.hero(subject.hero_id).weapon?.replace("citadel_weapon_", "ability_melee_").replace(/_set\d*$/, ""));
-  const gun = gunStats(m, pawn, S.assets);
-  const weaponItem = S.assets.itemByClass(S.assets.hero(subject.hero_id).weapon);
+    || S.assets.itemByClass(heroWeapon?.replace("citadel_weapon_", "ability_melee_").replace(/_set\d*$/, ""));
+  const gun = subject ? gunStats(m, pawn, S.assets) : null;
+  const weaponItem = S.assets.itemByClass(heroWeapon);
   const gunAbility = { ...GUN, image: weaponItem?.image };
   const meleeAbilities = MELEES.map((x) => ({ ...x, image: meleeItem?.image }));
   const meleeAbility = meleeAbilities.find((x) => x.melee === meleeKind) || { ...MELEE, image: meleeItem?.image };
-  const ability = gunMode ? gunAbility : meleeMode ? meleeAbility : row?.ability || sigs[0];
-  const analysis = gunMode || meleeMode ? { source: gunMode ? "gun" : "melee", casts: [] } : analyzeAbility(m, pawn, ability, opts());
+  const ability = !subject ? null : gunMode ? gunAbility : meleeMode ? meleeAbility : row?.ability || sigs[0];
+  const analysis = !subject ? { source: "nobody", casts: [] }
+    : gunMode || meleeMode ? { source: gunMode ? "gun" : "melee", casts: [] } : analyzeAbility(m, pawn, ability, opts());
   const casts = analysis.casts;
-  const won = m.winning_team ? m.winning_team === subject.team : null;
+  const won = subject && m.winning_team ? m.winning_team === subject.team : null;
 
   function abStat(ab) {
     if (ab.melee) {
@@ -99,7 +98,8 @@ export async function viewMatch(id, params) {
     <div class="match-header">
       <a href="#/" class="back">← home</a>
       <div class="mh-title">
-        ${won != null ? `<span class="result ${won ? "win" : "loss"}" title="for ${esc(subject.name)}">${won ? "WIN" : "LOSS"}</span>` : ""}
+        ${won != null ? `<span class="result ${won ? "win" : "loss"}" title="for ${esc(subject.name)}">${won ? "WIN" : "LOSS"}</span>`
+          : m.winning_team ? `<span class="result team-won team-${m.winning_team}">${TEAM_NAMES[m.winning_team]} won</span>` : ""}
         <h2>#${id}</h2>
         <span class="muted">${fmtClock(m.end)}</span>
         ${info ? `<span class="muted small" title="dropped ${esc(new Date(info.parsed_at).toString())}">${esc(info.file)}</span>` : ""}
@@ -109,10 +109,10 @@ export async function viewMatch(id, params) {
     <section class="scoreboard">
       ${teams.map((t) => `
         <div class="team team-${t}">
-          <h3>${TEAM_NAMES[t] || `Team ${t}`}${subject.team === t ? " · " + esc(subject.name) + "'s team" : ""}</h3>
+          <h3>${TEAM_NAMES[t] || `Team ${t}`}${subject?.team === t ? " · " + esc(subject.name) + "'s team" : ""}</h3>
           <div class="team-head"><span></span><span>player</span><span style="text-align:right">k/d/a</span><span style="text-align:right">skill%</span><span style="text-align:right">souls</span></div>
           ${teamOf(t).map((p) => {
-            return `<div class="sb-row ${p.pawn === pawn ? "on" : ""}" data-pawn="${p.pawn}" role="button" tabindex="0" title="analyze ${esc(p.name)}">
+            return `<div class="sb-row ${p.pawn === pawn ? "on" : ""}" data-pawn="${p.pawn}" role="button" tabindex="0" title="${p.pawn === pawn ? "deselect" : `analyze ${esc(p.name)}`}">
               <img class="sb-hero" src="${esc(S.assets.hero(p.hero_id).icon)}" alt="">
               <span class="sb-name">${esc(p.name || S.assets.hero(p.hero_id).name)}</span>
               <span class="sb-kda">${p.kills}/${p.deaths}/${p.assists}</span>
@@ -123,24 +123,25 @@ export async function viewMatch(id, params) {
           }).join("")}
         </div>`).join("")}
     </section>
-    <section class="toolbar">
+    ${subject ? `<section class="toolbar">
       <div class="abilities">${abilityButtons([gunAbility, ...meleeAbilities, ...table.filter((r) => !r.kind).map((r) => r.ability)], ability.class_name, abStat)}</div>
       <div class="controls">${controlsHTML(false)}</div>
     </section>
     ${table.some((r) => r.kind === "extra") ? `<section class="items-row"><span class="muted small">other abilities</span>
       <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.kind === "extra").map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}
     ${table.some((r) => r.item) ? `<section class="items-row"><span class="muted small">active items</span>
-      <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.item).map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}
-    ${analysis.source === "cooldown" ? `<p class="note">No cast events for ${esc(ability.name)} in this demo; casts are taken from the ability going on cooldown, so there is no aim direction or aim error.</p>` : ""}
+      <div class="abilities small-abs">${abilityButtons(table.filter((r) => r.item).map((r) => r.ability), ability.class_name, abStat)}</div></section>` : ""}`
+    : `<section class="pick-hint"><b>Match overview.</b> Pick a player in the scoreboard, on the map or in the tables below to see their abilities, gun, melee and state.</section>`}
+    ${subject && analysis.source === "cooldown" ? `<p class="note">No cast events for ${esc(ability.name)} in this demo; casts are taken from the ability going on cooldown, so there is no aim direction or aim error.</p>` : ""}
     ${m.warnings?.length ? `<p class="note warn">Parser warnings for this demo: ${m.warnings.map(esc).join(" · ")}</p>` : ""}
-    ${analysis.source === "none" ? `<p class="note">No casts of ${esc(ability.name)} found for this player.</p>` : ""}
+    ${subject && analysis.source === "none" ? `<p class="note">No casts of ${esc(ability.name)} found for this player.</p>` : ""}
     <section class="stage">
       <div class="map-wrap"><canvas class="minimap"></canvas>
         <div class="map-legend small muted">
           <label class="check"><input type="checkbox" class="show-all" ${settings.showAll ? "checked" : ""}> all casts</label>
           <label class="check"><input type="checkbox" class="show-heat" ${settings.showHeat ? "checked" : ""}> heat</label>
           <label class="check"><input type="checkbox" class="show-deaths" ${settings.showDeaths ? "checked" : ""}> deaths</label>
-          <span class="zoom-btns">${[1, 2, 3].map((z) => `<button class="chip ${(settings.mapZoom || 1) === z ? "on" : ""}" data-zoom="${z}">${z === 1 ? "full map" : `follow ×${z}`}</button>`).join("")}</span>
+          <span class="zoom-btns" ${subject ? "" : "hidden"}>${[1, 2, 3].map((z) => `<button class="chip ${(settings.mapZoom || 1) === z ? "on" : ""}" data-zoom="${z}">${z === 1 ? "full map" : `follow ×${z}`}</button>`).join("")}</span>
           <span>click a hero to analyze them · rays = aim at cast</span>
         </div>
         <div class="state" id="state"></div></div>
@@ -154,7 +155,7 @@ export async function viewMatch(id, params) {
           <input type="range" class="scrub" min="0" max="${Math.ceil(m.end)}" step="0.5">
           <span class="clock">0:00</span>
           <span class="span-info"></span>
-          <button class="btn csv" title="download casts as CSV">CSV</button>
+          <button class="btn csv" title="download casts as CSV" ${subject ? "" : "hidden"}>CSV</button>
           <button class="btn demo-cmd" title="copy a Deadlock console command that jumps the real replay to this moment">in-game ↗</button>
         </div>
         <div class="span-row">
@@ -173,7 +174,7 @@ export async function viewMatch(id, params) {
         <div class="readout">
           <div class="tiles"></div>
           <div class="feed-wrap">
-            <div class="feed-filter">
+            <div class="feed-filter" ${subject ? "" : "hidden"}>
               ${["all", "hit", "miss", "kills", "all kills"].map((f) => `<button class="chip ${settings.feed === f ? "on" : ""}" data-feed="${f}">${f}</button>`).join("")}
             </div>
             <ol class="feed"></ol>
@@ -198,7 +199,7 @@ export async function viewMatch(id, params) {
   for (const b of app.querySelectorAll(".sb-row")) {
     b.addEventListener("click", (ev) => {
       if (ev.target.closest("a")) return; // name links to the player page
-      setParams({ pawn: b.dataset.pawn, ability: null });
+      setParams({ pawn: Number(b.dataset.pawn) === pawn ? null : b.dataset.pawn, ability: null });
     });
     b.addEventListener("keydown", (ev) => { if (ev.key === "Enter") b.click(); });
   }
@@ -229,6 +230,8 @@ export async function viewMatch(id, params) {
     return null; // unnamed internal modifier
   }
   function renderState(t) {
+    $("#state", app).hidden = !subject;
+    if (!subject) return;
     const hp = hpAt(m, pawn, t);
     const st = statsAt(m, pawn, t);
     const heroName = S.assets.hero(subject.hero_id).name;
@@ -417,7 +420,7 @@ export async function viewMatch(id, params) {
   (() => {
     const el = $("#laning", app);
     const LANE_END = 600;
-    const lane = m.players.filter((p) => p.lane && p.lane === subject.lane);
+    const lane = subject ? m.players.filter((p) => p.lane && p.lane === subject.lane) : [];
     if (lane.length < 2) { el.hidden = true; return; }
     const at = (p, t) => statsAt(m, p.pawn, t) || [0, 0, 0, 0, 0, 0];
     const mine = lane.filter((p) => p.team === subject.team), theirs = lane.filter((p) => p.team !== subject.team);
@@ -455,8 +458,9 @@ export async function viewMatch(id, params) {
   })();
 
   // incoming skillshots (defense)
-  const inc = incoming(m, pawn, S.assets, opts());
-  $("#incoming", app).innerHTML = `
+  const inc = subject ? incoming(m, pawn, S.assets, opts()) : null;
+  if (!subject) $("#incoming", app).hidden = true;
+  else $("#incoming", app).innerHTML = `
     <h3>Incoming skillshots aimed at ${esc(subject.name)}
       <span class="muted">· enemy casts whose aim was within ${AIMED_AT_DEG}° of them</span></h3>
     <div class="summary">
@@ -483,7 +487,12 @@ export async function viewMatch(id, params) {
     if (id === "tracker") renderTracker(t);
     if (id === "time") renderTime(t);
   }
-  if ($("#laning", app).hidden) $('[data-tab="laning"]', app).hidden = true;
+  // per-player tabs disappear without a selection; fall back to the players tab
+  for (const id of ["laning", "incoming"]) {
+    if (!$(`#${id}`, app).hidden) continue;
+    $(`[data-tab="${id}"]`, app).hidden = true;
+    if (tab === id) tab = "tracker";
+  }
   for (const b of app.querySelectorAll("[data-tab]")) {
     b.addEventListener("click", () => { settings.matchTab = b.dataset.tab; saveSettings(); showTab(b.dataset.tab); syncUrl(); });
   }
@@ -573,16 +582,16 @@ export async function viewMatch(id, params) {
     for (const tr of m.stats.tracks) {
       const p = m.byPawn.get(tr.pawn);
       const nw = tr.rows[i]?.[0] || 0;
-      v += p.team === subject.team ? nw : -nw;
+      v += p.team === (subject?.team ?? 2) ? nw : -nw;
     }
     lead.push([m.stats.t0 + i * m.stats.dt, v]);
   }
-  const deaths = m.kills.filter((k) => k[1] === pawn).map((k) => k[0]);
-  const kills = m.kills.filter((k) => k[2] === pawn || (k[4] || []).includes(pawn)).map((k) => k[0]);
+  const deaths = subject ? m.kills.filter((k) => k[1] === pawn).map((k) => k[0]) : [];
+  const kills = (subject ? m.kills.filter((k) => k[2] === pawn || (k[4] || []).includes(pawn)) : m.kills).map((k) => k[0]);
 
   const timeline = createTimeline($(".timeline", app), {
     end: m.end, casts, heroesOnly: settings.heroesOnly, lead, deaths, kills,
-    gun: gunMode ? gun : meleeMode ? melee : null,
+    gun: gunMode ? gun : meleeMode ? melee : null, noChart: !subject,
     gunLabels: meleeMode ? ["swings", "hero hits", meleeKind ? null : "heavy hero hits"] : null,
   }, (t) => seek(t), (a, b) => setSpan(a, b));
   const minimap = createMinimap($(".minimap", app), {
@@ -687,12 +696,13 @@ export async function viewMatch(id, params) {
   // fights: click one to make it the span
   const fights = detectFights(m).filter((f) => f.kills.length >= 2);
   $(".fights", app).innerHTML = fights.length ? `<span class="muted small">fights</span>` + fights.map((f, i) => {
-    const mine = f.kills.some((k) => k[1] === pawn || k[2] === pawn || (k[4] || []).includes(pawn));
-    const won = f.byTeam[subject.team] > f.byTeam[subject.team === 2 ? 3 : 2];
-    const lost = f.byTeam[subject.team] < f.byTeam[subject.team === 2 ? 3 : 2];
+    const side = subject?.team ?? 2, other = side === 2 ? 3 : 2;
+    const mine = !!subject && f.kills.some((k) => k[1] === pawn || k[2] === pawn || (k[4] || []).includes(pawn));
+    const won = subject && f.byTeam[side] > f.byTeam[other];
+    const lost = subject && f.byTeam[side] < f.byTeam[other];
     return `<button class="fight ${won ? "won" : lost ? "lost" : ""} ${mine ? "mine" : ""}" data-fight="${i}"
-      title="${fmtClock(f.t0)}–${fmtClock(f.t1)} · ${f.kills.length} kills${mine ? " · you were involved" : ""}">
-      ${fmtClock(f.t0)} <b>${f.byTeam[subject.team]}–${f.byTeam[subject.team === 2 ? 3 : 2]}</b></button>`;
+      title="${fmtClock(f.t0)}–${fmtClock(f.t1)} · ${f.kills.length} kills${subject ? (mine ? ` · ${esc(subject.name)} was involved` : "") : " · Amber–Sapphire"}">
+      ${fmtClock(f.t0)} <b>${f.byTeam[side]}–${f.byTeam[other]}</b></button>`;
   }).join("") : "";
   $(".fights", app).addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-fight]");
@@ -844,7 +854,34 @@ export async function viewMatch(id, params) {
     return lines.join("\n");
   }
 
+  /** no player selected: the match at the playhead / in the span, and every kill */
+  function renderOverview(t) {
+    const ks = m.kills.filter((k) => inSpan(k[0]));
+    const teamKills = (tm) => ks.filter((k) => m.byPawn.get(k[1]) && m.byPawn.get(k[1]).team !== tm).length;
+    const souls = (tm) => m.players.filter((p) => p.team === tm).reduce((a, p) => a + (statsAt(m, p.pawn, t)?.[0] || 0), 0);
+    const lead = souls(2) - souls(3);
+    const fightsIn = fights.filter((f) => inSpan(f.t0)).length;
+    $(".tiles", app).innerHTML =
+      tile("Kills <small>Amber – Sapphire</small>", `<span class="amber-txt">${teamKills(2)}</span>–<span class="sapphire-txt">${teamKills(3)}</span>`) +
+      tile("Souls <small>Amber – Sapphire</small>", `<span class="amber-txt">${k1(souls(2))}</span>–<span class="sapphire-txt">${k1(souls(3))}</span>`) +
+      tile("Souls lead", lead ? `${k1(Math.abs(lead))}<small> ${lead > 0 ? "Amber" : "Sapphire"}</small>` : "even") +
+      tile("Fights", fightsIn) +
+      tile("Game time", fmtClock(t)) +
+      tile("Winner", m.winning_team ? TEAM_NAMES[m.winning_team] : "–");
+    $(".feed", app).innerHTML = [...ks].reverse().slice(0, 60).map((k) => {
+      const [kt, vic, att, abilityId] = k;
+      const v = m.byPawn.get(vic), a = m.byPawn.get(att);
+      const kab = S.assets.item(abilityId);
+      return `<li data-t="${kt}" class="ev-kill team-${a?.team || 0}"><span class="t">${fmtClock(kt)}</span>
+        ${a ? `<img src="${esc(S.assets.hero(a.hero_id).icon)}" title="${esc(a.name)}">` : ""}
+        ${kab?.image ? `<img class="kab" src="${esc(kab.image)}" title="${esc(kab.name)}">` : ""}
+        <span>→</span>${v ? `<img src="${esc(S.assets.hero(v.hero_id).icon)}" title="${esc(v.name)}">` : ""}
+        <span class="muted small">${esc(a?.name || "?")} → ${esc(v?.name || "?")}</span></li>`;
+    }).join("") || `<li class="muted">no kills yet</li>`;
+  }
+
   function renderReadout(t) {
+    if (!subject) { renderOverview(t); return; }
     if (gunMode) { renderGunReadout(t); return; }
     if (meleeMode) { renderMeleeReadout(t); return; }
     const past = casts.filter((c) => inSpan(c.t));

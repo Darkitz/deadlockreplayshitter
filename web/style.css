@@ -508,3 +508,11 @@ table.mini td.accent { color: var(--accent); }
 :root[data-theme="light"] img[src*="/hud/abilities/"] { background: #2b2f37; border-radius: 6px; }
 .lang-toggle { min-width: 46px; font-size: 12px; font-weight: 600; }
 :root[data-theme="light"] .brand h1 { background: linear-gradient(180deg, #c48a24, #94600f 60%, #6b4310); -webkit-background-clip: text; background-clip: text; }
+
+/* match overview (nobody selected) */
+.pick-hint { padding: 10px 14px; border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: var(--radius); color: var(--muted); }
+.pick-hint b { color: var(--text); }
+.result.team-won.team-2 { background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); border-top: 0; }
+.result.team-won.team-3 { background: color-mix(in srgb, var(--sapphire) 18%, transparent); color: var(--sapphire); border-top: 0; }
+.amber-txt { color: var(--amber); }
+.sapphire-txt { color: var(--sapphire); }
