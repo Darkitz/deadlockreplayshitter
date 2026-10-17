@@ -1,9 +1,9 @@
 // Caching: the core files (pages, scripts, the parser, game data) are kept so replay analysis
 // keeps working without a connection. Icons are cached as they get loaded. Demos never go
 // through this; they are read straight from disk.
-// Strategy: serve from cache, refresh the cache in the background (stale-while-revalidate),
-// so a new version shows up on the next visit.
-const CACHE = "dldi-v2";  // bump to force every visitor to refetch everything
+// Strategy: network first for the site itself (always the newest version when online),
+// cache first for icons / fonts; everything falls back to the cache when offline.
+const CACHE = "dldi-v3";  // bump to force every visitor to refetch everything
 const CORE = [
   "./", "index.html", "style.css", "icon.svg", "data/assets.json", "parser/dlparse.wasm",
   "js/analysis.js", "js/app.js", "js/data.js", "js/explain.js", "js/home.js", "js/lang.js",
@@ -26,14 +26,21 @@ self.addEventListener("activate", (ev) => {
 self.addEventListener("fetch", (ev) => {
   const req = ev.request;
   if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
+  const key = req.url.split("?")[0]; // ?query variants share one entry
+  const isAsset = /\/assets\//.test(key);
   ev.respondWith(caches.open(CACHE).then(async (cache) => {
-    // ?query variants (cache busting) share one entry
-    const key = req.url.split("?")[0];
-    const cached = await cache.match(key);
-    const fresh = fetch(req).then((res) => {
+    // icons and fonts never change: cache first. Site code and data: network first, so a new
+    // version shows up right away; the cache only answers when offline.
+    if (isAsset) {
+      const hit = await cache.match(key);
+      if (hit) return hit;
+    }
+    try {
+      const res = await fetch(req, { cache: "no-cache" });
       if (res.ok) cache.put(key, res.clone());
       return res;
-    }).catch(() => null);
-    return cached || (await fresh) || new Response("offline and not cached yet", { status: 503 });
+    } catch {
+      return (await cache.match(key)) || new Response("offline and not cached yet", { status: 503 });
+    }
   }));
 });
