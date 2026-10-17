@@ -5,8 +5,7 @@
 //!
 //! Everything is stamped with game time in seconds (0 = match start). Interpreting
 //! "thrown vs hit" for a specific ability happens in the web UI, so new abilities need no
-//! reparse. Bump `FORMAT_VERSION` whenever the output changes; tools/sync.py reparses demos
-//! whose JSON has an older version.
+//! reparse. Bump `FORMAT_VERSION` whenever the output changes (the JSON shape the site reads).
 use std::collections::HashMap;
 use std::io::{Read, Seek};
 
@@ -26,8 +25,8 @@ use serde::Serialize;
 
 pub const FORMAT_VERSION: u32 = 14;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`.
-/// sync.py passes the current ids (resolved by class name) via `--ignore-ids`; this list is only
-/// the fallback.
+/// They are string tokens of the class names, so they survive patches. The CLI can override them
+/// with `--ignore-ids`; the browser build always uses this list.
 pub const DEFAULT_NOISY_ABILITIES: &[u32] = &[
     2573821048, // zip_line
     875395762,  // zipline_boost

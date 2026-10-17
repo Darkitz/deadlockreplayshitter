@@ -23,7 +23,7 @@ function img(src, onload) {
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-export function createMinimap(canvas, { match, assets, profiles, onPick }) {
+export function createMinimap(canvas, { match, assets, onPick }) {
   const R = assets.map?.radius || 10752;
   let state = { t: 0, subject: null, casts: [], showAll: false, zoom: 1 };
   let dots = [];
@@ -319,7 +319,7 @@ export function createMinimap(canvas, { match, assets, profiles, onPick }) {
     const p = hit.p, t = state.t;
     const h = hpAt(match, p.pawn, t), st = statsAt(match, p.pawn, t);
     const items = itemsAt(match, p.pawn, t).filter((id) => assets.item(id)?.type === "upgrade");
-    const name = (profiles?.[p.account_id]?.name) || p.name || assets.hero(p.hero_id).name;
+    const name = p.name || assets.hero(p.hero_id).name;
     tip.innerHTML = `<b>${esc(name)}</b> <span class="muted">${esc(assets.hero(p.hero_id).name)}</span>
       <div>${h ? `${h.hp} / ${h.max} HP` : ""}${st ? ` · ${(st[0] / 1000).toFixed(1)}k souls · ${st[2]}/${st[3]}/${st[4]}` : ""}</div>
       <div class="tip-items">${items.map((id) => `<img class="slot-${esc(assets.item(id)?.slot || "x")}" src="${esc(assets.itemIcon(id))}" alt="">`).join("")}</div>`;

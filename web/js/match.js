@@ -233,7 +233,6 @@ export async function viewMatch(id, params) {
   // wiring
   for (const b of app.querySelectorAll(".sb-row")) {
     b.addEventListener("click", (ev) => {
-      if (ev.target.closest("a")) return; // name links to the player page
       setParams({ pawn: Number(b.dataset.pawn) === pawn ? null : b.dataset.pawn, ability: null });
     });
     b.addEventListener("keydown", (ev) => { if (ev.key === "Enter") b.click(); });
@@ -630,7 +629,7 @@ export async function viewMatch(id, params) {
     gunLabels: meleeMode ? ["swings", "hero hits", meleeKind ? null : "heavy hero hits"] : null,
   }, (t) => seek(t), (a, b) => setSpan(a, b));
   const minimap = createMinimap($(".minimap", app), {
-    match: m, assets: S.assets, profiles: {}, onPick: (p) => setParams({ pawn: p.pawn, ability: null }),
+    match: m, assets: S.assets, onPick: (p) => setParams({ pawn: p.pawn, ability: null }),
   });
 
   if (params.has("zoom")) settings.mapZoom = Number(params.get("zoom")) || 1;

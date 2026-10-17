@@ -246,7 +246,6 @@ footer { padding: 16px 24px 28px; }
   .scoreboard, .readout { grid-template-columns: 1fr; }
   .items-row { flex-direction: column; align-items: flex-start; }
 }
-#career { display: flex; flex-direction: column; gap: 10px; }
 code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
 .feed li img.kab { border-radius: 50%; background: var(--panel-3); }
 .timeline .zoom-label { fill: var(--accent); font-size: 10px; }
@@ -297,7 +296,6 @@ input[type=search] { background: var(--panel-2); color: var(--text); border: 1px
 .mc-team.won .mc-team-name { color: var(--text); font-weight: 600; }
 .mc-heroes { display: flex; gap: 4px; }
 .mc-heroes img { width: 30px; height: 30px; border-radius: 6px; object-fit: cover; background: var(--panel-3); }
-.mc-heroes img.tracked { outline: 2px solid var(--accent); outline-offset: 1px; }
 .chip-s { font-size: 11px; border: 1px solid var(--accent); color: var(--accent); border-radius: 999px; padding: 0 7px; }
 .nw-line { fill: none; stroke-width: 1.5; opacity: .55; }
 .nw-line.team-2 { stroke: var(--amber); }
