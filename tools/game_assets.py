@@ -378,6 +378,25 @@ def build_assets(previous=None):
         tier = str(a.get("m_iItemTier") or "")
         if tier.startswith("EModTier_"):
             entry["tier"] = int(tier.rsplit("_", 1)[1])
+        # "your next N bullets / shots are empowered" abilities (Living Ink, Slam Fire, Hellfire
+        # Salvo, ...): the gun fires the projectiles, so the site scores each one
+        props = a.get("m_mapAbilityProperties") or {}
+        for pk in ("MaxShots", "ShotCount", "DemonShotCount"):
+            pv = props.get(pk)
+            pv = pv.get("m_strValue") if isinstance(pv, dict) else pv
+            try:
+                n = int(float(str(pv)))
+            except (TypeError, ValueError):
+                continue
+            if n >= 1:
+                entry["shots"] = n
+                dur = props.get("AbilityDuration")
+                dur = dur.get("m_strValue") if isinstance(dur, dict) else dur
+                try:
+                    entry["shot_window"] = float(str(dur).rstrip("s")) or 10.0
+                except (TypeError, ValueError):
+                    entry["shot_window"] = 10.0
+                break
         if atype == "EAbilityType_Weapon":
             infos = a.get("m_mapWeaponInfos") or {}
             primary = infos.get("primary") if isinstance(infos, dict) else None

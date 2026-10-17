@@ -255,3 +255,21 @@ test("service worker precaches every script the site loads", async () => {
     if (f.endsWith(".js")) assert.ok(sw.includes(`"js/${f}"`), `web/sw.js CORE is missing js/${f}`);
   }
 });
+
+test("empowered-bullet abilities: every bullet is scored (Living Ink)", () => {
+  const ink = { ...AB, shots: 3, shot_window: 10 };
+  const m = fixture({
+    casts: [cast(10), cast(30)],
+    damage: [
+      [10.6, 1, 2, 2, AB.id, 60, 1, 0, 0, 0, 0],   // bullet 1 hits the enemy hero
+      [11.7, 1, 2, 2, AB.id, 60, 1, 0, 0, 0, 0],   // bullet 2 hits
+      [31.4, 1, 70, -1, AB.id, 40, 4, 0, 0, 0, 0], // second cast: one bullet hits a trooper
+    ],
+  });
+  // gun shots: 3 after the first cast (+1 normal shot later), 3 after the second
+  m.shots = [[10.5, 1, 99, 1], [11.6, 1, 99, 1], [12.4, 1, 99, 1], [20, 1, 99, 1], [31.2, 1, 99, 1], [32, 1, 99, 1], [33, 1, 99, 1]];
+  const { casts } = analyzeAbility(m, 1, ink, { window: 3 });
+  assert.deepEqual(casts.map((c) => c.projectiles.map((p) => p.result)), [["hit", "hit", "miss"], ["other", "miss", "miss"]]);
+  const c = counts(casts, true);
+  assert.deepEqual([c.projectiles, c.projHit, c.thrown, c.hit, c.miss], [6, 2, 2, 1, 0]);
+});

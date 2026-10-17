@@ -69,7 +69,10 @@ export async function viewMatch(id, params) {
         `${gun.npcHits} shots hit only troopers or objectives; hero accuracy leaves those out.`);
     } else {
       const r = table.find((x) => x.ability.class_name === ab.class_name);
-      if (r?.thrown) lines.push(`${r.scored} / ${r.thrown}: casts that ${settings.heroesOnly ? "hit an enemy hero" : "hit anything"} / all casts (hit window ${settings.window} s).`);
+      if (r?.projectiles) {
+        lines.push(`${r.projHit} / ${r.projectiles}: ${ab.name}'s bullets that ${settings.heroesOnly ? "hit an enemy hero" : "hit anything"} / bullets fired.`,
+          `Each cast empowers your next ${ab.shots} shot${ab.shots > 1 ? "s" : ""}; ${r.hit} of ${r.thrown} casts hit a hero, ${r.miss} hit nothing.`);
+      } else if (r?.thrown) lines.push(`${r.scored} / ${r.thrown}: casts that ${settings.heroesOnly ? "hit an enemy hero" : "hit anything"} / all casts (hit window ${settings.window} s).`);
       else lines.push("Not used this match.");
       if (r?.item) lines.push("Active item.");
     }
@@ -87,6 +90,7 @@ export async function viewMatch(id, params) {
       return gun.shots ? `<span class="ab-stat">${gun.heroHits}/${gun.shots}</span>` : `<span class="ab-stat muted">–</span>`;
     }
     const r = table.find((x) => x.ability.class_name === ab.class_name);
+    if (r?.projectiles) return `<span class="ab-stat">${r.projHit}/${r.projectiles}</span>`;
     return r && r.thrown ? `<span class="ab-stat">${r.scored}/${r.thrown}</span>` : `<span class="ab-stat muted">–</span>`;
   }
   // signature-ability accuracy of every player (who hits their skills best this match)
@@ -967,7 +971,20 @@ export async function viewMatch(id, params) {
     const past = casts.filter((c) => inSpan(c.t));
     const c = counts(past, settings.heroesOnly);
     const st = spanStats();
-    $(".tiles", app).innerHTML =
+    const hitWord = settings.heroesOnly ? "heroes" : "anything";
+    if (c.projectiles != null) $(".tiles", app).innerHTML =
+      tile("Casts", c.thrown) +
+      tile(`Bullets fired <small>×${ability.shots} per cast</small>`, c.projectiles) +
+      tile(`Bullets hit ${hitWord}`, c.projHit, "good") +
+      tile("Bullet accuracy", c.projectiles ? pct(c.projAcc) : "–", "accent") +
+      tile(`Casts that hit ${hitWord}`, `${c.scored}<small> / ${c.thrown}</small>`) +
+      tile("Casts without a hit", c.miss) +
+      tile("Damage", k1(c.dmg)) +
+      tile("K / D / A", st ? `${st[2]}/${st[3]}/${st[4]}` : "–") +
+      tile("Souls", st ? k1(st[0]) : "–") +
+      tile("Hits → kills", c.hit ? `${c.kills}<small> / ${c.hit}</small>` : "–") +
+      tile("Ready → recast", c.idle != null ? `${c.idle.toFixed(1)}<small> s</small>` : "–");
+    else $(".tiles", app).innerHTML =
       tile("Thrown", c.thrown) +
       tile(settings.heroesOnly ? "Hit heroes" : "Hit", c.scored, "good") +
       tile("Accuracy", c.thrown ? pct(c.acc) : "–", "accent") +
@@ -1003,7 +1020,8 @@ export async function viewMatch(id, params) {
           : k.result === "other" ? `hit non-hero${dist} · ${k.dmg} dmg`
           : k.aimErr != null ? `miss · ${k.aimErr.toFixed(0)}° off <img src="${esc(S.assets.hero(m.byPawn.get(k.aimPawn)?.hero_id).icon)}" title="${esc(m.byPawn.get(k.aimPawn)?.name)}"> @ ${Math.round(k.aimDist)} m`
           : "miss · no enemy in range";
-        const extra = k.killed ? ` <b class="kill-tag">→ kill</b>` : "";
+        const bullets = k.projectiles ? ` · <b>${k.projectiles.filter((p) => p.result === "hit").length}/${k.projectiles.length}</b> bullets hit` : "";
+        const extra = bullets + (k.killed ? ` <b class="kill-tag">→ kill</b>` : "");
         return `<li data-t="${k.t}"><span class="dot ${k.result}"></span><span class="t">${fmtClock(k.t)}</span>${vics}<span>${label}${extra}</span></li>`;
       }
       const [kt, vic, att, abilityId] = ev.k;

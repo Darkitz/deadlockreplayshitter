@@ -115,6 +115,9 @@ export function analyzeAbility(m, pawn, ability, opts) {
       if (c.hitX != null && (c.x || c.y)) c.dist = Math.hypot(c.hitX - c.x, c.hitY - c.y) * UNIT_M;
     }
   }
+  // "next N bullets" abilities (Living Ink, Slam Fire, ...): score every projectile
+  if (ability.shots) scoreProjectiles(m, pawn, ability, casts, hits);
+
   // kill conversion + idle time (how long the ability was ready before this cast)
   const deaths = m.kills.map((k) => [k[0], k[1]]);
   const cds = aid != null ? m.uses.filter((u) => u[1] === pawn && u[2] === aid) : [];
@@ -140,6 +143,51 @@ export function analyzeAbility(m, pawn, ability, opts) {
   return res;
 }
 
+/** projectiles of a cast fly at most this long before their damage arrives (steered ink bullets) */
+const PROJECTILE_FLIGHT = 4;
+
+/**
+ * For abilities that empower the next N gun shots: the first N weapon shots after each cast
+ * (within the ability's duration, until the next cast) are its projectiles. The ability's damage
+ * packets, grouped by tick, each claim the latest unclaimed projectile fired before them
+ * (within PROJECTILE_FLIGHT s). Sets c.projectiles = [{t, result: hit|other|miss, victims}].
+ */
+function scoreProjectiles(m, pawn, ability, casts, hits) {
+  const shots = [];
+  for (const s of m.shots || []) if (s[1] === pawn) for (let k = 0; k < s[3]; k++) shots.push(s[0]);
+  const me = m.byPawn.get(pawn);
+  let si = 0;
+  for (let i = 0; i < casts.length; i++) {
+    const c = casts[i];
+    const end = Math.min(c.t + (ability.shot_window || 10), i + 1 < casts.length ? casts[i + 1].t : Infinity);
+    while (si < shots.length && shots[si] < c.t - 0.05) si++;
+    c.projectiles = [];
+    for (let k = si; k < shots.length && shots[k] <= end && c.projectiles.length < ability.shots; k++) {
+      c.projectiles.push({ t: shots[k], result: "miss", victims: [] });
+    }
+  }
+  // group damage by tick, then FIFO onto projectiles
+  const groups = [];
+  for (const h of hits) {
+    const last = groups[groups.length - 1];
+    if (last && Math.abs(last.t - h[0]) < 0.02) last.list.push(h); else groups.push({ t: h[0], list: [h] });
+  }
+  const queue = casts.flatMap((c) => c.projectiles);
+  for (const g of groups) {
+    // the latest unclaimed projectile fired before the damage (ink bullets land in ~0.1-0.5 s)
+    let p = null;
+    for (const q of queue) if (!q.claimed && q.t <= g.t + 0.05 && g.t - q.t <= PROJECTILE_FLIGHT && (!p || q.t > p.t)) p = q;
+    if (!p) continue;
+    p.claimed = true;
+    for (const h of g.list) {
+      const v = h[1] >= 0 ? m.byPawn.get(h[1]) : null;
+      if (v && v.team === me?.team) continue;
+      if (v) { p.result = "hit"; if (!p.victims.includes(h[1])) p.victims.push(h[1]); } else if (p.result === "miss") p.result = "other";
+    }
+  }
+  for (const q of queue) delete q.claimed;
+}
+
 export function counts(casts, heroesOnly = true) {
   let hit = 0, other = 0, dmg = 0;
   for (const c of casts) {
@@ -151,8 +199,13 @@ export function counts(casts, heroesOnly = true) {
   const scored = heroesOnly ? hit : hit + other;
   const kills = casts.filter((c) => c.killed).length;
   const idles = casts.map((c) => c.idle).filter((v) => v != null);
+  // projectile abilities: per-bullet numbers too
+  const proj = casts.some((c) => c.projectiles) ? casts.flatMap((c) => c.projectiles || []) : null;
+  const projHit = proj ? proj.filter((p) => p.result === "hit" || (!heroesOnly && p.result === "other")).length : 0;
   return {
     thrown, hit, other, miss: thrown - hit - other, scored, dmg, acc: thrown ? scored / thrown : 0,
+    projectiles: proj ? proj.length : null, projHit, projAcc: proj?.length ? projHit / proj.length : null,
+    perShot: proj ? Math.max(...casts.map((c) => c.projectiles?.length || 0), 0) : null,
     kills, idle: idles.length ? idles.reduce((a, b) => a + b, 0) / idles.length : null,
   };
 }
