@@ -341,6 +341,21 @@ def build_assets(previous=None):
             entry["image"] = site_icon(img)
         items[token_id(key)] = entry
 
+    # helper abilities without their own localization ("ability_artist_rollingprojectile_trigger")
+    # are named after the ability they belong to: "Flow State (recast)"
+    by_class = {e["class_name"]: e for e in items.values()}
+    nice_suffix = {"trigger": "recast", "end": "end", "alt": "alt", "activate": "activate"}
+    for e in items.values():
+        if e["name"] != e["class_name"]:
+            continue
+        parts = e["class_name"].split("_")
+        for cut in range(len(parts) - 1, 1, -1):
+            parent = by_class.get("_".join(parts[:cut]))
+            if parent and parent["name"] != parent["class_name"]:
+                extra = " ".join(nice_suffix.get(w, w) for w in parts[cut:])
+                e["name"] = f"{parent['name']} ({extra})"
+                break
+
     modifiers = {token_id(k): k for k in modifiers_kv if isinstance(modifiers_kv[k], dict) and not k.startswith("_")}
 
     accolades = {}
