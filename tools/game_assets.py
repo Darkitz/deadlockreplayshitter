@@ -217,13 +217,15 @@ UI_FILES = {
     "icon_souls": "panorama/images/post_game/attributes/icon_souls.vsvg_c",
 }
 UI_DIR = ICON_DIR / "ui"
+# sounds: Rem's reply when Violet asks him to stop invading her dreams (match start convo 03)
+SOUND_FILES = {"rem": "sounds/vo/familiar/familiar_match_start_artist_familiar_convo03_07.vsnd_c"}
 
 
 def extract_ui():
     """post-game UI art -> web/assets/game/ui/<name>.svg|png; returns {name: site path}"""
     out, todo = {}, {}
-    for name, vpk in UI_FILES.items():
-        ext = "svg" if vpk.endswith(".vsvg_c") else "png"
+    for name, vpk in {**UI_FILES, **SOUND_FILES}.items():
+        ext = "svg" if vpk.endswith(".vsvg_c") else "mp3" if vpk.endswith(".vsnd_c") else "png"
         dest = UI_DIR / f"{name}.{ext}"
         out[name] = f"assets/game/ui/{name}.{ext}"
         if not dest.exists():
@@ -231,11 +233,14 @@ def extract_ui():
     if todo:
         tmp = CACHE / "ui_tmp"
         shutil.rmtree(tmp, ignore_errors=True)
-        subprocess.run([str(VRF), "-i", str(VPK), "-d", "-o", str(tmp), "-f", ",".join(v for v, _ in todo.values())],
-                       capture_output=True)
+        # one file per call: VRF treats -o as the output *file* when given a single file
+        for vpk, _ in todo.values():
+            out_file = tmp / vpk.replace(".vsvg_c", ".svg").replace(".vtex_c", ".png").replace(".vsnd_c", ".mp3")
+            out_file.parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run([str(VRF), "-i", str(VPK), "-d", "-o", str(out_file), "-f", vpk], capture_output=True)
         UI_DIR.mkdir(parents=True, exist_ok=True)
         for name, (vpk, dest) in todo.items():
-            src = tmp / vpk.replace(".vsvg_c", ".svg").replace(".vtex_c", ".png")
+            src = tmp / vpk.replace(".vsvg_c", ".svg").replace(".vtex_c", ".png").replace(".vsnd_c", ".mp3")
             if src.exists():
                 shutil.move(src, dest)
             else:

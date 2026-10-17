@@ -64,7 +64,7 @@ function scrollToSection(id, tries = 40) {
 // ------------------------------------------------------------------ hover help
 // Tile labels, table headers and anything with data-help get an explanation on hover. Labels
 // are looked up in explain.js, so new tiles with a known label get help for free.
-const HELP_SEL = "[data-help], .tile .k, th";
+const HELP_SEL = "[data-help]:not(.rem-btn), .tile .k, th";
 
 function helpFor(el) {
   if (el.dataset.help) return el.dataset.help;
@@ -110,6 +110,23 @@ function initHelp() {
   window.addEventListener("scroll", () => { tip.hidden = true; cur = null; }, { passive: true });
 }
 
+// ------------------------------------------------------------------ Rem
+
+/** "Could you maybe stop doing that?" — Rem's answer, from the game files */
+function initRem() {
+  const btn = $("#rem-btn");
+  const src = S.assets?.ui?.rem;
+  if (!btn || !src) { if (btn) btn.hidden = true; return; }
+  btn.addEventListener("click", () => {
+    const a = new Audio(src);
+    a.volume = 0.8;
+    a.play().catch(() => {});
+    btn.classList.remove("rem-wiggle");
+    void btn.offsetWidth; // restart the animation
+    btn.classList.add("rem-wiggle");
+  });
+}
+
 // ------------------------------------------------------------------ light / dark
 
 function initTheme() {
@@ -151,6 +168,7 @@ async function main() {
     return;
   }
   initHelp();
+  initRem();
   initDropZone();
   initLang();
   window.addEventListener("hashchange", route);
