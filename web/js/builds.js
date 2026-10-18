@@ -416,7 +416,7 @@ async function showPlayer(account, preloaded) {
     <section class="bp-p-head">
       <div>
         <h2>${esc(title)}</h2>
-        <div class="bp-sub"><b>${data.builds.length} builds</b> · <a href="https://steamcommunity.com/profiles/${data.steam_id64}" target="_blank" rel="noopener">Steam profile</a></div>
+        <div class="bp-sub"><b class="bp-total"></b> · <a href="https://steamcommunity.com/profiles/${data.steam_id64}" target="_blank" rel="noopener">Steam profile</a></div>
         ${refreshHTML}
       </div>
       <div class="bp-actions"><button type="button" class="btn primary bp-copy-all">copy shown</button><button type="button" class="btn bp-dl">download all (.txt)</button></div>
@@ -470,7 +470,10 @@ async function showPlayer(account, preloaded) {
     shown = byLevel.slice(0, reveal + 1).flat();
     const next = byLevel.findIndex((x, lvl) => lvl > reveal && x.length);
     const hidden = rows.length - shown.length;
-    root.querySelector(".bp-count").textContent = `${rows.length} build${rows.length === 1 ? "" : "s"}${hidden ? ` · ${hidden} older hidden` : ""}`;
+    // header: the player's builds as far as they're revealed (filters aside)
+    const all = data.builds.length, olderAll = data.builds.filter((b) => ageLevel(b) > reveal).length;
+    root.querySelector(".bp-total").textContent = `${all - olderAll} build${all - olderAll === 1 ? "" : "s"}${olderAll ? ` · ${olderAll} older hidden` : ""}`;
+    root.querySelector(".bp-count").textContent = `${shown.length} build${shown.length === 1 ? "" : "s"}${hidden ? ` · ${hidden} older hidden` : ""}`;
     root.querySelector(".bp-plist").innerHTML = (shown.map(row).join("") || (next < 0 ? `<p class="muted">No builds match.</p>` : ""))
       + (next > 0 ? `<button type="button" class="btn bp-more" data-reveal="${next}">show ${byLevel[next].length} more not updated in over ${AGES[next - 1][1]}</button>` : "");
   };
