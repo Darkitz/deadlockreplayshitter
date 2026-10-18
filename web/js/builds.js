@@ -441,13 +441,14 @@ async function showPlayer(account, preloaded) {
       : (y.updated ?? 0) - (x.updated ?? 0));
   };
   let shown = [];
-  // older builds (often outdated, or deleted in game: deadlock-api keeps those) go under nested
-  // folds: older than a month, inside that older than 3 months, then half a year, then a year
+  // older builds (often outdated, or deleted in game: deadlock-api keeps those) are hidden behind a
+  // button at the end of the list; each press adds the next age group (a month, 3 months, half a
+  // year, a year) and moves the button below it
   const DAY = 86400;
   const AGES = [[30, "a month"], [91, "3 months"], [182, "half a year"], [365, "a year"]];
   const now = Date.now() / 1000;
   const ageLevel = (b) => (b.updated == null ? 0 : AGES.filter(([d]) => b.updated < now - d * DAY).length);
-  const open = AGES.map(() => false);
+  let reveal = 0; // age groups shown: 0 = only builds updated in the last month
   const row = (b, i) => {
     const hero = S.assets.hero(b.hero_id);
     return `<div class="bp-prow">
@@ -462,26 +463,20 @@ async function showPlayer(account, preloaded) {
   };
   const draw = () => {
     const rows = visible();
-    // newest first within the sort order: level 0 rows, then each older level
     const byLevel = AGES.map(() => []).concat([[]]);
     for (const b of rows) byLevel[ageLevel(b)].push(b);
-    shown = byLevel.flat();
-    root.querySelector(".bp-count").textContent = `${shown.length} build${shown.length === 1 ? "" : "s"}`;
-    let i = 0;
-    const rowsOf = (lvl) => byLevel[lvl].map((b) => row(b, i++)).join("");
-    const fold = (lvl) => {
-      if (lvl > AGES.length) return "";
-      const n = byLevel.slice(lvl).reduce((a, x) => a + x.length, 0);
-      if (!n) return "";
-      const body = rowsOf(lvl) + fold(lvl + 1);
-      return `<details class="bp-old" data-lvl="${lvl - 1}" ${open[lvl - 1] ? "open" : ""}>
-        <summary>${n} build${n === 1 ? "" : "s"} not updated in over ${AGES[lvl - 1][1]}</summary><div class="bp-plist">${body}</div></details>`;
-    };
-    const list = rowsOf(0) + fold(1);
-    root.querySelector(".bp-plist").innerHTML = list || `<p class="muted">No builds match.</p>`;
-    for (const d of root.querySelectorAll(".bp-old")) d.addEventListener("toggle", () => { open[d.dataset.lvl] = d.open; });
+    // skip empty groups: the button always adds something
+    while (reveal < AGES.length && !byLevel.slice(0, reveal + 1).some((x) => x.length)) reveal++;
+    shown = byLevel.slice(0, reveal + 1).flat();
+    const next = byLevel.findIndex((x, lvl) => lvl > reveal && x.length);
+    const hidden = rows.length - shown.length;
+    root.querySelector(".bp-count").textContent = `${rows.length} build${rows.length === 1 ? "" : "s"}${hidden ? ` · ${hidden} older hidden` : ""}`;
+    root.querySelector(".bp-plist").innerHTML = (shown.map(row).join("") || (next < 0 ? `<p class="muted">No builds match.</p>` : ""))
+      + (next > 0 ? `<button type="button" class="btn bp-more" data-reveal="${next}">show ${byLevel[next].length} more not updated in over ${AGES[next - 1][1]}</button>` : "");
   };
   root.querySelector(".bp-plist").addEventListener("click", (e) => {
+    const more = e.target.closest("[data-reveal]");
+    if (more) { reveal = Number(more.dataset.reveal); draw(); return; }
     const b = shown[e.target.closest("[data-copy]")?.dataset.copy];
     if (b) copy(b.share, `“${b.name || "Untitled"}”`);
   });
