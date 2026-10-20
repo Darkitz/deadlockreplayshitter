@@ -29,5 +29,13 @@
 
   "citadel_ability_melee_parry": { "kind": "self", "note": "Parry: defensive reaction; scored in the melee view (parries made / got parried)" },
   "ability_deadpack_zip_line": { "kind": "self", "hidden": true, "note": "Deadman Danny's zipline movement" },
-  "cosmetic_ability_voting_poster": { "kind": "self", "hidden": true, "note": "cosmetic" }
+  "cosmetic_ability_voting_poster": { "kind": "self", "hidden": true, "note": "cosmetic" },
+
+  "_nurse": "Nurse Harrow (2026-10-20). stack_modifier: a stacking buff on the caster shown as a counter (leeches). debuff_modifier: an enemy debuff counted per cast (feared heroes). loadout: the ability swaps the gun for another weapon (healing syringes); scored by syringes fired and allies they reached.",
+  "ability_nurse_leech_therapy": { "kind": "offensive", "stack_modifier": "modifier_nurse_leech_therapy_stack_bonus", "stack_label": "leeches", "note": "Leech Therapy: jar of leeches (damage over time); picked-up leeches stack permanently" },
+  "ability_nurse_adrenaline_rush": { "kind": "support", "note": "Wretched Vapors: rush then crash on yourself or an ally" },
+  "ability_nurse_healing_needles": { "kind": "loadout", "weapon": "citadel_weapon_nurse_healing_needles", "equipped_modifier": "modifier_nurse_healing_needles_equipped", "ally_modifier": "modifier_nurse_healing_needles_buff", "note": "Healing Needles: a clip of syringes that heal allies" },
+  "ability_nurse_fear": { "kind": "offensive", "window": 8.5, "debuff_modifier": "modifier_citadel_nurse_fear_debuff", "debuff_label": "feared", "note": "Lurking Terrors: 1.3 s buildup + 7 s channel; fear is the payoff" },
+  "citadel_weapon_nurse_healing_needles": { "name": "Healing Needles (syringes)", "heal_weapon": true, "note": "the syringe gun: shots heal allies, not gun accuracy" }
+
 }

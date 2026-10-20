@@ -1,13 +1,13 @@
 // node --test tests/*.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
-import { prepare } from "../web/js/data.js";
+import { prepare, stacksAt } from "../web/js/data.js";
 import { analyzeAbility, counts, aimError, median } from "../web/js/analysis.js";
 
 const AB = { class_name: "test_skillshot", id: 42 };
 
 /** me at x=2, enemy at x=1000, ally at x=-500, for 100 s (0,0 = unknown position) */
-function fixture({ casts = [], damage = [], notify = [], uses = [], enemyX = 1000 } = {}) {
+function fixture({ casts = [], damage = [], notify = [], uses = [], enemyX = 1000, modifiers = [], shots = [], stack_changes = [] } = {}) {
   const n = 200;
   const track = (pawn, x) => ({
     pawn,
@@ -22,7 +22,7 @@ function fixture({ casts = [], damage = [], notify = [], uses = [], enemyX = 100
       { pawn: 2, controller: 12, account_id: 8, name: "enemy", hero_id: 1, team: 3 },
       { pawn: 3, controller: 13, account_id: 9, name: "ally", hero_id: 2, team: 2 },
     ],
-    casts, uses, damage, notify, kills: [], items: [], upgrades: [],
+    casts, uses, damage, notify, kills: [], items: [], upgrades: [], modifiers, shots, stack_changes,
     samples: { t0: 0, dt: 0.5, tracks: [track(1, 2), track(2, enemyX), track(3, -500)] },
     stats: { t0: 0, dt: 10, tracks: [] },
   });
@@ -313,4 +313,44 @@ test("recasts count for the parent; channels count damage for their whole durati
   m.damage.push([12, 1, 2, 2, 999, 200, 1, 0, 0, 0, 0]); // gun damage during the mode
   const mode = analyzeAbility(m, 1, { ...AB, id: 7777, kind: "mode", effect: 5 }, { window: 3 }).casts[0];
   assert.deepEqual([mode.result, mode.modeDmg, mode.modeHeroes], ["hit", 280, [2]]); // the 16 s tick is after the 5 s mode
+});
+
+test("Nurse Harrow: loadout (Healing Needles), debuff (fear) and stacks (leeches)", () => {
+  const NEEDLES = { class_name: "test_skillshot", id: 42, kind: "loadout", weapon_id: 500, equipped_modifier_id: 600, ally_modifier_id: 601 };
+  const m = fixture({
+    casts: [cast(10), cast(40)],
+    shots: [[11, 1, 500, 3], [12, 1, 500, 2], [13, 1, 900, 5], [41, 1, 500, 1]],
+    modifiers: [
+      [10.1, 15, 1, 1, 600, 42, 0], // syringes out 10.1 .. 15
+      [11.1, 13, 3, 1, 601, 42, 0], // ally healed
+      [40.1, 44, 1, 1, 600, 42, 0], // second load: nobody reached
+      // fear: enemy feared by me during the ult, and one later debuff that doesn't count
+      [62, 64, 2, 1, 700, 43, 0], [90, 92, 2, 1, 700, 43, 0],
+      // leeches on me: 0 -> 3 -> 5, death keeps 4 (new buff in the same moment), then 6
+      [20, 80, 1, 1, 800, 44, 5], [80.1, 100, 1, 1, 800, 44, 6],
+    ],
+    stack_changes: [[20, 5, 0], [25, 5, 3], [30, 5, 5], [80.1, 6, 4], [85, 6, 6]],
+  });
+  const loads = analyzeAbility(m, 1, NEEDLES, { window: 3 }).casts;
+  assert.deepEqual(loads.map((c) => [c.result, c.loadShots, c.allies]), [["ally", 5, [3]], ["self", 1, []]]);
+  const k = counts(loads);
+  assert.equal(k.loadShots, 6);
+  assert.equal(k.ally, 1);
+
+  const FEAR = { class_name: "test_fear", id: 43, kind: "offensive", window: 8.5, effect: 8.3, debuff_modifier_id: 700 };
+  m.casts.push([60, 1, "test_fear", 1, 0, 0, 0, 0]);
+  const fear = analyzeAbility(m, 1, FEAR, { window: 3 }).casts;
+  assert.deepEqual(fear[0].debuffed, [2]);
+  assert.equal(counts(fear).debuffed, 1);
+
+  assert.deepEqual(stacksAt(m, 1, 800, 50), { now: 5, max: 5, lost: 0 });
+  assert.deepEqual(stacksAt(m, 1, 800, 82), { now: 4, max: 5, lost: 1 });
+  assert.deepEqual(stacksAt(m, 1, 800, 99), { now: 6, max: 6, lost: 1 });
+});
+
+test("heal weapons stay out of gun accuracy", async () => {
+  const { gunStats } = await import("../web/js/analysis.js");
+  const m = fixture({ shots: [[10, 1, 900, 4], [11, 1, 500, 6]] });
+  const assets = { item: (id) => (id === 500 ? { heal_weapon: true } : { pellets: 1 }) };
+  assert.equal(gunStats(m, 1, assets).shots, 4);
 });

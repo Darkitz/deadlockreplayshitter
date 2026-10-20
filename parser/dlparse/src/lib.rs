@@ -23,7 +23,7 @@ use haste::valveprotos::deadlock::{
 use prost::Message;
 use serde::Serialize;
 
-pub const FORMAT_VERSION: u32 = 16;
+pub const FORMAT_VERSION: u32 = 17;
 /// movement abilities fire constantly and say nothing about skill usage; keep them out of `uses`.
 /// They are string tokens of the class names, so they survive patches. The CLI can override them
 /// with `--ignore-ids`; the browser build always uses this list.
@@ -289,6 +289,10 @@ pub struct Output {
     /// buffs/debuffs on heroes: [start, end, parent_pawn, caster_pawn_or_-1, modifier_id,
     ///  ability_id, max_stacks]; end = removal time (or start + duration if never seen removed)
     modifiers: Vec<(f32, f32, i32, i32, u32, u32, i32)>,
+    /// stack count over time for modifiers whose stacks change while they last (Nurse Harrow's
+    /// leeches, stacking passives): [t, index into `modifiers`, stacks]. The first entry of a
+    /// modifier is its starting count.
+    stack_changes: Vec<(f32, u32, i32)>,
     /// [t, victim_pawn, attacker_pawn, killer_ability_id, [assister pawns]]
     kills: Vec<(f32, i32, i32, u32, Vec<i32>)>,
     /// movement abilities (kept out of `uses`): [t, pawn, ability_id] for dash, jump, mantle,
@@ -341,6 +345,10 @@ struct V {
     noisy: Vec<u32>,
     /// ActiveModifiers row index -> (hash of user data, index into out.modifiers)
     mod_rows: HashMap<i32, (u64, Option<usize>)>,
+    /// current stack count per stored modifier (index into out.modifiers)
+    mod_stacks: HashMap<usize, i32>,
+    /// modifiers whose starting count is already in out.stack_changes
+    stack_logged: std::collections::HashSet<usize>,
     next_mod_scan: f32,
     next_sample: f32,
     next_stat: f32,
@@ -601,6 +609,15 @@ impl V {
                     if same {
                         // refresh / stack change of the same modifier: keep the row open
                         let o = prev.unwrap();
+                        let stacks = e.stack_count.unwrap_or(0);
+                        let was = self.mod_stacks.get(&o).copied().unwrap_or(0);
+                        if stacks != was {
+                            if self.stack_logged.insert(o) {
+                                self.out.stack_changes.push((self.out.modifiers[o].0, o as u32, was));
+                            }
+                            self.out.stack_changes.push((t, o as u32, stacks));
+                            self.mod_stacks.insert(o, stacks);
+                        }
                         let dur = e.duration.unwrap_or(-1.0);
                         self.out.modifiers[o].1 = if dur > 0.0 { t + dur } else { f32::MAX };
                         slot = Some(o);
@@ -614,6 +631,7 @@ impl V {
                             e.stack_count.unwrap_or(0),
                         ));
                         slot = Some(self.out.modifiers.len() - 1);
+                        self.mod_stacks.insert(self.out.modifiers.len() - 1, e.stack_count.unwrap_or(0));
                     }
                 }
             }

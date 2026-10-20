@@ -65,6 +65,12 @@ export function prepare(m) {
   m.statTracks = new Map(m.stats.tracks.map((t) => [t.pawn, t]));
   m.player = (accountId) => m.players.find((p) => p.account_id === accountId);
   for (const p of m.players) p.heroBuild = demoBuild(p.build);
+  // stack counts over time, per stored modifier (parser format 17+)
+  m.stackLog = new Map();
+  for (const [t, row, n] of m.stack_changes || []) {
+    if (!m.stackLog.has(row)) m.stackLog.set(row, []);
+    m.stackLog.get(row).push([t, n]);
+  }
   return m;
 }
 
@@ -139,6 +145,42 @@ export function abilityLevelsAt(m, pawn, t) {
     lv.set(u[2], n);
   }
   return lv;
+}
+
+/** a stacking buff on a pawn over time (Nurse Harrow's leeches): [[t, stacks], ...], sorted.
+ *  Needs parser format 17 for stack changes; older matches only know each buff's highest count. */
+export function stackSeries(m, pawn, modId) {
+  m._stacks ??= new Map();
+  const key = `${pawn}:${modId}`;
+  if (m._stacks.has(key)) return m._stacks.get(key);
+  const pts = [];
+  (m.modifiers || []).forEach((x, i) => {
+    if (x[2] !== pawn || x[4] !== modId) return;
+    const log = m.stackLog?.get(i);
+    if (log) for (const [t, n] of log) { if (t <= x[1]) pts.push([t, n]); } else pts.push([x[0], x[6] || 1]);
+    if (x[1] < m.end) pts.push([x[1], 0]);
+  });
+  pts.sort((a, b) => a[0] - b[0]);
+  // a buff replaced by a new one in the same moment (respawn, refresh) isn't a drop to zero
+  const out = [];
+  for (const p of pts) {
+    if (out.length && p[0] - out.at(-1)[0] < 0.25) out[out.length - 1] = p[1] === 0 && out.at(-1)[1] !== 0 ? out.at(-1) : p;
+    else out.push(p);
+  }
+  m._stacks.set(key, out);
+  return out;
+}
+
+/** stacks at time t, plus the most held and the stacks lost (drops) up to t */
+export function stacksAt(m, pawn, modId, t) {
+  let now = 0, max = 0, lost = 0;
+  for (const [pt, n] of stackSeries(m, pawn, modId)) {
+    if (pt > t) break;
+    if (n < now) lost += now - n;
+    now = n;
+    max = Math.max(max, n);
+  }
+  return { now, max, lost };
 }
 
 /** modifiers active on a pawn at time t: [start, end, parent, caster, modifier, ability, stacks] */

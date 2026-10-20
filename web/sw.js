@@ -3,7 +3,7 @@
 // through this; they are read straight from disk.
 // Strategy: network first for the site itself (always the newest version when online),
 // cache first for icons / fonts; everything falls back to the cache when offline.
-const CACHE = "dldi-v7";  // bump to force every visitor to refetch everything
+const CACHE = "dldi-v8";  // bump to force every visitor to refetch everything
 const CORE = [
   "./", "index.html", "style.css", "icon.svg", "data/assets.json", "parser/dlparse.wasm",
   "js/analysis.js", "js/app.js", "js/data.js", "js/explain.js", "js/home.js", "js/lang.js",

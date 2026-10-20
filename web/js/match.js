@@ -2,6 +2,7 @@
 
 import {
   loadMatch, statsAt, posAt, hpAt, itemsAt, abilityLevelsAt, modifiersAt, TEAM_NAMES,
+  stacksAt,
 } from "./data.js";
 import {
   analyzeAbility, counts, pct, abilityTable, incoming, AIMED_AT_DEG, GUN, gunStats, gunAt, damageTaken, detectFights, surroundings, MELEE, MELEE_LIGHT, MELEE_HEAVY, MELEE_REACH_M, meleeStats, meleeModel, timeSplit,
@@ -83,13 +84,17 @@ export async function viewMatch(id, params) {
       } else if (r?.thrown && ab.kind === "mode") {
         lines.push(`${k1(r.modeDmg || 0)}: hero damage you dealt (any source) while it was active, ${r.thrown} use${r.thrown > 1 ? "s" : ""}.`,
           `It empowers your other attacks for ~${ab.effect || 6} s, so it has no accuracy of its own. ${r.modeKills} kills / assists during it.`);
+      } else if (r?.thrown && ab.kind === "loadout") {
+        lines.push(`${r.ally} / ${r.thrown}: loads that reached an ally / all loads.`,
+          `It swaps your gun for ${S.assets.itemByClass(ab.weapon)?.name || "another weapon"}: ${r.loadShots ?? 0} shots fired with it, ${r.allyHeroes} different allies reached, ${Math.round(r.loadTime || 0)} s out. Those shots are kept out of gun accuracy.`);
       } else if (!r?.thrown && ab.kind === "proc") {
         lines.push("Passive: always on, nothing to cast.");
       } else if (r?.thrown && ab.kind === "proc") {
         lines.push(`×${r.thrown}: times it triggered (passive with a cooldown).`, `${r.hit} of those dealt damage to an enemy hero.`);
       } else if (r?.thrown) lines.push(`${r.scored} / ${r.thrown - r.allyOnly}: casts that ${settings.heroesOnly ? "hit an enemy hero" : "hit anything"} (damage or debuff) / all casts (hit window ${Math.max(settings.window, ab.window || 0)} s${ab.window > settings.window ? ", longer for this ability: its effects land late" : ""}).`,
         ...(r.allyOnly ? [`${r.allyOnly} uses on teammates are left out of accuracy.`] : []),
-        ...(r.heroesPerHit ? [`${r.heroesPerHit.toFixed(2)} heroes hit per hitting cast.`] : []));
+        ...(r.heroesPerHit ? [`${r.heroesPerHit.toFixed(2)} heroes hit per hitting cast.`] : []),
+        ...(r.debuffed != null ? [`${r.debuffed} enemy heroes ${ab.debuff_label || "debuffed"} in total (${r.debuffHits} of ${r.thrown} casts ${ab.debuff_label || "debuffed"} someone).`] : []));
       else lines.push("Not used this match.");
       if (r?.item) lines.push("Active item.");
     }
@@ -109,6 +114,7 @@ export async function viewMatch(id, params) {
     const r = table.find((x) => x.ability.class_name === ab.class_name);
     if (r?.projectiles) return `<span class="ab-stat">${r.projHit}/${r.projectiles}</span>`;
     const kind = ab.kind || "offensive";
+    if (r?.thrown && kind === "loadout") return `<span class="ab-stat ab-support">${r.ally}/${r.thrown}</span>`;
     if (r?.thrown && kind === "support") return `<span class="ab-stat ab-support">${r.ally}/${r.thrown}</span>`;
     if (r?.thrown && (kind === "self" || kind === "proc")) return `<span class="ab-stat ab-uses">×${r.thrown}</span>`;
     if (r?.thrown && kind === "mode") return `<span class="ab-stat">${k1(r.modeDmg || 0)}</span>`;
@@ -388,6 +394,10 @@ export async function viewMatch(id, params) {
           <small>${hp ? (hp.hp > 0 ? `${hp.hp} / ${hp.max} HP` : "dead") : "–"}</small></div>
         <div class="st-num"><b>${st ? k1(st[0]) : "–"}</b><small>souls</small></div>
         <div class="st-num"><b>${st ? st[1] : "–"}</b><small>level</small></div>
+        ${S.assets.signatures(subject.hero_id).filter((ab) => ab.stack_modifier_id).map((ab) => {
+          const s = stacksAt(m, pawn, ab.stack_modifier_id, t);
+          return `<div class="st-num" data-help="${esc(`${ab.name}: ${ab.stack_label || "stacks"}\n${s.now} now · most held ${s.max} · ${s.lost} lost so far`)}"><b>${s.now}</b><small>${esc(ab.stack_label || "stacks")}</small></div>`;
+        }).join("")}
       </div>
       <div class="st-abs">${abil}</div>
       <div class="st-items">${items.map((it) => `<img class="slot-${esc(it.slot || "x")}" src="${esc(S.assets.itemIcon(it.id))}" data-help="${esc(itemHelp(it))}" data-tip="${esc(it.class_name)}" alt="${esc(it.name)}">`).join("") || `<span class="muted small">no items yet</span>`}</div>
@@ -1003,7 +1013,14 @@ export async function viewMatch(id, params) {
     const akind = ability.kind || "offensive";
     const common = tile("K / D / A", st ? `${st[2]}/${st[3]}/${st[4]}` : "–") + tile("Souls", st ? k1(st[0]) : "–") +
       tile("Ready → recast", c.idle != null ? `${c.idle.toFixed(1)}<small> s</small>` : "–");
-    if (akind === "support" && c.projectiles == null) $(".tiles", app).innerHTML =
+    if (akind === "loadout") $(".tiles", app).innerHTML =
+      tile("Loads", c.thrown) +
+      tile("Reached an ally", `${c.ally}<small> / ${c.thrown}</small>`, "good") +
+      tile("Allies helped", c.allyHeroes) +
+      tile(`Shots fired <small>${esc(S.assets.itemByClass(ability.weapon)?.name || "")}</small>`, c.loadShots ?? 0, "accent") +
+      tile("Time loaded", `${Math.round(c.loadTime)}<small> s</small>`) +
+      tile("Used in a fight", c.thrown ? `${pct(c.inFight / c.thrown)}<small> ${c.inFight}</small>` : "–") + common;
+    else if (akind === "support" && c.projectiles == null) $(".tiles", app).innerHTML =
       tile("Uses", c.thrown) +
       tile("Reached an ally", `${c.ally}<small> / ${c.thrown}</small>`, "good") +
       tile("Allies helped", c.allyHeroes) +
@@ -1052,6 +1069,20 @@ export async function viewMatch(id, params) {
       tile("Hits → kills", c.hit ? `${c.kills}<small> / ${c.hit}</small>` : "–") +
       tile("Ready → recast", c.idle != null ? `${c.idle.toFixed(1)}<small> s</small>` : "–");
 
+    // ability-specific extras: a stacking resource (leeches) and the debuff it's for (fear)
+    let extra = "";
+    if (c.debuffed != null) {
+      extra += tile(`Heroes ${esc(ability.debuff_label || "debuffed")}`, c.debuffed, "good")
+        + tile(`Casts that ${esc(ability.debuff_label || "debuffed")} someone`, `${c.debuffHits}<small> / ${c.thrown}</small>`);
+    }
+    if (ability.stack_modifier_id) {
+      const sk = stacksAt(m, pawn, ability.stack_modifier_id, t);
+      const label = ability.stack_label || "stacks";
+      extra += tile(`${label[0].toUpperCase()}${label.slice(1)} now`, sk.now, "accent") + tile(`Most ${label} held`, sk.max)
+        + tile(`${label[0].toUpperCase()}${label.slice(1)} lost`, sk.lost);
+    }
+    if (extra) $(".tiles", app).insertAdjacentHTML("afterbegin", extra);
+
     const f = settings.feed || "all";
     const events = [];
     for (const k of past) {
@@ -1071,7 +1102,8 @@ export async function viewMatch(id, params) {
           return p ? `<img src="${esc(S.assets.hero(p.hero_id).icon)}" title="${esc(p.name)}">` : "";
         }).join("");
         const dist = k.dist != null ? ` · ${Math.round(k.dist)} m` : "";
-        const label = ability.kind === "mode" && k.modeDmg != null ? `${k1(k.modeDmg)} hero dmg during it${k.modeKills ? ` · ${k.modeKills} kill${k.modeKills > 1 ? "s" : ""}` : ""}${k.inFight ? "" : " · out of fights"}`
+        const label = ability.kind === "loadout" ? `${k.loadShots} shot${k.loadShots === 1 ? "" : "s"} · ${k.allies.length ? `on ${k.allies.map((a) => esc(m.byPawn.get(a)?.name || "ally")).join(", ")}` : "no ally reached"} · ${Math.round(k.loadLen)} s`
+          : ability.kind === "mode" && k.modeDmg != null ? `${k1(k.modeDmg)} hero dmg during it${k.modeKills ? ` · ${k.modeKills} kill${k.modeKills > 1 ? "s" : ""}` : ""}${k.inFight ? "" : " · out of fights"}`
           : k.result === "hit" ? `hit${k.delay != null ? ` +${k.delay.toFixed(2)}s` : ""}${dist} · ${k.dmg} dmg`
           : k.result === "other" ? `hit non-hero${dist} · ${k.dmg} dmg`
           : k.result === "ally" ? `on ${k.allies.map((a) => esc(m.byPawn.get(a)?.name || "ally")).join(", ")}${k.onSelf ? " + self" : ""}`
@@ -1081,7 +1113,8 @@ export async function viewMatch(id, params) {
           : k.aimErr != null ? `miss · ${k.aimErr.toFixed(0)}° off <img src="${esc(S.assets.hero(m.byPawn.get(k.aimPawn)?.hero_id).icon)}" title="${esc(m.byPawn.get(k.aimPawn)?.name)}"> @ ${Math.round(k.aimDist)} m`
           : "miss · no enemy in range";
         const bullets = k.projectiles ? ` · <b>${k.projectiles.filter((p) => p.result === "hit").length}/${k.projectiles.length}</b> bullets hit` : "";
-        const extra = bullets + (k.killed ? ` <b class="kill-tag">→ kill</b>` : "");
+        const debuff = k.debuffed?.length ? ` · ${esc(ability.debuff_label || "debuffed")} ${k.debuffed.map((v) => esc(m.byPawn.get(v)?.name || "?")).join(", ")}` : "";
+        const extra = bullets + debuff + (k.killed ? ` <b class="kill-tag">→ kill</b>` : "");
         return `<li data-t="${k.t}"><span class="dot ${k.result}"></span><span class="t">${fmtClock(k.t)}</span>${vics}<span>${label}${extra}</span></li>`;
       }
       const [kt, vic, att, abilityId] = ev.k;

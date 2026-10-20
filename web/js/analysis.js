@@ -167,9 +167,35 @@ export function analyzeAbility(m, pawn, ability, opts) {
     }
   }
 
+  // the debuff that is the point of the ability (Lurking Terrors: fear): enemy heroes that got it
+  if (ability.debuff_modifier_id) {
+    for (const c of casts) {
+      const end = c.t + effect;
+      c.debuffed = [...new Set((m.modifiers || []).filter((x) => x[4] === ability.debuff_modifier_id && x[3] === pawn
+        && x[0] >= c.t - 0.05 && x[0] <= end && m.byPawn.get(x[2]) && m.byPawn.get(x[2]).team !== me?.team).map((x) => x[2]))];
+    }
+  }
+
+  // loadouts (Healing Needles): the ability swaps the gun for another weapon until it's empty or
+  // put away. Scored by the shots fired with it and the allies they reached.
+  if (kind === "loadout") {
+    for (let i = 0; i < casts.length; i++) {
+      const c = casts[i];
+      const next = i + 1 < casts.length ? casts[i + 1].t : m.end;
+      const eq = (m.modifiers || []).find((x) => x[2] === pawn && x[4] === ability.equipped_modifier_id && x[0] >= c.t - 0.5 && x[0] <= c.t + 3);
+      const end = Math.min(eq ? eq[1] : c.t + 20, next, m.end);
+      c.loadLen = Math.max(0, end - c.t);
+      c.loadShots = (m.shots || []).filter((s) => s[1] === pawn && s[2] === ability.weapon_id && s[0] >= c.t && s[0] <= end).reduce((a, s) => a + s[3], 0);
+      const reached = (m.modifiers || []).filter((x) => x[3] === pawn && x[4] === ability.ally_modifier_id && x[0] >= c.t && x[0] <= end + 0.5
+        && x[2] !== pawn && m.byPawn.get(x[2])?.team === me?.team);
+      c.allies = [...new Set([...(c.allies || []), ...reached.map((x) => x[2])])];
+      c.result = c.allies.length ? "ally" : "self";
+    }
+  }
+
   // self buffs / mobility: was it used in a fight? (enemy hero within 25 m, or hero damage
   // dealt or taken within 3 s)
-  if (kind === "self" || kind === "support" || kind === "mode") {
+  if (kind === "self" || kind === "support" || kind === "mode" || kind === "loadout") {
     const heroDmg = m.damage.filter((d) => (d[1] === pawn && d[3] >= 0 && m.byPawn.get(d[3])?.team !== me?.team)
       || (d[3] === pawn && m.byPawn.get(d[1])?.team !== me?.team)).map((d) => d[0]);
     for (const c of casts) {
@@ -270,6 +296,8 @@ export function counts(casts, heroesOnly = true) {
   const modeDmg = modeCasts.reduce((a, c) => a + c.modeDmg, 0);
   const modeKills = modeCasts.reduce((a, c) => a + c.modeKills, 0);
   const kills = casts.filter((c) => c.killed).length;
+  const debuffCasts = casts.filter((c) => c.debuffed);
+  const loads = casts.filter((c) => c.loadShots != null);
   const idles = casts.map((c) => c.idle).filter((v) => v != null);
   // projectile abilities: per-bullet numbers too
   const proj = casts.some((c) => c.projectiles) ? casts.flatMap((c) => c.projectiles || []) : null;
@@ -283,6 +311,12 @@ export function counts(casts, heroesOnly = true) {
     projectiles: proj ? proj.length : null, projHit, projAcc: proj?.length ? projHit / proj.length : null,
     perShot: proj ? Math.max(...casts.map((c) => c.projectiles?.length || 0), 0) : null,
     kills, idle: idles.length ? idles.reduce((a, b) => a + b, 0) / idles.length : null,
+    // debuff abilities: enemy heroes that got the debuff (feared, ...), and casts that landed one
+    debuffed: debuffCasts.length ? debuffCasts.reduce((a, c) => a + c.debuffed.length, 0) : null,
+    debuffHits: debuffCasts.filter((c) => c.debuffed.length).length,
+    // loadouts: shots fired with the swapped-in weapon and time it was out
+    loadShots: loads.length ? loads.reduce((a, c) => a + c.loadShots, 0) : null,
+    loadTime: loads.reduce((a, c) => a + c.loadLen, 0),
   };
 }
 
@@ -372,7 +406,8 @@ export function gunStats(m, pawn, assets) {
   m._gun ??= new Map();
   if (m._gun.has(pawn)) return m._gun.get(pawn);
   const me = m.byPawn.get(pawn);
-  const rows = (m.shots || []).filter((s) => s[1] === pawn);
+  // weapons that heal (Nurse Harrow's syringes) aren't aiming at enemies: not the gun
+  const rows = (m.shots || []).filter((s) => s[1] === pawn && !assets?.item(s[2])?.heal_weapon);
   const weapons = new Set(rows.map((s) => s[2]));
   const dmg = m.damage.filter((d) => d[1] === pawn && weapons.has(d[4]));
   const events = [];

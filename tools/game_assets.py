@@ -478,6 +478,8 @@ def build_assets(previous=None):
         for k, v in (OVERRIDES.get(key) or {}).items():
             if k != "note":
                 entry[k] = v
+            if k.endswith("_modifier") or k == "weapon":
+                entry[f"{k}_id"] = token_id(v)  # demos name modifiers / weapons by this hash
         if img:
             entry["image"] = site_icon(img)
         items[token_id(key)] = entry
