@@ -1286,3 +1286,15 @@ body.dragging-files .open-demo { border-color: var(--accent) !important; box-sha
 .fl-card .sr-star { position: absolute; top: 6px; right: 6px; }
 .fl-all { font-size: 18px; padding: 12px 34px; border-radius: 12px; }
 .fl-done { color: var(--hit); font-weight: 700; }
+
+/* ---------- following: activity log (js/activity.js) ---------- */
+.ac-log { list-style: none; margin: 0; padding: 0; display: grid; }
+.ac-log li { display: flex; gap: 14px; align-items: baseline; padding: 7px 4px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); line-height: 1.5; }
+.ac-log li.extra { display: none; }
+.fl-activity.all .ac-log li.extra { display: flex; }
+.ac-t { flex: 0 0 92px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ac-log b.good { color: var(--hit); }
+.ac-log b.bad { color: var(--miss); }
+.ac-who { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--text); vertical-align: -3px; }
+.ac-who img { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; }
+.ac-log li.ac-together { background: color-mix(in srgb, var(--accent) 6%, transparent); }

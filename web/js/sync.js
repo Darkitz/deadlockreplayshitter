@@ -35,7 +35,7 @@ const cache = new Map(); // account -> { at, rows }
 let profiles = {}; // account -> Steam profile (merged feeds show who played)
 let busy = false;
 
-async function loadHistory(acc) {
+export async function loadHistory(acc) {
   const hit = cache.get(acc);
   if (hit && Date.now() - hit.at < 120_000) return hit.rows;
   const rows = (await getJSON(`${API}/players/${acc}/match-history`)).slice(0, COUNT);

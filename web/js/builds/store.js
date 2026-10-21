@@ -1,7 +1,7 @@
 // Build cache (from Build Shitter): one IndexedDB object store of { key, value, fetchedAt, tag }.
 // Falls back to memory when IndexedDB is unavailable (private windows, blocked storage).
 // Versioned: a DATA_VERSION change wipes this cache (bump when cached records change shape).
-const DATA_VERSION = 1;
+const DATA_VERSION = 2; // 2: player build lists carry publish times
 
 const DB_NAME = "dldi-builds";
 const STORE = "cache";

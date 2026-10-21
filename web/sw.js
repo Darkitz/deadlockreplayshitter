@@ -3,12 +3,12 @@
 // through this; they are read straight from disk.
 // Strategy: network first for the site itself (always the newest version when online),
 // cache first for icons / fonts; everything falls back to the cache when offline.
-const CACHE = "dldi-v17";  // bump to force every visitor to refetch everything
+const CACHE = "dldi-v18";  // bump to force every visitor to refetch everything
 const CORE = [
   "./", "index.html", "style.css", "icon.svg", "data/assets.json", "parser/dlparse.wasm",
   "js/analysis.js", "js/app.js", "js/data.js", "js/explain.js", "js/home.js", "js/lang.js",
   "js/local.js", "js/match.js", "js/minimap.js", "js/parse-worker.js", "js/postgame.js", "js/timeline.js", "js/ui.js",
-  "js/sync.js", "js/account.js", "js/player.js", "js/search.js", "js/builds.js", "js/builds/api.js", "js/builds/codec.js", "js/builds/proto.js", "js/builds/store.js", "data/tips.json",
+  "js/sync.js", "js/account.js", "js/player.js", "js/search.js", "js/activity.js", "js/builds.js", "js/builds/api.js", "js/builds/codec.js", "js/builds/proto.js", "js/builds/store.js", "data/tips.json",
 ];
 
 self.addEventListener("install", (ev) => {

@@ -76,7 +76,7 @@ export function parsePlayerQuery(raw) {
 const followBtn = (acc) => storedAccount() === String(acc) ? `<span class="chip-s on">you</span>`
   : `<button class="chip-s pl-follow ${isFollowed(acc) ? "on" : ""}" data-follow="${esc(acc)}">${isFollowed(acc) ? "★ following" : "☆ follow"}</button>`;
 
-/** Following: you and the players you follow, with one merged feed of their last matches */
+/** Following: you and the players you follow, and what they did lately (js/activity.js) */
 // a follow list as a link: account ids in base36, dot-separated (short enough to paste anywhere)
 const encodeList = (accs) => accs.map((a) => Number(a).toString(36)).join(".");
 const decodeList = (s) => [...new Set(String(s || "").split(".").map((x) => parseInt(x, 36)).filter((n) => n > 0 && n <= 0xffffffff).map(String))];
@@ -91,11 +91,12 @@ export async function viewFollowing(params) {
   app.innerHTML = `<div class="pl-page">
     <div class="fl-head"><h2 class="pl-name">Following</h2>
       ${accs.length ? `<button class="btn small" data-share data-help="Share your follow list&#10;Copies a link with these players (you included). Whoever opens it can follow them too.">share list</button>` : ""}</div>
-    <p class="muted small">You and the players you follow, with their last matches in one list. Find players with <a href="#/search">Search</a>.</p>
+    <p class="muted small">You and the players you follow. Find players with <a href="#/search">Search</a>; their pages have all their matches and builds.</p>
     <section class="fl-people">${accs.map((a) => `
       <a class="fl-chip" href="#/player/${a}" data-acc="${a}"><img alt="" hidden><span>${a === me ? "you" : esc(a)}</span>${a === me ? "" : `<button class="fl-unfollow" data-unfollow="${a}" data-help="Unfollow">×</button>`}</a>`).join("")
       || `<p class="muted">Nobody yet. Find someone with <a href="#/search">Search</a> (or click a name on a match scoreboard) and press ☆ follow; remember yourself with “this is me” on your own page. Kept in this browser only.</p>`}</section>
-    <section class="pl-body"></section></div>`;
+    ${accs.length ? `<h3 class="sr-h">Last 5 days</h3>` : ""}
+    <section class="fl-activity"></section></div>`;
   $(".pl-page", app).addEventListener("click", async (ev) => {
     if (ev.target.closest("[data-share]")) {
       const b = ev.target.closest("[data-share]");
@@ -122,7 +123,7 @@ export async function viewFollowing(params) {
       if (p.name) chip.querySelector("span").textContent = chip.dataset.acc === me ? `${p.name} (you)` : p.name;
     }
   }).catch(() => {});
-  if (accs.length) renderMatches($(".pl-body", app), accs);
+  if (accs.length) import("./activity.js").then((m) => m.renderActivity($(".fl-activity", app), accs));
 }
 
 /** a shared follow list (#/following?list=…): just those players and one big "follow all" */

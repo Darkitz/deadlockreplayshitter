@@ -138,6 +138,7 @@ const summarize = ({ build, share, stats }) => ({
   description: build.description ?? "",
   version: build.version,
   updated: build.last_updated_timestamp ?? null,
+  published: build.publish_timestamp ?? null,
   favorites: stats.favorites,
   share,
 });
