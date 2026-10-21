@@ -13,9 +13,9 @@ import { isFollowed, setFollowed, storedAccount } from "./account.js";
 let renderId = 0;
 
 const BARS = [
-  ["p", "Players", "Steam name, profile link or SteamID"],
-  ["b", "Builds", "build id"],
-  ["m", "Matches", "match id"],
+  ["p", "Players", "Steam name or profile link", "Name, steamcommunity.com link or SteamID"],
+  ["b", "Builds", "Build id", "The number in a build's info"],
+  ["m", "Matches", "Match id", "From the match history or a replay file"],
 ];
 
 export async function viewSearch(params) {
@@ -23,18 +23,18 @@ export async function viewSearch(params) {
   const rid = ++renderId;
   document.title = "Search · DLDI";
   app.innerHTML = `<div class="sr-page">
-    <div class="sr-bars">${BARS.map(([k, label, ph]) => `
-      <section class="sr-bar" data-k="${k}">
-        <form class="bp-lookup sr-form" data-k="${k}">
-          <label>${label}</label>
-          <input type="search" name="q" value="${esc(params.get(k) || "")}" placeholder="${ph}" autocomplete="off" spellcheck="false" ${k === "p" ? "" : 'inputmode="numeric"'}>
-          <button class="btn primary">find</button>
-        </form>
-        <div class="sr-out"></div>
-      </section>`).join("")}
-      <p class="muted small sr-note">Looked up on <a href="https://deadlock-api.com" target="_blank" rel="noopener">deadlock-api.com</a>.
-        Names only find players with recent matches; a profile link or SteamID always works.</p>
-    </div></div>`;
+    <h2 class="sr-title">Search</h2>
+    <div class="sr-tiles">${BARS.map(([k, label, ph, hint]) => `
+      <form class="sr-tile sr-form" data-k="${k}">
+        <label for="sr-${k}">${label}</label>
+        <div class="sr-input"><span aria-hidden="true">⌕</span>
+          <input id="sr-${k}" type="search" name="q" value="${esc(params.get(k) || "")}" placeholder="${ph}" autocomplete="off" spellcheck="false" ${k === "p" ? "" : 'inputmode="numeric"'}></div>
+        <small>${hint}</small>
+      </form>`).join("")}</div>
+    <div class="sr-results">${BARS.map(([k, label]) => `<section class="sr-bar" data-k="${k}" hidden><h3 class="sr-h">${label}</h3><div class="sr-out"></div></section>`).join("")}</div>
+    <p class="muted small sr-note">Everything here is looked up on <a href="https://deadlock-api.com" target="_blank" rel="noopener">deadlock-api.com</a>.
+      Names only find players with recent matches; a profile link or SteamID always works.</p>
+  </div>`;
   for (const form of app.querySelectorAll(".sr-form")) {
     form.addEventListener("submit", (ev) => {
       ev.preventDefault();
@@ -44,16 +44,18 @@ export async function viewSearch(params) {
       location.hash = `#/search${p.size ? `?${p}` : ""}`;
     });
   }
-  app.querySelector(".sr-bars").addEventListener("click", (ev) => {
+  app.querySelector(".sr-results").addEventListener("click", (ev) => {
+    const more = ev.target.closest("[data-more]");
+    if (more) { more.closest(".sr-out").classList.add("all"); more.remove(); return; }
     const fo = ev.target.closest("[data-follow]");
     if (!fo) return;
     ev.preventDefault();
     const on = !isFollowed(fo.dataset.follow);
     setFollowed(fo.dataset.follow, on);
     fo.classList.toggle("on", on);
-    fo.textContent = on ? "★ following" : "☆ follow";
+    fo.textContent = fo.classList.contains("sr-star") ? (on ? "★" : "☆") : on ? "★ following" : "☆ follow";
   });
-  const out = (k) => $(`.sr-bar[data-k="${k}"] .sr-out`, app);
+  const out = (k) => { const sec = $(`.sr-bar[data-k="${k}"]`, app); sec.hidden = false; return $(".sr-out", sec); };
   const pq = params.get("p"), bq = params.get("b"), mq = params.get("m");
   document.title = pq || bq || mq ? `${pq || bq || mq} · search · DLDI` : "Search · DLDI";
   if (!pq && !bq && !mq) $('.sr-form[data-k="p"] input', app).focus();
@@ -102,14 +104,14 @@ const section = (title, body) => `<section class="sr-section"><h3 class="section
 
 function playersHTML(rows) {
   const me = storedAccount();
-  return `<div class="pl-grid">${rows.map((r) => `
-    <div class="pl-result">
-      <a href="#/player/${r.acc}" class="pl-r-main">
+  return `<div class="sr-people">${rows.map((r, i) => `
+    <div class="sr-person ${i >= 10 ? "extra" : ""}">
+      <a href="#/player/${r.acc}">
         ${r.avatar ? `<img src="${esc(r.avatar)}" alt="" loading="lazy">` : `<span class="pl-r-ph"></span>`}
-        <span><b>${esc(r.name || r.acc)}</b><small class="muted">${r.played30 != null ? `${r.played30} matches in 30 days` : `account ${esc(r.acc)}`}</small></span>
+        <span><b>${esc(r.name || r.acc)}</b><small>${r.played30 != null ? `${r.played30} matches · 30 days` : `account ${esc(r.acc)}`}</small></span>
       </a>
-      ${me === r.acc ? `<span class="chip-s on">you</span>` : `<button class="chip-s pl-follow ${isFollowed(r.acc) ? "on" : ""}" data-follow="${esc(r.acc)}">${isFollowed(r.acc) ? "★ following" : "☆ follow"}</button>`}
-    </div>`).join("")}</div>`;
+      ${me === r.acc ? `<span class="sr-you">you</span>` : `<button class="sr-star ${isFollowed(r.acc) ? "on" : ""}" data-follow="${esc(r.acc)}" aria-label="follow" data-help="${isFollowed(r.acc) ? "Following" : "Follow"}&#10;Their matches join yours on the Following page">${isFollowed(r.acc) ? "★" : "☆"}</button>`}
+    </div>`).join("")}</div>${rows.length > 10 ? `<button class="sr-more" data-more>show all ${rows.length}</button>` : ""}`;
 }
 
 async function buildHTML({ build, stats }) {
