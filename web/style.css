@@ -1151,10 +1151,6 @@ body.dragging-files .open-demo { border-color: var(--accent) !important; box-sha
   animation: od-pulse 1s ease-in-out infinite alternate; position: relative; z-index: 101; }
 @keyframes od-pulse { to { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 15%, transparent); } }
 
-/* ---------- your avatar in the top bar ---------- */
-.me-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; overflow: hidden; border: 1.5px solid var(--line); }
-.me-btn img { width: 100%; height: 100%; object-fit: cover; }
-.me-btn:hover, .me-btn.on { border-color: var(--accent); }
 
 /* ---------- player page (js/player.js) ---------- */
 .pl-head { display: flex; align-items: center; gap: 16px; margin: 6px 0 14px; }
@@ -1170,3 +1166,47 @@ body.dragging-files .open-demo { border-color: var(--accent) !important; box-sha
 .pg-board .pg-who a.pg-player { color: inherit; text-decoration: none; }
 .pg-board .pg-who a.pg-player:hover b { color: var(--accent); }
 .sync-card .sc-action .btn { white-space: nowrap; flex-shrink: 0; }
+
+/* ---------- following (js/player.js) ---------- */
+.fl-people { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.fl-chip { display: inline-flex; align-items: center; gap: 8px; padding: 3px 6px 3px 3px; border-radius: 20px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--text); text-decoration: none; font-weight: 600; font-size: 13px; }
+.fl-chip:hover { border-color: var(--accent); }
+.fl-chip img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.fl-unfollow { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; }
+.fl-unfollow:hover { color: var(--miss); }
+.pl-follow.on { border-color: var(--accent); color: var(--accent); }
+.sync-card.together { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.sync-card .sc-body + .sc-body { padding-top: 6px; border-top: 1px dashed var(--line); }
+.sc-who { display: inline-flex; align-items: center; gap: 4px; color: var(--text); font-weight: 700; text-decoration: none; }
+.sc-who img { width: 16px; height: 16px; border-radius: 50%; }
+.sc-who:hover { color: var(--accent); }
+
+/* ---------- top bar: brand · menu · actions ---------- */
+.top { gap: 10px 28px; }
+.top-right { margin-left: auto; gap: 10px; }
+.main-nav { display: flex; align-items: stretch; gap: 4px; align-self: stretch; }
+.main-nav a { display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; color: color-mix(in srgb, var(--text) 70%, transparent);
+  text-transform: uppercase; letter-spacing: .08em; font-weight: 700; font-size: 13px; text-decoration: none;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.main-nav a:hover { color: var(--text); }
+.main-nav a.on { color: var(--accent); border-bottom-color: var(--accent); }
+.nav-avatars { display: inline-flex; align-items: center; }
+.nav-avatars:empty { display: none; }
+.nav-avatars img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 2px solid var(--bg); background: var(--panel-2); }
+.nav-avatars img + img { margin-left: -8px; }
+.nav-avatars span { margin-left: 3px; font-size: 11px; letter-spacing: 0; }
+.menu { position: relative; }
+.menu > summary { list-style: none; cursor: pointer; width: 36px; padding: 0; display: grid; place-items: center; height: 34px; font-size: 16px; }
+.menu > summary::-webkit-details-marker { display: none; }
+.menu[open] > summary { border-color: var(--accent); }
+.menu-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 220px; display: grid; gap: 4px; padding: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }
+.menu-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 6px; font-size: 13px; color: var(--muted); }
+.menu-row .btn { min-width: 90px; }
+@media (max-width: 900px) {
+  .main-nav { order: 3; width: 100%; justify-content: flex-start; }
+  .main-nav a { padding: 8px 10px; }
+}
+.top { justify-content: flex-start; }
+.menu-row .theme-toggle, .menu-row .lang-toggle { width: auto; height: auto; padding: 4px 10px; display: inline-block; font-size: 12.5px; }

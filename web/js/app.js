@@ -5,6 +5,7 @@
 //   #/match/<id>?pawn=&ability=&from=&t=   one match: minimap + timeline + tracker
 //   #/about                               how every number is derived
 //   #/player/<account id>?tab=matches|builds   a player: last matches (demo sync) + builds
+//   #/following                           you + players you follow: one merged match feed
 //   #/?account=<SteamID64>                remember your account in this browser (→ your player page)
 //   #/builds · #/build/<id> · #/builds/<player>   hero builds (deadlock-api; js/builds.js)
 
@@ -15,7 +16,7 @@ import { viewHome } from "./home.js";
 import { viewAbout, explain } from "./explain.js";
 import { initDropZone, localList } from "./local.js";
 import { initLang, helpLabel, helpText } from "./lang.js";
-import { applyAccountParam, storedAccount } from "./sync.js";
+import { applyAccountParam, storedAccount, people } from "./account.js";
 
 async function loadAll() {
   const [assets, local] = await Promise.all([loadJSON("data/assets.json"), localList()]);
@@ -38,7 +39,8 @@ async function route() {
     return;
   }
   window.scrollTo({ top: 0 });
-  const nav = parts[0] === "build" ? "builds" : parts[0] === "player" && parts[1] === storedAccount() ? "me" : parts[0] || "home";
+  const nav = { build: "builds", builds: "builds", following: "following", about: "about", match: "home" }[parts[0]]
+    ?? (parts[0] === "player" && people().includes(parts[1]) ? "following" : parts[0] || "home");
   for (const a of document.querySelectorAll("[data-nav]")) a.classList.toggle("on", a.dataset.nav === nav);
 
   if (parts[0] === "match" && parts[1]) {
@@ -52,6 +54,10 @@ async function route() {
     S.view = "player";
     const { viewPlayer } = await import("./player.js");
     await viewPlayer(acc, params);
+  } else if (parts[0] === "following") {
+    S.view = "following";
+    const { viewFollowing } = await import("./player.js");
+    await viewFollowing();
   } else if (parts[0] === "builds" || parts[0] === "build") {
     // loaded on demand: only these pages talk to deadlock-api
     S.view = "builds";
@@ -165,24 +171,31 @@ function initRem() {
 
 // ------------------------------------------------------------------ your account (top bar)
 
-/** your Steam avatar in the top bar, once your account is remembered in this browser */
+/** "Following" in the menu: avatars of you + the players you follow */
 async function initMe() {
   const btn = $("#me-btn");
   const update = async () => {
-    const acc = storedAccount();
-    btn.hidden = !acc;
-    if (!acc) return;
-    btn.href = `#/player/${acc}`;
-    btn.dataset.help = "Your matches & builds";
+    const accs = people();
+    const box = $(".nav-avatars", btn);
+    const shown = accs.slice(0, 3);
+    box.innerHTML = shown.map(() => `<img src="icon.svg" alt="">`).join("") + (accs.length > 3 ? `<span>+${accs.length - 3}</span>` : "");
+    if (!shown.length) return;
     try {
-      const { getProfile } = await import("./builds/api.js");
-      const p = await getProfile(acc);
-      if (p?.avatar) $("img", btn).src = p.avatar;
-      if (p?.name) btn.dataset.help = `${p.name}\nYour matches & builds`;
-    } catch { /* offline: the placeholder stays */ }
+      const { getProfiles } = await import("./builds/api.js");
+      const ps = await getProfiles(shown);
+      [...box.querySelectorAll("img")].forEach((img, k) => { if (ps[shown[k]]?.avatar) img.src = ps[shown[k]].avatar; });
+    } catch { /* offline: placeholders stay */ }
   };
   window.addEventListener("dldi-account", update);
   update();
+}
+
+/** the settings menu (theme, language) closes on outside clicks and Escape */
+function initMenus() {
+  for (const d of document.querySelectorAll("details.menu")) {
+    document.addEventListener("click", (ev) => { if (d.open && !d.contains(ev.target)) d.open = false; });
+    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") d.open = false; });
+  }
 }
 
 function initTheme() {
@@ -193,7 +206,7 @@ function initTheme() {
     else delete document.documentElement.dataset.theme;
     document.querySelector('meta[name="color-scheme"]')?.setAttribute("content", light ? "light" : "dark");
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", light ? "#f4f5f7" : "#0a0b0d");
-    btn.textContent = light ? "☾" : "☀";
+    btn.textContent = light ? "☀ light" : "☾ dark";
     btn.title = light ? "switch to dark" : "switch to light";
   };
   apply(document.documentElement.dataset.theme);
@@ -226,6 +239,7 @@ async function main() {
   initHelp();
   initRem();
   initMe();
+  initMenus();
   initDropZone();
   initLang();
   window.addEventListener("hashchange", route);

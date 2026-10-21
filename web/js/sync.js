@@ -1,9 +1,8 @@
-// A player's last matches (the player page's Matches tab), synced in the browser. Your own
-// account can be remembered in this browser (open #/?account=<SteamID64 or account id>, or
-// "this is me" on your player page; #/?account= forgets it). Nothing about it is in the site's
-// code or on any server.
+// Last matches with demo sync: one player's (the player page's Matches tab) or several merged
+// (#/following: you and the players you follow). Who you are and who you follow is remembered in
+// this browser only (js/account.js).
 //
-// Everything runs in the page: the browser asks deadlock-api for the match history and each
+// Everything runs in the page: the browser asks deadlock-api for the match histories and each
 // match's salts, and parses demos like dropped files. A page can't read Valve's replay servers
 // itself (plain http, no CORS headers), so a demo is downloaded by the browser like any file.
 // In Chrome / Edge you can give the page one folder to read (your Downloads, or the game's
@@ -12,40 +11,10 @@
 import { esc, S, ago } from "./ui.js";
 import { fmtClock } from "./timeline.js";
 import { openDemoFiles } from "./local.js";
+import { getProfiles } from "./builds/api.js";
 
 const API = "https://api.deadlock-api.com/v1";
-const KEY = "dldi.account";
 const COUNT = 40;
-const STEAM64_BASE = 76561197960265728n;
-
-// ------------------------------------------------------------------ the account (this browser only)
-
-export function storedAccount() {
-  try { return localStorage.getItem(KEY) || null; } catch { return null; }
-}
-
-/** remember (or with null forget) your account in this browser */
-export function setStoredAccount(id) {
-  try {
-    if (id == null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, String(id));
-  } catch { /* storage blocked */ }
-  window.dispatchEvent(new Event("dldi-account"));
-}
-
-/** #/?account=… stores (or with an empty value forgets) the account; returns true if it changed */
-export function applyAccountParam(params) {
-  if (!params.has("account")) return false;
-  const raw = params.get("account").trim();
-  if (!raw) setStoredAccount(null);
-  else if (/^\d{1,20}$/.test(raw)) {
-    const n = BigInt(raw);
-    setStoredAccount(String(n > 0xffffffffn ? n - STEAM64_BASE : n));
-  }
-  // keep the id out of the address bar and history
-  params.delete("account");
-  history.replaceState(null, "", `${location.pathname}${location.search}#/${params.size ? `?${params}` : ""}`);
-  return true;
-}
 
 // ------------------------------------------------------------------ data
 
@@ -63,6 +32,7 @@ const state = new Map();
 const salts = new Map(); // match id -> demo URL
 const note = new Map(); // match id -> status line
 const cache = new Map(); // account -> { at, rows }
+let profiles = {}; // account -> Steam profile (merged feeds show who played)
 let busy = false;
 
 async function loadHistory(acc) {
@@ -138,21 +108,32 @@ async function scanFolder() {
 const synced = (id) => (S.localMatches || []).some((m) => m.match_id === id);
 const status = (id) => (synced(id) ? "synced" : folder.files.has(id) && !["busy", "error"].includes(state.get(id)) ? "folder" : state.get(id) || "checking");
 
-/** a player's last matches with sync, into `mount` (the player page's Matches tab) */
-export async function renderMatches(mount, acc) {
+/** last matches with sync, into `mount`. `accs`: one account, or several (merged: a match
+ *  several of them played shows up once, with each of them) */
+export async function renderMatches(mount, accs) {
+  accs = [].concat(accs).map(String);
   mount.classList.add("sync");
   mount.innerHTML = `<p class="muted">Loading match history from deadlock-api…</p>`;
   let rows;
   try {
-    [rows] = await Promise.all([loadHistory(acc), loadFolder()]);
+    const [histories] = await Promise.all([Promise.all(accs.map((a) => loadHistory(a).catch(() => []))), loadFolder()]);
+    const byMatch = new Map();
+    histories.forEach((list, k) => {
+      for (const r of list) {
+        if (!byMatch.has(r.match_id)) byMatch.set(r.match_id, { ...r, who: [] });
+        byMatch.get(r.match_id).who.push({ acc: accs[k], ...r });
+      }
+    });
+    rows = [...byMatch.values()].sort((a, b) => (b.start_time || 0) - (a.start_time || 0)).slice(0, COUNT);
+    if (accs.length > 1) profiles = { ...profiles, ...(await getProfiles(accs).catch(() => ({}))) };
     await scanFolder();
   } catch (err) {
     mount.innerHTML = `<p class="bad">Couldn't load the match history from deadlock-api: ${esc(err.message)}</p>`;
     return;
   }
   for (const r of rows) if (!state.has(r.match_id)) state.set(r.match_id, "checking");
-  if (!rows.length) { mount.innerHTML = `<p class="muted">deadlock-api has no matches for this player.</p>`; return; }
-  const draw = () => { if (mount.isConnected) mount.innerHTML = sectionHTML(rows); };
+  if (!rows.length) { mount.innerHTML = `<p class="muted">deadlock-api has no matches for ${accs.length > 1 ? "these players" : "this player"}.</p>`; return; }
+  const draw = () => { if (mount.isConnected) mount.innerHTML = sectionHTML(rows, accs.length > 1); };
   draw();
   mount.addEventListener("click", async (ev) => {
     const dl = ev.target.closest("[data-download]");
@@ -209,7 +190,7 @@ function folderHTML() {
   return `<span class="muted small" data-help="${help}">watching “${esc(folder.handle.name)}”</span><button class="btn small" data-pick-folder>change</button>`;
 }
 
-function sectionHTML(rows) {
+function sectionHTML(rows, named) {
   const inFolder = rows.filter((r) => status(r.match_id) === "folder");
   const done = rows.filter((r) => synced(r.match_id)).length;
   return `
@@ -219,38 +200,44 @@ function sectionHTML(rows) {
       ${folderHTML()}
       <button class="drop-strip" data-pick-demo data-help="Drop a demo&#10;Drop a .dem / .dem.bz2 anywhere on the page, or click to pick one.">⤓ drop a demo here</button>
     </div>
-    <section class="match-grid sync-grid">${rows.map(cardHTML).join("")}</section>`;
+    <section class="match-grid sync-grid">${rows.map((r) => cardHTML(r, named)).join("")}</section>`;
 }
 
-function cardHTML(r) {
+/** one followed player's line on a card: hero, win / loss, K/D/A */
+function whoHTML(w, named) {
+  const hero = S.assets.hero(w.hero_id);
+  const won = w.match_result === w.player_team;
+  const p = profiles[w.acc];
+  return `<img class="sc-hero" src="${esc(hero.icon)}" alt="" data-help="${esc(hero.name)}">
+    <div class="sc-line">${named ? `<a class="sc-who" href="#/player/${w.acc}">${p?.avatar ? `<img src="${esc(p.avatar)}" alt="">` : ""}${esc(p?.name || w.acc)}</a> · ` : ""}<b class="${won ? "good" : "bad"}">${won ? "Win" : "Loss"}</b> · ${esc(hero.name)}</div>
+    <div class="sc-line muted">${w.player_kills}/${w.player_deaths}/${w.player_assists} · ${(w.net_worth / 1000).toFixed(1)}k souls · lvl ${w.hero_level}</div>`;
+}
+
+/** `named`: a merged feed, so each line says who played */
+function cardHTML(r, named) {
   const id = r.match_id;
-  const hero = S.assets.hero(r.hero_id);
-  const won = r.match_result === r.player_team;
+  const who = r.who || [r];
   const st = status(id);
   const url = salts.get(id);
   const where = folder.granted ? `lands in “${esc(folder.handle.name)}”, then syncs` : "then drop it onto the page";
   const action = {
     synced: `<a class="btn small" href="#/match/${id}">open</a>`,
     folder: `<button class="btn primary small" data-sync="${id}" ${busy ? "disabled" : ""}>sync</button><small>demo in the folder</small>`,
-    ready: `<a class="btn primary small" href="${esc(url)}" target="_blank" rel="noopener" data-download="${id}" data-help="Download the demo&#10;From Valve's replay servers. They're plain http, so your browser may ask before keeping the file.">download demo</a><small>${where}</small>`,
-    waiting: `<a class="btn small" href="${esc(url)}" target="_blank" rel="noopener" data-download="${id}">again</a><small>${folder.granted ? `waiting for it in “${esc(folder.handle.name)}”…` : "drop it onto the page when it's done"}</small>`,
+    ready: `<a class="btn primary small" href="${esc(url)}" data-download="${id}" data-help="Download the demo&#10;From Valve's replay servers. They're plain http, so your browser may ask before keeping the file.">download demo</a><small>${where}</small>`,
+    waiting: `<a class="btn small" href="${esc(url)}" data-download="${id}">again</a><small>${folder.granted ? `waiting for it in “${esc(folder.handle.name)}”…` : "drop it onto the page when it's done"}</small>`,
     none: `<button class="btn small" data-steam="${id}" data-help="Ask deadlock-api for the demo link&#10;deadlock-api (deadlock-api.com, a community API, not Valve) doesn't have this match's replay salt yet. This asks it to look it up from Steam, which it can only do about 10 times per 30 minutes.">ask deadlock-api</button><small>no demo link known yet</small>`,
     gone: `<small>no demo available</small>`,
     checking: `<small>checking…</small>`,
     busy: `<small>${esc(note.get(id) || "working…")}</small>`,
     error: `${folder.files.has(id) ? `<button class="btn small" data-sync="${id}">retry</button>` : ""}<small class="err">${esc(note.get(id) || "failed")}</small>`,
   }[st];
-  return `<div class="match-card sync-card ${st === "synced" ? "is-synced" : ""}" data-mid="${id}" data-state="${st}">
+  return `<div class="match-card sync-card ${st === "synced" ? "is-synced" : ""} ${who.length > 1 ? "together" : ""}" data-mid="${id}" data-state="${st}">
     <div class="mc-top">
       <b>#${id}</b>
       <span class="muted">${fmtClock(r.match_duration_s || 0)}</span>
       <span class="muted small">${r.start_time ? ago(new Date(r.start_time * 1000)) : ""}</span>
     </div>
-    <div class="sc-body">
-      <img class="sc-hero" src="${esc(hero.icon)}" alt="" data-help="${esc(hero.name)}">
-      <div class="sc-line"><b class="${won ? "good" : "bad"}">${won ? "Win" : "Loss"}</b> · ${esc(hero.name)}</div>
-      <div class="sc-line muted">${r.player_kills}/${r.player_deaths}/${r.player_assists} · ${(r.net_worth / 1000).toFixed(1)}k souls · lvl ${r.hero_level}</div>
-    </div>
+    ${who.map((w) => `<div class="sc-body">${whoHTML(w, named)}</div>`).join("")}
     <div class="sc-action">${action}</div>
   </div>`;
 }

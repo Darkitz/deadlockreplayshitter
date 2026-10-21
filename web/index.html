@@ -35,15 +35,23 @@
       <p id="subtitle" class="muted">Deadlock Demo Insight · in your browser</p>
     </div>
   </a>
+  <nav class="main-nav" aria-label="main">
+    <a href="#/" data-nav="home" data-help="Matches&#10;Drop or open a demo; the matches you opened in this browser.">Matches</a>
+    <a href="#/following" data-nav="following" id="me-btn" data-help="Following&#10;You and the players you follow: their last matches in one list.">Following<span class="nav-avatars"></span></a>
+    <a href="#/builds" data-nav="builds" data-help="Builds&#10;Look up any hero build by ID, or a player's builds, and copy the in-game share string.">Builds</a>
+  </nav>
   <div class="top-right">
     <button class="rem-btn" id="rem-btn" data-help="Rem&#10;&quot;Could you maybe stop doing that?&quot; — his reply, straight from the game files." aria-label="play Rem">
       <img class="rem-face" src="assets/game/heroes/familiar_sm_psd.png" alt="">
       <span class="rem-label">Rem</span>
     </button>
-    <button class="btn lang-toggle" id="lang-toggle" title="language">EN</button>
-    <button class="btn theme-toggle" id="theme-toggle" title="switch light / dark" aria-label="switch light / dark">☀</button>
-    <a class="me-btn" id="me-btn" data-nav="me" hidden><img src="icon.svg" alt="you"></a>
-    <a class="btn nav-builds" href="#/builds" data-nav="builds" data-help="Hero builds&#10;Look up any build by ID, or every build a player published, and copy the in-game share string. Loads from deadlock-api.com.">builds</a>
+    <details class="menu" id="settings-menu">
+      <summary class="btn menu-btn" aria-label="settings" title="theme, language">⚙</summary>
+      <div class="menu-pop">
+        <div class="menu-row"><span>Theme</span><button class="btn small theme-toggle" id="theme-toggle" aria-label="switch light / dark">☀</button></div>
+        <div class="menu-row"><span>Language</span><button class="btn small lang-toggle" id="lang-toggle">EN</button></div>
+      </div>
+    </details>
     <button class="btn primary open-demo" data-open-demo data-help="Open a demo&#10;Click to pick a .dem / .dem.bz2, or drop it here (anywhere on the page works too).&#10;It's parsed right here in your browser; nothing is uploaded."><span class="od-icon" aria-hidden="true">⤓</span> open demo</button>
   </div>
 </header>

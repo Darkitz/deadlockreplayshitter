@@ -158,7 +158,7 @@ function showHome() {
       ${lookupForm(true)}
       <div class="bp-examples muted">try: <a href="#/build/897781">#897781 (Violet)</a> <a href="#/build/1174">#1174 (old Infernus)</a>
         <a href="#/player/93543378?tab=builds">a player's builds</a></div>
-      <p class="note">Opened a demo? Every player's selected build is linked on its <b>Summary</b> scoreboard.</p>
+      <p class="note">Opened a demo? Every player's selected build is linked on its <b>Summary</b> scoreboard, and their names lead to their player page with all their builds.</p>
       <div class="bp-online">
         <h3>NEEDS THE INTERNET</h3>
         <ul>
