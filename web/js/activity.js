@@ -7,7 +7,7 @@ import { fmtClock } from "./timeline.js";
 import { getProfiles, getPlayer } from "./builds/api.js";
 import { loadHistory } from "./sync.js";
 
-const DAYS = 5;
+const DAYS = 14;
 const MODE = { 1: "an unranked", 2: "a private", 3: "a bot", 4: "a ranked", 7: "a Hero Labs" };
 const SHOWN = 40;
 
@@ -83,7 +83,7 @@ export async function renderActivity(el, accs) {
   });
   events.sort((a, b) => b.t - a.t);
   if (!el.isConnected) return;
-  if (!events.length) { el.innerHTML = `<p class="muted">Nothing in the last ${DAYS} days.</p>`; return; }
+  if (!events.length) { el.innerHTML = `<p class="muted">Nothing in the last two weeks.</p>`; return; }
   const line = (e, i) => `<li class="ac-${e.kind} ${i >= SHOWN ? "extra" : ""}"><span class="ac-t" title="${new Date(e.t * 1000).toLocaleString()}">${ago(new Date(e.t * 1000))}</span><span>${e.text}</span></li>`;
   el.innerHTML = `<ol class="ac-log">${events.map(line).join("")}</ol>${events.length > SHOWN ? `<button class="sr-more" data-ac-more>show all ${events.length}</button>` : ""}`;
   el.querySelector("[data-ac-more]")?.addEventListener("click", (ev) => { el.classList.add("all"); ev.target.remove(); });

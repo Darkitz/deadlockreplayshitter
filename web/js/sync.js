@@ -38,7 +38,7 @@ let busy = false;
 export async function loadHistory(acc) {
   const hit = cache.get(acc);
   if (hit && Date.now() - hit.at < 120_000) return hit.rows;
-  const rows = (await getJSON(`${API}/players/${acc}/match-history`)).slice(0, COUNT);
+  const rows = await getJSON(`${API}/players/${acc}/match-history`); // all of it (the activity feed goes back two weeks)
   cache.set(acc, { at: Date.now(), rows });
   return rows;
 }

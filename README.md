@@ -122,7 +122,7 @@ python3 -m http.server -d web 8000     # http://localhost:8000
 
 **Search** (top bar) has one bar each for players (Steam name, profile link, SteamID), builds
 (id) and matches (id), all looked up on deadlock-api. **Following** lists you and the players you
-follow (☆ on their page) and a feed of the last 5 days: matches (who played together, or against each
+follow (☆ on their page) and a feed of the last 2 weeks: matches (who played together, or against each
 other) and builds created or updated. **share list** makes a link others can follow all of them from. Example: `#/following?list=zxzxh.19q3or.1pt95g.1joyj6`.
 
 ### Player pages: last matches and builds
