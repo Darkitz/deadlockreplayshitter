@@ -91,8 +91,9 @@ export function parseFile(file, matchId, onProgress) {
 
 const looksLikeDemo = (f) => /\.dem(\.bz2)?$/i.test(f.name);
 
-/** parse, store and open dropped / picked files */
-export async function openDemoFiles(files) {
+/** parse, store and open dropped / picked files. `navigate: false` stays on the page (sync);
+ *  returns the last parsed match id, or null */
+export async function openDemoFiles(files, { navigate = true } = {}) {
   const list = [...files].filter(looksLikeDemo);
   const ov = overlay();
   if (!list.length) {
@@ -122,11 +123,12 @@ export async function openDemoFiles(files) {
       lastId = id;
     } catch (err) {
       ov.show(`${head}<p class="bad">Could not parse: ${esc(err.message)}</p>`, true);
-      return;
+      return null;
     }
   }
   ov.hide();
-  if (lastId != null) {
+  if (lastId != null && !navigate) forgetMatch(lastId);
+  else if (lastId != null) {
     // the match view caches loaded matches by id; a re-dropped file must replace the old parse
     forgetMatch(lastId);
     const target = list.length > 1 ? "#/" : `#/match/${lastId}`;
@@ -134,6 +136,7 @@ export async function openDemoFiles(files) {
     if (location.hash === target || (target === "#/" && !location.hash.startsWith("#/match"))) window.dispatchEvent(new HashChangeEvent("hashchange"));
     else location.hash = target;
   }
+  return lastId;
 }
 
 function overlay() {

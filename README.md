@@ -118,6 +118,23 @@ Module workers and WebAssembly need http, not `file://`:
 python3 -m http.server -d web 8000     # http://localhost:8000
 ```
 
+### Your last matches
+
+Open the site once with `#/?account=<SteamID64>` (or a SteamID3 account id). The id is stored
+in that browser only (`#/?account=` forgets it) and the home page lists your last 40 matches
+from deadlock-api's match history as blurred placeholders. The browser asks deadlock-api for
+each match's salts; matches without a known replay salt get **ask Steam** (deadlock-api asks
+Steam, about 10 times per 30 minutes per IP).
+
+Downloading the demo is the one step the page can't do itself: Valve's replay servers are plain
+http without CORS headers, so a page can't read them. The browser downloads it like any file
+(**download demo**; it may ask before keeping an http download). In Chrome and Edge, **pick your
+Downloads folder** once (or the game's replays folder): the page may then read that one folder,
+syncs demos as they land there, and offers one-click **sync** / **sync all** for demos already in
+it. Elsewhere, drop the downloaded file onto the page.
+
+Valve now serves many `.dem.bz2` files zstd-compressed; the parser reads both.
+
 ## Building
 
 ```bash

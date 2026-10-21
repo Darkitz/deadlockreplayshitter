@@ -47,6 +47,18 @@ pub unsafe extern "C" fn dl_parse(ptr: *mut u8, len: usize, match_id: f64) -> i3
             return 1;
         }
         data = out;
+    } else if data.starts_with(&[0x28, 0xb5, 0x2f, 0xfd]) {
+        // newer replays: zstd, still named .dem.bz2
+        let mut out = Vec::with_capacity(len * 3);
+        let res = ruzstd::decoding::StreamingDecoder::new(&data[..])
+            .map_err(|e| e.to_string())
+            .and_then(|mut d| std::io::Read::read_to_end(&mut d, &mut out).map_err(|e| e.to_string()));
+        drop(data);
+        if let Err(e) = res {
+            RESULT.with(|r| *r.borrow_mut() = format!("zstd: {e}").into_bytes());
+            return 1;
+        }
+        data = out;
     }
     let cb: Box<dyn FnMut(f32)> = Box::new(|t| unsafe { progress(t) });
     let res = parse_demo(Cursor::new(&data[..]), match_id as u64, DEFAULT_NOISY_ABILITIES.to_vec(), Some(cb));

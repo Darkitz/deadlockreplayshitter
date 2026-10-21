@@ -4,6 +4,7 @@
 //   #/                                    drop a demo · demos opened in this browser
 //   #/match/<id>?pawn=&ability=&from=&t=   one match: minimap + timeline + tracker
 //   #/about                               how every number is derived
+//   #/?account=<SteamID64>                your last matches on the home page (stored in this browser)
 //   #/builds · #/build/<id> · #/builds/<player>   hero builds (deadlock-api; js/builds.js)
 
 import { loadJSON, Assets, TEAM_NAMES } from "./data.js";
@@ -13,6 +14,7 @@ import { viewHome } from "./home.js";
 import { viewAbout, explain } from "./explain.js";
 import { initDropZone, localList } from "./local.js";
 import { initLang, helpLabel, helpText } from "./lang.js";
+import { applyAccountParam } from "./sync.js";
 
 async function loadAll() {
   const [assets, local] = await Promise.all([loadJSON("data/assets.json"), localList()]);
@@ -29,6 +31,8 @@ async function route() {
   const [path, q] = location.hash.replace(/^#/, "").split("?");
   const params = new URLSearchParams(q || "");
   const parts = (path || "/").split("/").filter(Boolean);
+  // #/?account=… stores your account in this browser for "your last matches" (js/sync.js)
+  if (!parts.length) applyAccountParam(params);
   window.scrollTo({ top: 0 });
   const nav = parts[0] === "build" ? "builds" : parts[0] || "home";
   for (const a of document.querySelectorAll("[data-nav]")) a.classList.toggle("on", a.dataset.nav === nav);

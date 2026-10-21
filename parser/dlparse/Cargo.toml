@@ -20,6 +20,8 @@ name = "dlparse"
 path = "src/lib.rs"
 crate-type = ["rlib", "cdylib"]
 
-# browser build: Valve's replay downloads are .dem.bz2 and browsers can't decompress bzip2
+# browser build: Valve's replay downloads are .dem.bz2 (bzip2, or zstd despite the name) and
+# browsers can't decompress either
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 bzip2-rs = "0.1"
+ruzstd = "0.8"
