@@ -1,0 +1,39 @@
+{
+  // Ctrl+Shift+B starts the site on http://localhost:8767 (a plain static server, like GitHub Pages).
+  // Your matches: open http://localhost:8767/#/?account=<SteamID64> once (stored in that browser only).
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start DLDI",
+      "type": "shell",
+      "command": "python3 -m http.server 8767 --bind 127.0.0.1 -d web",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "dldi",
+        "pattern": { "regexp": "^__never__$" },
+        "background": { "beginsPattern": ".", "endsPattern": "Serving HTTP" }
+      },
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Tests",
+      "type": "shell",
+      "command": "node --test tests/*.test.mjs",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build parser (wasm)",
+      "type": "shell",
+      "command": "tools/build-wasm.sh",
+      "problemMatcher": []
+    },
+    {
+      "label": "Refresh game assets (after a patch)",
+      "type": "shell",
+      "command": "python3 tools/game_assets.py",
+      "problemMatcher": []
+    }
+  ]
+}
