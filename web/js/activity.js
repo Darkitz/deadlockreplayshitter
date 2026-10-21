@@ -1,6 +1,6 @@
 // What the players you follow did lately, one line each (the Following page): matches (played
 // together when several of them were in one) and builds created / updated. From the match
-// histories and build lists deadlock-api has; the last DAYS days.
+// histories and build lists deadlock-api has: the last two weeks, "load more" adds two more.
 
 import { esc, S, ago } from "./ui.js";
 import { fmtClock } from "./timeline.js";
@@ -9,12 +9,10 @@ import { loadHistory } from "./sync.js";
 
 const DAYS = 14;
 const MODE = { 1: "an unranked", 2: "a private", 3: "a bot", 4: "a ranked", 7: "a Hero Labs" };
-const SHOWN = 40;
 
 /** fills `el` with the activity of `accs` (account ids) */
 export async function renderActivity(el, accs) {
   el.innerHTML = `<p class="muted small">Loading activity from deadlock-api…</p>`;
-  const since = Date.now() / 1000 - DAYS * 86400;
   const [profiles, histories, builds] = await Promise.all([
     getProfiles(accs).catch(() => ({})),
     Promise.all(accs.map((a) => loadHistory(a).catch(() => []))),
@@ -25,7 +23,12 @@ export async function renderActivity(el, accs) {
   const list = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
   const local = new Set((S.localMatches || []).map((m) => m.match_id));
   const matchLink = (id, text) => `<a href="${local.has(id) ? `#/match/${id}` : `#/search?m=${id}`}">${text}</a>`;
+  // the oldest thing we know about: "load more" stops there
+  const oldest = Math.min(...histories.flat().map((r) => r.start_time || Infinity), ...builds.flat().map((b) => b.updated || Infinity));
 
+  let days = DAYS;
+  const draw = () => {
+  const since = Date.now() / 1000 - days * 86400;
   const events = [];
   // matches: one line per match, with everyone you follow who played it
   const byMatch = new Map();
@@ -83,8 +86,18 @@ export async function renderActivity(el, accs) {
   });
   events.sort((a, b) => b.t - a.t);
   if (!el.isConnected) return;
-  if (!events.length) { el.innerHTML = `<p class="muted">Nothing in the last two weeks.</p>`; return; }
-  const line = (e, i) => `<li class="ac-${e.kind} ${i >= SHOWN ? "extra" : ""}"><span class="ac-t" title="${new Date(e.t * 1000).toLocaleString()}">${ago(new Date(e.t * 1000))}</span><span>${e.text}</span></li>`;
-  el.innerHTML = `<ol class="ac-log">${events.map(line).join("")}</ol>${events.length > SHOWN ? `<button class="sr-more" data-ac-more>show all ${events.length}</button>` : ""}`;
-  el.querySelector("[data-ac-more]")?.addEventListener("click", (ev) => { el.classList.add("all"); ev.target.remove(); });
+  const weeks = days / 7;
+  const more = oldest < since ? `<div class="ac-more-box"><button class="btn small ac-more" data-ac-more>load 2 more weeks</button>
+      <p class="ac-warn">⚠ Older activity <b>will be inaccurate</b>: deadlock-api only keeps each build's latest version, so
+        earlier creations and updates of a build disappear once it's updated again, and match histories can have gaps.</p></div>`
+    : `<p class="muted small ac-end">That's everything deadlock-api has.</p>`;
+  const line = (e) => `<li class="ac-${e.kind}"><span class="ac-t" title="${new Date(e.t * 1000).toLocaleString()}">${ago(new Date(e.t * 1000))}</span><span>${e.text}</span></li>`;
+  el.innerHTML = (events.length ? `<ol class="ac-log">${events.map(line).join("")}</ol>` : `<p class="muted">Nothing in the last ${weeks} weeks.</p>`) + more;
+  };
+  draw();
+  el.addEventListener("click", (ev) => {
+    if (!ev.target.closest("[data-ac-more]")) return;
+    days += DAYS;
+    draw();
+  });
 }

@@ -96,7 +96,7 @@ export async function viewFollowing(params) {
       <a class="fl-chip" href="#/player/${a}" data-acc="${a}"><img alt="" hidden><span>${a === me ? "you" : esc(a)}</span>${a === me ? "" : `<button class="fl-unfollow" data-unfollow="${a}" data-help="Unfollow">×</button>`}</a>`).join("")
       || `<p class="muted">Nobody yet. Find someone with <a href="#/search">Search</a> (or click a name on a match scoreboard) and press ☆ follow; remember yourself with “this is me” on your own page. Kept in this browser only.
         Or start from <a href="#/following?list=zxzxh.19q3or.1pt95g.1joyj6">an example list</a>.</p>`}</section>
-    ${accs.length ? `<h3 class="sr-h">Last 2 weeks</h3>` : ""}
+    ${accs.length ? `<h3 class="sr-h">Activity</h3>` : ""}
     <section class="fl-activity"></section></div>`;
   $(".pl-page", app).addEventListener("click", async (ev) => {
     if (ev.target.closest("[data-share]")) {
