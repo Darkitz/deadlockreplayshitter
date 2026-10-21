@@ -1,13 +1,13 @@
 // What the players you follow did lately, one line each (the Following page): matches (played
 // together when several of them were in one) and builds created / updated. From the match
-// histories and build lists deadlock-api has: the last two weeks, "load more" adds two more.
+// histories and build lists deadlock-api has: the last 5 days, then 2 weeks, then 2 more per press.
 
 import { esc, S, ago } from "./ui.js";
 import { fmtClock } from "./timeline.js";
 import { getProfiles, getPlayer } from "./builds/api.js";
 import { loadHistory } from "./sync.js";
 
-const DAYS = 14;
+const DAYS = 5; // then two weeks, then two more weeks per press
 const MODE = { 1: "an unranked", 2: "a private", 3: "a bot", 4: "a ranked", 7: "a Hero Labs" };
 
 /** fills `el` with the activity of `accs` (account ids) */
@@ -86,18 +86,19 @@ export async function renderActivity(el, accs) {
   });
   events.sort((a, b) => b.t - a.t);
   if (!el.isConnected) return;
-  const weeks = days / 7;
-  const more = oldest < since ? `<div class="ac-more-box"><button class="btn small ac-more" data-ac-more>load 2 more weeks</button>
+  const span = days < 14 ? `${days} days` : `${days / 7} weeks`;
+  const more = oldest < since ? days < 14 ? `<div class="ac-more-box"><button class="btn small ac-more" data-ac-more>show the last 2 weeks</button></div>`
+    : `<div class="ac-more-box"><button class="btn small ac-more" data-ac-more>load 2 more weeks</button>
       <p class="ac-warn">⚠ Older activity <b>will be inaccurate</b>: deadlock-api only keeps each build's latest version, so
         earlier creations and updates of a build disappear once it's updated again, and match histories can have gaps.</p></div>`
     : `<p class="muted small ac-end">That's everything deadlock-api has.</p>`;
   const line = (e) => `<li class="ac-${e.kind}"><span class="ac-t" title="${new Date(e.t * 1000).toLocaleString()}">${ago(new Date(e.t * 1000))}</span><span>${e.text}</span></li>`;
-  el.innerHTML = (events.length ? `<ol class="ac-log">${events.map(line).join("")}</ol>` : `<p class="muted">Nothing in the last ${weeks} weeks.</p>`) + more;
+  el.innerHTML = (events.length ? `<ol class="ac-log">${events.map(line).join("")}</ol>` : `<p class="muted">Nothing in the last ${span}.</p>`) + more;
   };
   draw();
   el.addEventListener("click", (ev) => {
     if (!ev.target.closest("[data-ac-more]")) return;
-    days += DAYS;
+    days = days < 14 ? 14 : days + 14;
     draw();
   });
 }
