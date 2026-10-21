@@ -169,14 +169,16 @@ export function initDropZone() {
   document.body.append(zone);
   let depth = 0;
   const hasFiles = (ev) => [...(ev.dataTransfer?.types || [])].includes("Files");
-  window.addEventListener("dragenter", (ev) => { if (!hasFiles(ev)) return; depth++; zone.hidden = false; });
-  window.addEventListener("dragleave", () => { depth = Math.max(0, depth - 1); if (!depth) zone.hidden = true; });
+  // while a file is dragged over the page, the top bar's "open demo" lights up as the target
+  const dragging = (on) => { zone.hidden = !on; document.body.classList.toggle("dragging-files", on); };
+  window.addEventListener("dragenter", (ev) => { if (!hasFiles(ev)) return; depth++; dragging(true); });
+  window.addEventListener("dragleave", () => { depth = Math.max(0, depth - 1); if (!depth) dragging(false); });
   window.addEventListener("dragover", (ev) => { if (hasFiles(ev)) ev.preventDefault(); });
   window.addEventListener("drop", (ev) => {
     if (!hasFiles(ev)) return;
     ev.preventDefault();
     depth = 0;
-    zone.hidden = true;
+    dragging(false);
     openDemoFiles(ev.dataTransfer.files);
   });
   const input = document.createElement("input");

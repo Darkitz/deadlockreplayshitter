@@ -1143,3 +1143,30 @@ a.btn { display: inline-block; color: var(--text); text-decoration: none; }
 .sync-card .sc-action small { color: var(--muted); font-size: 11.5px; }
 .sync-card .sc-action small.err { color: var(--miss); }
 .sync-card.is-synced { border-color: color-mix(in srgb, var(--hit) 40%, var(--line)); }
+
+/* ---------- "open demo": also a drop target ---------- */
+.open-demo { display: inline-flex; align-items: center; gap: 6px; border-style: dashed !important; border-width: 1.5px !important; }
+.open-demo .od-icon { font-size: 16px; line-height: 1; }
+body.dragging-files .open-demo { border-color: var(--accent) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+  animation: od-pulse 1s ease-in-out infinite alternate; position: relative; z-index: 101; }
+@keyframes od-pulse { to { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 15%, transparent); } }
+
+/* ---------- your avatar in the top bar ---------- */
+.me-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; overflow: hidden; border: 1.5px solid var(--line); }
+.me-btn img { width: 100%; height: 100%; object-fit: cover; }
+.me-btn:hover, .me-btn.on { border-color: var(--accent); }
+
+/* ---------- player page (js/player.js) ---------- */
+.pl-head { display: flex; align-items: center; gap: 16px; margin: 6px 0 14px; }
+.pl-avatar { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; border: 1px solid var(--line); }
+.pl-name { margin: 0 0 4px; font-size: 26px; }
+.pl-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.pl-source { margin-left: auto; align-self: center; }
+.pl-body { margin-top: 14px; display: grid; gap: 14px; }
+.sync-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+.drop-strip { margin-left: auto; padding: 6px 14px; border-radius: 8px; border: 1.5px dashed color-mix(in srgb, var(--accent) 50%, var(--line));
+  background: color-mix(in srgb, var(--accent) 5%, transparent); color: var(--muted); cursor: pointer; font: inherit; font-size: 13px; }
+.drop-strip:hover, body.dragging-files .drop-strip { color: var(--text); border-color: var(--accent); }
+.pg-board .pg-who a.pg-player { color: inherit; text-decoration: none; }
+.pg-board .pg-who a.pg-player:hover b { color: var(--accent); }
+.sync-card .sc-action .btn { white-space: nowrap; flex-shrink: 0; }

@@ -7,7 +7,7 @@
 //   #/builds                    look up a build ID / player
 //   #/build/<id>[/v/<n>]        a build (latest or an old version); from a match also
 //                               ?hero=&author=&name=&origin= to recognize private copies
-//   #/builds/<account>          every build a player published
+//   #/builds/<account>          redirects to the player page's builds tab (#/player/<id>?tab=builds)
 
 import { $, S, esc, itemHelp } from "./ui.js";
 import { Cooldown, getBuild, getPlayer, parseAccount, withMeta } from "./builds/api.js";
@@ -69,8 +69,8 @@ export function lookupHash(raw) {
   const s = raw.trim();
   const steam = s.match(/steamcommunity\.com\/profiles\/(\d+)/)?.[1] ?? s.match(/^(?:player[:/ ]?|\[?U:1:)(\d+)\]?$/i)?.[1];
   const id = s.replace(/^#\/?(build\/)?/, "");
-  if (steam && parseAccount(steam)) return `#/builds/${steam}`;
-  if (/^\d{11,}$/.test(id) && parseAccount(id)) return `#/builds/${id}`; // SteamID64
+  if (steam && parseAccount(steam)) return `#/player/${parseAccount(steam)}?tab=builds`;
+  if (/^\d{11,}$/.test(id) && parseAccount(id)) return `#/player/${parseAccount(id)}?tab=builds`; // SteamID64
   if (/^\d{1,10}$/.test(id) && Number(id) <= 0xffffffff) return `#/build/${id}`;
   if (/steamcommunity\.com\/id\//.test(s)) return "vanity";
   return null;
@@ -137,8 +137,11 @@ export async function viewBuilds(parts, params) {
   current = null;
   if (parts[0] === "build" && parts[1]) return showBuild(parts[1], parts[2] === "v" ? parts[3] : null, params);
   if (parts[1]) {
+    // a player's builds live on the player page now
     const account = parseAccount(parts[1]);
-    return account ? showPlayer(account) : message("Player ID must be a SteamID3 or SteamID64", "bp-error");
+    if (account) location.replace(`#/player/${account}?tab=builds`);
+    else message("Player ID must be a SteamID3 or SteamID64", "bp-error");
+    return;
   }
   showHome();
 }
@@ -154,7 +157,7 @@ function showHome() {
         Or a SteamID64 / Steam profile link for every build that player published.</p>
       ${lookupForm(true)}
       <div class="bp-examples muted">try: <a href="#/build/897781">#897781 (Violet)</a> <a href="#/build/1174">#1174 (old Infernus)</a>
-        <a href="#/builds/93543378">a player's builds</a></div>
+        <a href="#/player/93543378?tab=builds">a player's builds</a></div>
       <p class="note">Opened a demo? Every player's selected build is linked on its <b>Summary</b> scoreboard.</p>
       <div class="bp-online">
         <h3>NEEDS THE INTERNET</h3>
@@ -273,7 +276,7 @@ function privateCopy(id, hint, found) {
         has its name. ${found ? `(Build #${esc(id)} on deadlock-api is someone else's ${esc(heroName(found.hero_id))} build.)` : ""}</p>
       <div class="bp-examples">
         ${hint.origin ? `<a class="btn primary" href="#/build/${hint.origin}">the build it was copied from (#${hint.origin})</a>` : ""}
-        <a class="btn" href="#/builds/${hint.author}">builds published by its author</a>
+        <a class="btn" href="#/player/${hint.author}?tab=builds">builds published by its author</a>
       </div>
     </section>`;
 }
@@ -316,7 +319,7 @@ async function showBuild(id, version, params, preloaded) {
         <h2>${esc(build.name || "Untitled build")}</h2>
         <div class="bp-sub"><b>${esc(hero.name)}</b> · #${build.hero_build_id} v${build.version}${updated ? ` · updated ${updated}` : ""}
           · ★ ${stats.favorites.toLocaleString()} favorites
-          ${build.author_account_id ? ` · <a href="#/builds/${build.author_account_id}">all builds by this author</a>` : ""}</div>
+          ${build.author_account_id ? ` · <a href="#/player/${build.author_account_id}?tab=builds">all builds by this author</a>` : ""}</div>
         ${hint?.player ? `<p class="note bp-from-match">${esc(hint.player)} played this build in the match you came from.</p>` : ""}
         ${build.description ? `<p class="bp-desc">${esc(build.description)}</p>` : ""}
         ${version ? `<p class="note">Old version ${esc(version)}. <a href="#/build/${id}">Show latest</a></p>` : refreshHTML}
@@ -393,30 +396,25 @@ async function showBuild(id, version, params, preloaded) {
 const buildsText = (rows, header) =>
   [header, "", ...rows.flatMap((b) => [`# ${heroName(b.hero_id)} — ${b.name || "Untitled build"} (v${b.version}) ${pageUrl(`#/build/${b.id}`)}`, b.share, ""])].join("\n");
 
-async function showPlayer(account, preloaded) {
-  const rid = renderId;
-  if (!preloaded) message("Loading builds…");
+/** a player's published builds, into `root` (the player page's builds tab) */
+export async function renderPlayerBuilds(root, account, preloaded) {
+  const rid = ++renderId;
+  if (!preloaded) root.innerHTML = `<p class="bp-loading">Loading builds…</p>`;
   let data;
   try {
     data = preloaded ?? withMeta(await getPlayer(account));
   } catch (err) {
-    if (rid === renderId) message(`Couldn't load builds: ${err.message}`, "bp-error");
+    if (rid === renderId && root.isConnected) root.innerHTML = `<p class="bp-error">Couldn't load builds: ${esc(err.message)}</p>`;
     return;
   }
-  if (rid !== renderId) return;
-  // a name from demos opened in this browser, if this player was in one
-  const known = (S.localMatches || []).flatMap((mm) => mm.players || []).find((p) => String(p.account_id) === String(data.account_id));
-  const title = known?.name || `Player ${data.account_id}`;
-  document.title = `Builds by ${title} · DLDI`;
+  if (rid !== renderId || !root.isConnected) return;
   const counts = {};
   for (const b of data.builds) counts[b.hero_id] = (counts[b.hero_id] ?? 0) + 1;
 
-  const root = app();
   root.innerHTML = `
     <section class="bp-p-head">
       <div>
-        <h2>${esc(title)}</h2>
-        <div class="bp-sub"><b class="bp-total"></b> · <a href="https://steamcommunity.com/profiles/${data.steam_id64}" target="_blank" rel="noopener">Steam profile</a></div>
+        <div class="bp-sub"><b class="bp-total"></b></div>
         ${refreshHTML}
       </div>
       <div class="bp-actions"><button type="button" class="btn primary bp-copy-all">copy shown</button><button type="button" class="btn bp-dl">download all (.txt)</button></div>
@@ -492,7 +490,7 @@ async function showPlayer(account, preloaded) {
     const rows = visible();
     copy(buildsText(rows, `# Deadlock builds by account ${data.account_id}`), `${rows.length} builds`);
   });
-  refreshBar(root, data, async () => withMeta(await getPlayer(account, true)), (fresh) => { renderId++; showPlayer(account, fresh); });
+  refreshBar(root, data, async () => withMeta(await getPlayer(account, true)), (fresh) => renderPlayerBuilds(root, account, fresh));
   draw();
 }
 

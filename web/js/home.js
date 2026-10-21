@@ -28,8 +28,6 @@ export function viewHome() {
     ${list.length ? `
       <h2 class="section-title">Opened in this browser</h2>
       <section class="match-grid">${list.map(card).join("")}</section>` : ""}</div>`;
-  // your own last matches (only with an account stored in this browser: js/sync.js)
-  import("./sync.js").then((mod) => mod.initSync(app)).catch(() => {});
   const pick = $("[data-pick]", app);
   pick.addEventListener("click", () => S.pickDemo?.());
   pick.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); S.pickDemo?.(); } });

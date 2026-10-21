@@ -236,6 +236,18 @@ export const DEEP_DIVES = [
       published, and make the in-game share string. Unlike everything else here they need the internet: your browser
       asks <a href="https://deadlock-api.com" target="_blank" rel="noopener">deadlock-api.com</a> directly. Replay
       analysis never does.</p>
+      <h4>What deadlock-api is</h4>
+      <p><a href="https://deadlock-api.com" target="_blank" rel="noopener">deadlock-api.com</a> is a free community API for
+      Deadlock data: builds, match histories, Steam names and avatars, and the salts that make up a demo's download link.
+      It's neither Valve nor us. Build pages and player pages ask it straight from your browser.</p>
+      <h4>Player pages: last matches</h4>
+      <p>A player's <b>Matches</b> tab lists their last 40 matches from deadlock-api's match history. A match's demo lives on
+      Valve's replay servers, at a link made from its replay salt. When deadlock-api doesn't know the salt yet,
+      <b>ask deadlock-api</b> makes it look the salt up from Steam (about 10 per 30 minutes). Valve's replay servers are
+      plain http without CORS headers, so a page can't read them: the browser downloads the demo like any file. In Chrome
+      and Edge you can let the page read one folder (your Downloads, or the game's replays folder); demos that land there
+      are parsed by themselves. Elsewhere you drop the file onto the page. Remember your own account with <b>this is me</b>
+      (stored in this browser only).</p>
       <h4>Which build each player ran</h4>
       <p>Every hero in a demo carries the build its player had selected (<code>m_sHeroBuildSerialized</code>, a
       <code>CMsgHeroBuild</code>). The game sends it as a C string, so the demo only keeps it up to its first zero byte:

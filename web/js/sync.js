@@ -1,6 +1,7 @@
-// Your last matches, synced in the browser. Only shows up once an account is stored in this
-// browser (open #/?account=<SteamID64 or account id>; #/?account= forgets it). Nothing about
-// the account is in the site's code or on any server.
+// A player's last matches (the player page's Matches tab), synced in the browser. Your own
+// account can be remembered in this browser (open #/?account=<SteamID64 or account id>, or
+// "this is me" on your player page; #/?account= forgets it). Nothing about it is in the site's
+// code or on any server.
 //
 // Everything runs in the page: the browser asks deadlock-api for the match history and each
 // match's salts, and parses demos like dropped files. A page can't read Valve's replay servers
@@ -8,7 +9,7 @@
 // In Chrome / Edge you can give the page one folder to read (your Downloads, or the game's
 // replays folder): demos that land there are picked up and parsed by themselves.
 
-import { $, esc, S, ago } from "./ui.js";
+import { esc, S, ago } from "./ui.js";
 import { fmtClock } from "./timeline.js";
 import { openDemoFiles } from "./local.js";
 
@@ -23,17 +24,23 @@ export function storedAccount() {
   try { return localStorage.getItem(KEY) || null; } catch { return null; }
 }
 
+/** remember (or with null forget) your account in this browser */
+export function setStoredAccount(id) {
+  try {
+    if (id == null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, String(id));
+  } catch { /* storage blocked */ }
+  window.dispatchEvent(new Event("dldi-account"));
+}
+
 /** #/?account=… stores (or with an empty value forgets) the account; returns true if it changed */
 export function applyAccountParam(params) {
   if (!params.has("account")) return false;
   const raw = params.get("account").trim();
-  try {
-    if (!raw) localStorage.removeItem(KEY);
-    else if (/^\d{1,20}$/.test(raw)) {
-      const n = BigInt(raw);
-      localStorage.setItem(KEY, String(n > 0xffffffffn ? n - STEAM64_BASE : n));
-    }
-  } catch { /* storage blocked: nothing to remember */ }
+  if (!raw) setStoredAccount(null);
+  else if (/^\d{1,20}$/.test(raw)) {
+    const n = BigInt(raw);
+    setStoredAccount(String(n > 0xffffffffn ? n - STEAM64_BASE : n));
+  }
   // keep the id out of the address bar and history
   params.delete("account");
   history.replaceState(null, "", `${location.pathname}${location.search}#/${params.size ? `?${params}` : ""}`);
@@ -55,13 +62,14 @@ const getJSON = async (url) => {
 const state = new Map();
 const salts = new Map(); // match id -> demo URL
 const note = new Map(); // match id -> status line
-let cache = null; // { acc, at, rows }
+const cache = new Map(); // account -> { at, rows }
 let busy = false;
 
 async function loadHistory(acc) {
-  if (cache?.acc === acc && Date.now() - cache.at < 120_000) return cache.rows;
+  const hit = cache.get(acc);
+  if (hit && Date.now() - hit.at < 120_000) return hit.rows;
   const rows = (await getJSON(`${API}/players/${acc}/match-history`)).slice(0, COUNT);
-  cache = { acc, at: Date.now(), rows };
+  cache.set(acc, { at: Date.now(), rows });
   return rows;
 }
 
@@ -130,23 +138,20 @@ async function scanFolder() {
 const synced = (id) => (S.localMatches || []).some((m) => m.match_id === id);
 const status = (id) => (synced(id) ? "synced" : folder.files.has(id) && !["busy", "error"].includes(state.get(id)) ? "folder" : state.get(id) || "checking");
 
-/** the "your last matches" section on the home page (only with an account stored here) */
-export async function initSync(app) {
-  const acc = storedAccount();
-  if (!acc) return;
-  const mount = document.createElement("div");
-  mount.className = "sync";
-  $(".home", app)?.append(mount);
-  mount.innerHTML = `<h2 class="section-title">Your last ${COUNT} matches <span class="muted small">loading match history…</span></h2>`;
+/** a player's last matches with sync, into `mount` (the player page's Matches tab) */
+export async function renderMatches(mount, acc) {
+  mount.classList.add("sync");
+  mount.innerHTML = `<p class="muted">Loading match history from deadlock-api…</p>`;
   let rows;
   try {
     [rows] = await Promise.all([loadHistory(acc), loadFolder()]);
     await scanFolder();
   } catch (err) {
-    mount.innerHTML = `<h2 class="section-title">Your last matches</h2><p class="bad">Couldn't load the match history from deadlock-api: ${esc(err.message)}</p>`;
+    mount.innerHTML = `<p class="bad">Couldn't load the match history from deadlock-api: ${esc(err.message)}</p>`;
     return;
   }
   for (const r of rows) if (!state.has(r.match_id)) state.set(r.match_id, "checking");
+  if (!rows.length) { mount.innerHTML = `<p class="muted">deadlock-api has no matches for this player.</p>`; return; }
   const draw = () => { if (mount.isConnected) mount.innerHTML = sectionHTML(rows); };
   draw();
   mount.addEventListener("click", async (ev) => {
@@ -156,12 +161,13 @@ export async function initSync(app) {
       setTimeout(draw, 0);
       return;
     }
-    const b = ev.target.closest("[data-sync], [data-steam], [data-sync-all], [data-pick-folder], [data-allow-folder]");
+    const b = ev.target.closest("[data-sync], [data-steam], [data-sync-all], [data-pick-folder], [data-allow-folder], [data-pick-demo]");
     if (!b || b.disabled) return;
     ev.preventDefault();
     if (b.dataset.syncAll != null) syncAll(rows, draw);
     else if (b.dataset.sync) sync(Number(b.dataset.sync), draw);
     else if (b.dataset.steam) askSteam(Number(b.dataset.steam), draw);
+    else if (b.dataset.pickDemo != null) S.pickDemo?.();
     else {
       if (b.dataset.pickFolder != null) await pickFolder(); else await allowFolder();
       await scanFolder();
@@ -207,10 +213,12 @@ function sectionHTML(rows) {
   const inFolder = rows.filter((r) => status(r.match_id) === "folder");
   const done = rows.filter((r) => synced(r.match_id)).length;
   return `
-    <h2 class="section-title">Your last ${rows.length} matches
-      <span class="muted small" data-help="Your matches&#10;From deadlock-api's match history for the account stored in this browser.&#10;Forget it: open #/?account= (empty).">${done} synced</span>
+    <div class="sync-bar">
+      <span class="muted small" data-help="Last matches&#10;From deadlock-api's match history. Synced ones are parsed and kept in this browser.">${done} of ${rows.length} synced</span>
       ${inFolder.length ? `<button class="btn primary small" data-sync-all ${busy ? "disabled" : ""}>sync all ${inFolder.length}</button>` : ""}
-      ${folderHTML()}</h2>
+      ${folderHTML()}
+      <button class="drop-strip" data-pick-demo data-help="Drop a demo&#10;Drop a .dem / .dem.bz2 anywhere on the page, or click to pick one.">⤓ drop a demo here</button>
+    </div>
     <section class="match-grid sync-grid">${rows.map(cardHTML).join("")}</section>`;
 }
 
@@ -226,7 +234,7 @@ function cardHTML(r) {
     folder: `<button class="btn primary small" data-sync="${id}" ${busy ? "disabled" : ""}>sync</button><small>demo in the folder</small>`,
     ready: `<a class="btn primary small" href="${esc(url)}" target="_blank" rel="noopener" data-download="${id}" data-help="Download the demo&#10;From Valve's replay servers. They're plain http, so your browser may ask before keeping the file.">download demo</a><small>${where}</small>`,
     waiting: `<a class="btn small" href="${esc(url)}" target="_blank" rel="noopener" data-download="${id}">again</a><small>${folder.granted ? `waiting for it in “${esc(folder.handle.name)}”…` : "drop it onto the page when it's done"}</small>`,
-    none: `<button class="btn small" data-steam="${id}" data-help="Ask Steam for the replay salt&#10;deadlock-api doesn't have this match's replay salt stored. It can ask Steam, but only about 10 times per 30 minutes.">ask Steam</button><small>no demo link known yet</small>`,
+    none: `<button class="btn small" data-steam="${id}" data-help="Ask deadlock-api for the demo link&#10;deadlock-api (deadlock-api.com, a community API, not Valve) doesn't have this match's replay salt yet. This asks it to look it up from Steam, which it can only do about 10 times per 30 minutes.">ask deadlock-api</button><small>no demo link known yet</small>`,
     gone: `<small>no demo available</small>`,
     checking: `<small>checking…</small>`,
     busy: `<small>${esc(note.get(id) || "working…")}</small>`,
@@ -260,7 +268,7 @@ async function askSteam(id, draw) {
   } catch (err) {
     state.set(id, err.status === 429 ? "none" : "error");
     note.set(id, err.message);
-    if (err.status === 429) alert("deadlock-api's limit for asking Steam is reached (about 10 per 30 minutes). Try again later.");
+    if (err.status === 429) alert("deadlock-api can only look up about 10 demo links per 30 minutes. Try again later.");
   }
   draw();
 }
@@ -284,7 +292,6 @@ async function sync(id, draw, { single = true } = {}) {
   } finally {
     if (single) busy = false;
     draw();
-    if (single) refreshHome();
   }
 }
 
@@ -295,11 +302,6 @@ async function syncAll(rows, draw) {
     for (const r of rows) if (status(r.match_id) === "folder") await sync(r.match_id, draw, { single: false });
   } finally {
     busy = false;
-    refreshHome();
+    draw();
   }
-}
-
-/** a newly parsed match also belongs in "opened in this browser": redraw the home page */
-function refreshHome() {
-  if (!location.hash.replace(/^#\/?/, "").replace(/^\?.*/, "")) window.dispatchEvent(new HashChangeEvent("hashchange"));
 }

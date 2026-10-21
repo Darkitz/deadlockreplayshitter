@@ -118,13 +118,15 @@ Module workers and WebAssembly need http, not `file://`:
 python3 -m http.server -d web 8000     # http://localhost:8000
 ```
 
-### Your last matches
+### Player pages: last matches and builds
 
-Open the site once with `#/?account=<SteamID64>` (or a SteamID3 account id). The id is stored
-in that browser only (`#/?account=` forgets it) and the home page lists your last 40 matches
-from deadlock-api's match history as blurred placeholders. The browser asks deadlock-api for
-each match's salts; matches without a known replay salt get **ask Steam** (deadlock-api asks
-Steam, about 10 times per 30 minutes per IP).
+`#/player/<SteamID64 or account id>` shows a player's Steam name and avatar and two tabs:
+**Matches** (their last 40 matches from deadlock-api's match history, with demo sync) and
+**Builds** (the builds they published). Scoreboard names link there. Remember your own account
+with **this is me** (or open `#/?account=<SteamID64>` once): it's stored in that browser only,
+and your avatar in the top bar leads to your page. Matches deadlock-api has no replay salt for
+get **ask deadlock-api**: it looks the salt up from Steam, about 10 times per 30 minutes per IP.
+deadlock-api.com is a free community API (not Valve); the browser asks it directly.
 
 Downloading the demo is the one step the page can't do itself: Valve's replay servers are plain
 http without CORS headers, so a page can't read them. The browser downloads it like any file

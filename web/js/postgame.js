@@ -138,7 +138,7 @@ export function renderSummary(el, m, { onPick }) {
         const lv = abilityLevelsAt(m, r.p.pawn, m.end);
         return `<tr data-pawn="${r.p.pawn}" title="open ${esc(r.p.name)} in the replay">
           <td class="pg-icon"><img src="${esc(heroOf(r.p).icon)}" alt=""></td>
-          <td class="pg-who"><b>${esc(r.p.name)}</b><small>${esc(heroOf(r.p).name)}</small>${buildLink(r.p)}</td>
+          <td class="pg-who">${r.p.account_id ? `<a class="pg-player" href="#/player/${r.p.account_id}" data-help="${esc(r.p.name)}&#10;Their last matches and builds">` : ""}<b>${esc(r.p.name)}</b>${r.p.account_id ? "</a>" : ""}<small>${esc(heroOf(r.p).name)}</small>${buildLink(r.p)}</td>
           <td class="pg-mvp-cell">${r.mvp ? ui(r.mvp === 1 ? "mvp_trophy" : "key_trophy", "pg-trophy-sm") : ""}</td>
           ${cols.map(([k, , fmt]) => {
             // the game marks the best value of each column, but not deaths

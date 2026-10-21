@@ -4,7 +4,8 @@
 //   #/                                    drop a demo · demos opened in this browser
 //   #/match/<id>?pawn=&ability=&from=&t=   one match: minimap + timeline + tracker
 //   #/about                               how every number is derived
-//   #/?account=<SteamID64>                your last matches on the home page (stored in this browser)
+//   #/player/<account id>?tab=matches|builds   a player: last matches (demo sync) + builds
+//   #/?account=<SteamID64>                remember your account in this browser (→ your player page)
 //   #/builds · #/build/<id> · #/builds/<player>   hero builds (deadlock-api; js/builds.js)
 
 import { loadJSON, Assets, TEAM_NAMES } from "./data.js";
@@ -14,7 +15,7 @@ import { viewHome } from "./home.js";
 import { viewAbout, explain } from "./explain.js";
 import { initDropZone, localList } from "./local.js";
 import { initLang, helpLabel, helpText } from "./lang.js";
-import { applyAccountParam } from "./sync.js";
+import { applyAccountParam, storedAccount } from "./sync.js";
 
 async function loadAll() {
   const [assets, local] = await Promise.all([loadJSON("data/assets.json"), localList()]);
@@ -31,15 +32,26 @@ async function route() {
   const [path, q] = location.hash.replace(/^#/, "").split("?");
   const params = new URLSearchParams(q || "");
   const parts = (path || "/").split("/").filter(Boolean);
-  // #/?account=… stores your account in this browser for "your last matches" (js/sync.js)
-  if (!parts.length) applyAccountParam(params);
+  // #/?account=… remembers your account in this browser (js/sync.js), then shows your page
+  if (!parts.length && applyAccountParam(params) && storedAccount()) {
+    location.replace(`#/player/${storedAccount()}`);
+    return;
+  }
   window.scrollTo({ top: 0 });
-  const nav = parts[0] === "build" ? "builds" : parts[0] || "home";
+  const nav = parts[0] === "build" ? "builds" : parts[0] === "player" && parts[1] === storedAccount() ? "me" : parts[0] || "home";
   for (const a of document.querySelectorAll("[data-nav]")) a.classList.toggle("on", a.dataset.nav === nav);
 
   if (parts[0] === "match" && parts[1]) {
     S.view = "match";
     await viewMatch(Number(parts[1]), params);
+  } else if (parts[0] === "player" && /^\d{1,20}$/.test(parts[1] || "")) {
+    // loaded on demand: player pages talk to deadlock-api
+    const n = BigInt(parts[1]);
+    const acc = String(n > 0xffffffffn ? n - 76561197960265728n : n);
+    if (acc !== parts[1]) { location.replace(`#/player/${acc}${q ? `?${q}` : ""}`); return; }
+    S.view = "player";
+    const { viewPlayer } = await import("./player.js");
+    await viewPlayer(acc, params);
   } else if (parts[0] === "builds" || parts[0] === "build") {
     // loaded on demand: only these pages talk to deadlock-api
     S.view = "builds";
@@ -151,6 +163,28 @@ function initRem() {
 
 // ------------------------------------------------------------------ light / dark
 
+// ------------------------------------------------------------------ your account (top bar)
+
+/** your Steam avatar in the top bar, once your account is remembered in this browser */
+async function initMe() {
+  const btn = $("#me-btn");
+  const update = async () => {
+    const acc = storedAccount();
+    btn.hidden = !acc;
+    if (!acc) return;
+    btn.href = `#/player/${acc}`;
+    btn.dataset.help = "Your matches & builds";
+    try {
+      const { getProfile } = await import("./builds/api.js");
+      const p = await getProfile(acc);
+      if (p?.avatar) $("img", btn).src = p.avatar;
+      if (p?.name) btn.dataset.help = `${p.name}\nYour matches & builds`;
+    } catch { /* offline: the placeholder stays */ }
+  };
+  window.addEventListener("dldi-account", update);
+  update();
+}
+
 function initTheme() {
   const btn = $("#theme-toggle");
   const apply = (theme) => {
@@ -191,6 +225,7 @@ async function main() {
   }
   initHelp();
   initRem();
+  initMe();
   initDropZone();
   initLang();
   window.addEventListener("hashchange", route);

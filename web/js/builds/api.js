@@ -179,3 +179,34 @@ export async function getPlayer(account, force = false) {
     fetchedAt: entry.fetchedAt,
   };
 }
+
+// ---------- Steam profiles (name + avatar, via deadlock-api; Steam's own API has no CORS) ----------
+
+const PROFILE_TTL = 24 * HOUR;
+
+/** {account id: {name, avatar, avatar_full, url}} for the given ids, cached for a day */
+export async function getProfiles(ids) {
+  const out = {};
+  const missing = [];
+  for (const id of new Set(ids.map(String))) {
+    const hit = await store.get(`steam:${id}`);
+    if (hit && Date.now() - hit.fetchedAt < PROFILE_TTL) out[id] = hit.value;
+    else missing.push(id);
+  }
+  for (let i = 0; i < missing.length; i += 50) {
+    const chunk = missing.slice(i, i + 50);
+    let rows = [];
+    try {
+      rows = (await getJson(`${API}/players/steam?account_ids=${chunk.join(",")}`)) ?? [];
+    } catch {
+      continue; // no names this time; the page shows ids
+    }
+    for (const r of rows) {
+      const p = { name: r.personaname || null, avatar: r.avatarmedium || r.avatar || null, avatar_full: r.avatarfull || null, url: r.profileurl || null };
+      out[String(r.account_id)] = p;
+      store.set(`steam:${r.account_id}`, p);
+    }
+  }
+  return out;
+}
+export const getProfile = async (id) => (await getProfiles([id]))[String(id)] ?? null;
