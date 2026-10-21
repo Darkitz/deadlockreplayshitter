@@ -94,7 +94,8 @@ export async function viewFollowing(params) {
     <p class="muted small">You and the players you follow. Find players with <a href="#/search">Search</a>; their pages have all their matches and builds.</p>
     <section class="fl-people">${accs.map((a) => `
       <a class="fl-chip" href="#/player/${a}" data-acc="${a}"><img alt="" hidden><span>${a === me ? "you" : esc(a)}</span>${a === me ? "" : `<button class="fl-unfollow" data-unfollow="${a}" data-help="Unfollow">×</button>`}</a>`).join("")
-      || `<p class="muted">Nobody yet. Find someone with <a href="#/search">Search</a> (or click a name on a match scoreboard) and press ☆ follow; remember yourself with “this is me” on your own page. Kept in this browser only.</p>`}</section>
+      || `<p class="muted">Nobody yet. Find someone with <a href="#/search">Search</a> (or click a name on a match scoreboard) and press ☆ follow; remember yourself with “this is me” on your own page. Kept in this browser only.
+        Or start from <a href="#/following?list=zxzxh.19q3or.1pt95g.1joyj6">an example list</a>.</p>`}</section>
     ${accs.length ? `<h3 class="sr-h">Last 5 days</h3>` : ""}
     <section class="fl-activity"></section></div>`;
   $(".pl-page", app).addEventListener("click", async (ev) => {
