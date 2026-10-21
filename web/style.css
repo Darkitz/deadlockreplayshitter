@@ -1132,9 +1132,7 @@ a.btn { display: inline-block; color: var(--text); text-decoration: none; }
 .sync .section-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .sync-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
 .sync-card { position: relative; overflow: hidden; }
-.sync-card .sc-body { display: grid; grid-template-columns: 44px 1fr; column-gap: 10px; align-items: center;
-  filter: blur(1.6px) grayscale(.5); opacity: .55; transition: filter .15s, opacity .15s; }
-.sync-card:hover .sc-body, .sync-card.is-synced .sc-body { filter: none; opacity: 1; }
+.sync-card .sc-body { display: grid; grid-template-columns: 44px 1fr; column-gap: 10px; align-items: center; }
 .sync-card .sc-hero { grid-row: span 2; width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: var(--panel-2); }
 .sync-card .sc-line { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sync-card .sc-line .good { color: var(--hit); }
