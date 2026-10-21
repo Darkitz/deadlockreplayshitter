@@ -5,7 +5,8 @@
 //   #/match/<id>?pawn=&ability=&from=&t=   one match: minimap + timeline + tracker
 //   #/about                               how every number is derived
 //   #/player/<account id>?tab=matches|builds   a player: last matches (demo sync) + builds
-//   #/following                           you + players you follow: one merged match feed
+//   #/search?p=&b=&m=                     find players / builds / matches (deadlock-api)
+//   #/following                           you + players you follow (merged match feed)
 //   #/?account=<SteamID64>                remember your account in this browser (→ your player page)
 //   #/builds · #/build/<id> · #/builds/<player>   hero builds (deadlock-api; js/builds.js)
 
@@ -39,8 +40,8 @@ async function route() {
     return;
   }
   window.scrollTo({ top: 0 });
-  const nav = { build: "builds", builds: "builds", following: "following", about: "about", match: "home" }[parts[0]]
-    ?? (parts[0] === "player" && people().includes(parts[1]) ? "following" : parts[0] || "home");
+  const nav = { build: "search", builds: "search", search: "search", following: "following", about: "about" }[parts[0]]
+    ?? (parts[0] === "player" ? (people().includes(parts[1]) ? "following" : "search") : parts[0] || "home");
   for (const a of document.querySelectorAll("[data-nav]")) a.classList.toggle("on", a.dataset.nav === nav);
 
   if (parts[0] === "match" && parts[1]) {
@@ -54,10 +55,16 @@ async function route() {
     S.view = "player";
     const { viewPlayer } = await import("./player.js");
     await viewPlayer(acc, params);
+  } else if (parts[0] === "players") {
+    location.replace(params.get("q") ? `#/search?p=${encodeURIComponent(params.get("q"))}` : "#/following");
   } else if (parts[0] === "following") {
     S.view = "following";
     const { viewFollowing } = await import("./player.js");
-    await viewFollowing();
+    await viewFollowing(params);
+  } else if (parts[0] === "search") {
+    S.view = "search";
+    const { viewSearch } = await import("./search.js");
+    await viewSearch(params);
   } else if (parts[0] === "builds" || parts[0] === "build") {
     // loaded on demand: only these pages talk to deadlock-api
     S.view = "builds";

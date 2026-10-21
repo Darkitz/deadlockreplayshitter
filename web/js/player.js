@@ -1,6 +1,6 @@
 // A player: Steam name + avatar (from deadlock-api), and two tabs: their last matches (with demo
-// sync, js/sync.js) and the builds they published (js/builds.js). Plus #/following: you and the
-// players you follow, with one merged match feed.
+// sync, js/sync.js) and the builds they published (js/builds.js). Plus (finding players
+// is js/search.js), and #/following: you + the players you follow with one merged match feed.
 //
 //   #/player/<account id>[?tab=matches|builds]
 //   #/following
@@ -9,7 +9,7 @@ import { $, esc, S } from "./ui.js";
 import { getProfile, getProfiles } from "./builds/api.js";
 import { renderPlayerBuilds } from "./builds.js";
 import { renderMatches } from "./sync.js";
-import { storedAccount, setStoredAccount, isFollowed, setFollowed, people } from "./account.js";
+import { storedAccount, setStoredAccount, isFollowed, setFollowed, people, toAccount } from "./account.js";
 
 const STEAM64_BASE = 76561197960265728n;
 
@@ -27,7 +27,7 @@ export async function viewPlayer(acc, params) {
         <div class="muted small pl-sub">
           account ${esc(acc)} · <a href="https://steamcommunity.com/profiles/${steam64}" target="_blank" rel="noopener">Steam profile</a>
           · <button class="chip-s pl-me" data-help="Remember as you&#10;Stored in this browser only. Your avatar in the top bar then leads to you and the players you follow.">${storedAccount() === String(acc) ? "this is you · forget" : "this is me"}</button>
-          ${storedAccount() === String(acc) ? "" : `<button class="chip-s pl-follow ${isFollowed(acc) ? "on" : ""}" data-help="Follow&#10;Their matches join yours on the Following page (top bar). Stored in this browser only.">${isFollowed(acc) ? "★ following" : "☆ follow"}</button>`}
+          ${storedAccount() === String(acc) ? "" : `<button class="chip-s pl-follow ${isFollowed(acc) ? "on" : ""}" data-help="Follow&#10;Their matches join yours on the Following page. Stored in this browser only.">${isFollowed(acc) ? "★ following" : "☆ follow"}</button>`}
         </div>
       </div>
     </section>
@@ -62,28 +62,43 @@ export async function viewPlayer(acc, params) {
   else renderMatches(body, acc);
 }
 
-/** you and the players you follow: who they are, and one merged feed of their last matches */
-export async function viewFollowing() {
+/** what the search box got: an account (open it), a vanity name (/id/<name>), or a name */
+export function parsePlayerQuery(raw) {
+  const s = String(raw || "").trim();
+  const profile = s.match(/steamcommunity\.com\/profiles\/(\d+)/)?.[1] ?? s.match(/^\[?U:1:(\d+)\]?$/i)?.[1];
+  if (profile && toAccount(profile)) return { acc: toAccount(profile) };
+  const vanity = s.match(/steamcommunity\.com\/id\/([^/?#\s]+)/)?.[1];
+  if (vanity) return { vanity: decodeURIComponent(vanity) };
+  if (/^\d{1,20}$/.test(s) && toAccount(s)) return { acc: toAccount(s) };
+  return s ? { name: s } : null;
+}
+
+const followBtn = (acc) => storedAccount() === String(acc) ? `<span class="chip-s on">you</span>`
+  : `<button class="chip-s pl-follow ${isFollowed(acc) ? "on" : ""}" data-follow="${esc(acc)}">${isFollowed(acc) ? "★ following" : "☆ follow"}</button>`;
+
+/** Following: you and the players you follow, with one merged feed of their last matches */
+export async function viewFollowing(params) {
   const app = $("#app");
   const accs = people();
   const me = storedAccount();
   document.title = "Following · DLDI";
-  app.innerHTML = `
-    <section class="pl-head"><div class="pl-text">
-      <h2 class="pl-name">Following</h2>
-      <div class="muted small">${me ? "You and the players you follow" : "Players you follow"}: their last matches in one list.
-        Follow someone with ☆ on their player page (scoreboard names lead there). Kept in this browser only.</div>
-    </div></section>
+  app.innerHTML = `<div class="pl-page">
+    <h2 class="pl-name">Following</h2>
+    <p class="muted small">You and the players you follow, with their last matches in one list. Find players with <a href="#/search">Search</a>.</p>
     <section class="fl-people">${accs.map((a) => `
       <a class="fl-chip" href="#/player/${a}" data-acc="${a}"><img alt="" hidden><span>${a === me ? "you" : esc(a)}</span>${a === me ? "" : `<button class="fl-unfollow" data-unfollow="${a}" data-help="Unfollow">×</button>`}</a>`).join("")
-      || `<p class="muted">Nobody yet. Open a player's page (click a name on a match scoreboard) and press ☆ follow, or remember yourself with “this is me”.</p>`}</section>
-    <section class="pl-body"></section>`;
-  $(".fl-people", app).addEventListener("click", (ev) => {
-    const b = ev.target.closest("[data-unfollow]");
-    if (!b) return;
+      || `<p class="muted">Nobody yet. Find someone with <a href="#/search">Search</a> (or click a name on a match scoreboard) and press ☆ follow; remember yourself with “this is me” on your own page. Kept in this browser only.</p>`}</section>
+    <section class="pl-body"></section></div>`;
+  $(".pl-page", app).addEventListener("click", (ev) => {
+    const un = ev.target.closest("[data-unfollow]");
+    const fo = ev.target.closest("[data-follow]");
+    if (!un && !fo) return;
     ev.preventDefault();
-    setFollowed(b.dataset.unfollow, false);
-    viewFollowing();
+    if (un) { setFollowed(un.dataset.unfollow, false); viewFollowing(params); return; }
+    const on = !isFollowed(fo.dataset.follow);
+    setFollowed(fo.dataset.follow, on);
+    fo.classList.toggle("on", on);
+    fo.textContent = on ? "★ following" : "☆ follow";
   });
   getProfiles(accs).then((ps) => {
     for (const chip of app.querySelectorAll(".fl-chip")) {

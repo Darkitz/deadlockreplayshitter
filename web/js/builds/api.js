@@ -210,3 +210,25 @@ export async function getProfiles(ids) {
   return out;
 }
 export const getProfile = async (id) => (await getProfiles([id]))[String(id)] ?? null;
+
+/** players by Steam name (or vanity / account id), best matches first: [{acc, name, avatar, url, played30}] */
+export async function searchPlayers(query, limit = 24) {
+  const rows = (await getJson(`${API}/players/steam-search?search_query=${encodeURIComponent(query)}&limit=${limit}`)) ?? [];
+  return rows.map((r) => {
+    const p = { name: r.personaname || null, avatar: r.avatarmedium || r.avatar || null, avatar_full: r.avatarfull || null, url: r.profileurl || null };
+    store.set(`steam:${r.account_id}`, p);
+    return { acc: String(r.account_id), played30: r.matches_played_last_30d ?? null, ...p };
+  });
+}
+
+/** a build from the search index by id (cheap; no Valve request), or null */
+export async function findBuild(id) {
+  const row = await searchBuild(id).catch(() => null);
+  return row?.hero_build ? toValue(row) : null;
+}
+
+/** a match's summary (teams, heroes, K/D/A, result) from deadlock-api, or null */
+export async function matchInfo(id) {
+  const rows = (await getJson(`${API}/matches/metadata?match_ids=${id}&include_info=true&include_player_info=true`)) ?? [];
+  return rows.find((r) => String(r.match_id) === String(id)) ?? null;
+}

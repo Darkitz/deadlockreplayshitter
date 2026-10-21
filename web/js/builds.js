@@ -10,7 +10,7 @@
 //   #/builds/<account>          redirects to the player page's builds tab (#/player/<id>?tab=builds)
 
 import { $, S, esc, itemHelp } from "./ui.js";
-import { Cooldown, getBuild, getPlayer, parseAccount, withMeta } from "./builds/api.js";
+import { Cooldown, getBuild, getPlayer, parseAccount, withMeta, getProfile } from "./builds/api.js";
 
 const app = () => $("#app");
 let renderId = 0; // drops results of navigations that were superseded
@@ -72,13 +72,12 @@ export function lookupHash(raw) {
   if (steam && parseAccount(steam)) return `#/player/${parseAccount(steam)}?tab=builds`;
   if (/^\d{11,}$/.test(id) && parseAccount(id)) return `#/player/${parseAccount(id)}?tab=builds`; // SteamID64
   if (/^\d{1,10}$/.test(id) && Number(id) <= 0xffffffff) return `#/build/${id}`;
-  if (/steamcommunity\.com\/id\//.test(s)) return "vanity";
-  return null;
+  // names and /id/<name> links: the player search
+  return s ? `#/search?p=${encodeURIComponent(s)}` : null;
 }
 
 function go(raw) {
   const hash = lookupHash(raw);
-  if (hash === "vanity") return toast("Custom profile URLs can't be resolved here. Use the /profiles/7656… link or SteamID64");
   if (!hash) return toast("Enter a build ID, SteamID64 or Steam profile link");
   if (location.hash === hash) viewBuilds(hash.slice(2).split("/"), new URLSearchParams());
   else location.hash = hash;
@@ -87,7 +86,7 @@ function go(raw) {
 /** the lookup box (builds landing page) */
 function lookupForm(big) {
   return `<form class="bp-lookup ${big ? "big" : ""}">
-    <input type="search" placeholder="Build ID, SteamID64 or Steam profile link" autocomplete="off" spellcheck="false" aria-label="build ID or player">
+    <input type="search" placeholder="Build ID, player name, Steam link or SteamID" autocomplete="off" spellcheck="false" aria-label="build ID or player">
     <button class="btn primary">${big ? "get builds" : "go"}</button>
   </form>`;
 }
@@ -319,7 +318,7 @@ async function showBuild(id, version, params, preloaded) {
         <h2>${esc(build.name || "Untitled build")}</h2>
         <div class="bp-sub"><b>${esc(hero.name)}</b> · #${build.hero_build_id} v${build.version}${updated ? ` · updated ${updated}` : ""}
           · ★ ${stats.favorites.toLocaleString()} favorites
-          ${build.author_account_id ? ` · <a href="#/player/${build.author_account_id}?tab=builds">all builds by this author</a>` : ""}</div>
+          ${build.author_account_id ? ` · by <a class="bp-author" href="#/player/${build.author_account_id}?tab=builds" data-help="The creator&#10;Their page: matches and all their builds"><img alt="" hidden><span>player ${build.author_account_id}</span></a>` : ""}</div>
         ${hint?.player ? `<p class="note bp-from-match">${esc(hint.player)} played this build in the match you came from.</p>` : ""}
         ${build.description ? `<p class="bp-desc">${esc(build.description)}</p>` : ""}
         ${version ? `<p class="note">Old version ${esc(version)}. <a href="#/build/${id}">Show latest</a></p>` : refreshHTML}
@@ -358,6 +357,14 @@ async function showBuild(id, version, params, preloaded) {
       <button type="button" class="btn small sel-clear">clear</button>
     </div>`;
 
+  if (build.author_account_id) {
+    getProfile(build.author_account_id).then((p) => {
+      const a = root.querySelector(".bp-author");
+      if (!p || !a?.isConnected) return;
+      if (p.name) a.querySelector("span").textContent = p.name;
+      if (p.avatar) Object.assign(a.querySelector("img"), { src: p.avatar, hidden: false });
+    }).catch(() => {});
+  }
   root.querySelector(".bp-string").addEventListener("focus", (e) => e.target.select());
   root.querySelector(".bp-copy").addEventListener("click", () => copy(share, "Share string"));
   root.querySelector(".bp-link").addEventListener("click", () => copy(pageUrl(hash), "Link"));

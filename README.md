@@ -118,6 +118,12 @@ Module workers and WebAssembly need http, not `file://`:
 python3 -m http.server -d web 8000     # http://localhost:8000
 ```
 
+### Search and following
+
+**Search** (top bar) has one bar each for players (Steam name, profile link, SteamID), builds
+(id) and matches (id), all looked up on deadlock-api. **Following** lists you and the players you
+follow (☆ on their page) with one merged feed of their last matches.
+
 ### Player pages: last matches and builds
 
 `#/player/<SteamID64 or account id>` shows a player's Steam name and avatar and two tabs:
