@@ -3,7 +3,7 @@
 // is js/search.js), and #/following: you + the players you follow with one merged match feed.
 //
 //   #/player/<account id>[?tab=matches|builds]
-//   #/following
+//   #/following[?list=<base36 ids, dot-separated>]   (a shared follow list to import)
 
 import { $, esc, S } from "./ui.js";
 import { getProfile, getProfiles } from "./builds/api.js";
@@ -77,19 +77,33 @@ const followBtn = (acc) => storedAccount() === String(acc) ? `<span class="chip-
   : `<button class="chip-s pl-follow ${isFollowed(acc) ? "on" : ""}" data-follow="${esc(acc)}">${isFollowed(acc) ? "★ following" : "☆ follow"}</button>`;
 
 /** Following: you and the players you follow, with one merged feed of their last matches */
+// a follow list as a link: account ids in base36, dot-separated (short enough to paste anywhere)
+const encodeList = (accs) => accs.map((a) => Number(a).toString(36)).join(".");
+const decodeList = (s) => [...new Set(String(s || "").split(".").map((x) => parseInt(x, 36)).filter((n) => n > 0 && n <= 0xffffffff).map(String))];
+
 export async function viewFollowing(params) {
   const app = $("#app");
   const accs = people();
   const me = storedAccount();
+  const shared = decodeList(params.get("list"));
+  if (shared.length) return viewSharedList(shared);
   document.title = "Following · DLDI";
   app.innerHTML = `<div class="pl-page">
-    <h2 class="pl-name">Following</h2>
+    <div class="fl-head"><h2 class="pl-name">Following</h2>
+      ${accs.length ? `<button class="btn small" data-share data-help="Share your follow list&#10;Copies a link with these players (you included). Whoever opens it can follow them too.">share list</button>` : ""}</div>
     <p class="muted small">You and the players you follow, with their last matches in one list. Find players with <a href="#/search">Search</a>.</p>
     <section class="fl-people">${accs.map((a) => `
       <a class="fl-chip" href="#/player/${a}" data-acc="${a}"><img alt="" hidden><span>${a === me ? "you" : esc(a)}</span>${a === me ? "" : `<button class="fl-unfollow" data-unfollow="${a}" data-help="Unfollow">×</button>`}</a>`).join("")
       || `<p class="muted">Nobody yet. Find someone with <a href="#/search">Search</a> (or click a name on a match scoreboard) and press ☆ follow; remember yourself with “this is me” on your own page. Kept in this browser only.</p>`}</section>
     <section class="pl-body"></section></div>`;
-  $(".pl-page", app).addEventListener("click", (ev) => {
+  $(".pl-page", app).addEventListener("click", async (ev) => {
+    if (ev.target.closest("[data-share]")) {
+      const b = ev.target.closest("[data-share]");
+      const link = `${location.origin}${location.pathname}#/following?list=${encodeList(accs)}`;
+      try { await navigator.clipboard.writeText(link); b.textContent = "link copied ✓"; } catch { prompt("Copy this link:", link); }
+      setTimeout(() => { b.textContent = "share list"; }, 2000);
+      return;
+    }
     const un = ev.target.closest("[data-unfollow]");
     const fo = ev.target.closest("[data-follow]");
     if (!un && !fo) return;
@@ -109,4 +123,44 @@ export async function viewFollowing(params) {
     }
   }).catch(() => {});
   if (accs.length) renderMatches($(".pl-body", app), accs);
+}
+
+/** a shared follow list (#/following?list=…): just those players and one big "follow all" */
+function viewSharedList(shared) {
+  const app = $("#app");
+  const me = storedAccount();
+  document.title = "Shared follow list · DLDI";
+  const todo = () => shared.filter((a) => a !== me && !isFollowed(a));
+  app.innerHTML = `<div class="fl-wrap"></div>`;
+  const wrap = $(".fl-wrap", app);
+  const draw = () => {
+    const n = todo().length;
+    wrap.innerHTML = `<div class="fl-shared">
+      <h2 class="pl-name">Shared follow list</h2>
+      <p class="muted">${shared.length} player${shared.length === 1 ? "" : "s"}. Follow them to see their last matches together on your Following page (kept in this browser only).</p>
+      <div class="fl-cards">${shared.map((a) => `
+        <div class="fl-card" data-acc="${a}">
+          <a href="#/player/${a}"><img alt="" hidden><b>${esc(a)}</b></a>
+          ${a === me ? `<span class="muted small">you</span>` : `<button class="sr-star ${isFollowed(a) ? "on" : ""}" data-follow="${a}" aria-label="follow">${isFollowed(a) ? "★" : "☆"}</button>`}
+        </div>`).join("")}</div>
+      ${n ? `<button class="btn primary fl-all" data-all>★ Follow all ${n}</button>` : `<p class="fl-done">You follow everyone on this list.</p>`}
+      <a class="muted small" href="#/following">your Following page →</a>
+    </div>`;
+    getProfiles(shared).then((ps) => {
+      for (const card of wrap.querySelectorAll(".fl-card")) {
+        const p = ps[card.dataset.acc];
+        if (p?.avatar) Object.assign(card.querySelector("img"), { src: p.avatar_full || p.avatar, hidden: false });
+        if (p?.name) card.querySelector("b").textContent = p.name;
+      }
+    }).catch(() => {});
+  };
+  draw();
+  wrap.addEventListener("click", (ev) => {
+    const fo = ev.target.closest("[data-follow]");
+    if (fo) { setFollowed(fo.dataset.follow, !isFollowed(fo.dataset.follow)); draw(); return; }
+    if (ev.target.closest("[data-all]")) {
+      for (const a of todo()) setFollowed(a, true);
+      location.hash = "#/following";
+    }
+  });
 }
